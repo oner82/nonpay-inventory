@@ -31,26 +31,42 @@ const db = getFirestore(app);
 const remoteRef = doc(db, "app", "main");
 const LS='nonpay_inventory_v1_firebase';
 const tabs=['대시보드','사용입력','당일현황','입고관리','랜딩입고체크','선호비급여','통계','제품설정','백업'];
-const seedBase={products:[],doctors:['김원장','박원장','이원장'],surgeries:['RCR','Spine fusion','ACL reconstruction','Hallux','Fracture fixation'],prefs:[{doctor:'김원장',surgery:'RCR',items:['NP001','NP002']},{doctor:'박원장',surgery:'Spine fusion',items:['NP003']}],uses:[],inbounds:[],landingChecks:[],logs:[]};
+const seedBase={doctors:['김원장','박원장','이원장'],surgeries:['RCR','Spine fusion','ACL reconstruction','Hallux','Fracture fixation'],prefs:[{doctor:'김원장',surgery:'RCR',items:['NP001','NP002']},{doctor:'박원장',surgery:'Spine fusion',items:['NP003']}],uses:[],inbounds:[],landingChecks:[],logs:[]};
 
-const seed=await buildSeed();
 let state=loadLocal(), current='대시보드', ready=false;
 
-async function buildSeed(){
+async function loadProductsDB(){
+  const res=await fetch('./products-db.json',{cache:'no-store'});
+  if(!res.ok) throw new Error('products-db.json load failed');
+  const products=await res.json();
+  if(!Array.isArray(products)) throw new Error('products-db.json is not an array');
+  return products;
+}
+function loadLocal(){try{return JSON.parse(localStorage.getItem(LS))||structuredClone(seedBase)}catch(e){return structuredClone(seedBase)}}
+function setStatus(t){document.getElementById('syncStatus').textContent=t}
+async function loadRemote(){
   try{
-    const res=await fetch('./products-db.json',{cache:'no-store'});
-    if(!res.ok) throw new Error('products-db.json load failed');
-    const products=await res.json();
-    if(!Array.isArray(products)) throw new Error('products-db.json is not an array');
-    return {...seedBase,products};
+    const products=await loadProductsDB();
+    const snap=await getDoc(remoteRef);
+    if(snap.exists()){
+      const remoteState=snap.data().state||{};
+      state={...structuredClone(seedBase),...remoteState,products};
+      await setDoc(remoteRef,{state,updatedAt:new Date().toISOString()});
+      localStorage.setItem(LS,JSON.stringify(state));
+      setStatus('Firebase 연결됨 · 제품DB 동기화 완료');
+    }else{
+      state={...structuredClone(seedBase),...state,products};
+      await setDoc(remoteRef,{state,updatedAt:new Date().toISOString()});
+      localStorage.setItem(LS,JSON.stringify(state));
+      setStatus('Firebase 연결됨 · 초기 데이터 생성됨');
+    }
+    ready=true;
+    render();
   }catch(e){
     console.error(e);
-    return structuredClone(seedBase);
+    setStatus('Firebase/제품DB 연결 실패 · 현재 기기 저장으로 작동');
   }
 }
-function loadLocal(){try{return JSON.parse(localStorage.getItem(LS))||structuredClone(seed)}catch(e){return structuredClone(seed)}}
-function setStatus(t){document.getElementById('syncStatus').textContent=t}
-async function loadRemote(){try{const snap=await getDoc(remoteRef);if(snap.exists()){state=snap.data().state||state;localStorage.setItem(LS,JSON.stringify(state));setStatus('Firebase 연결됨 · 공용 데이터 불러옴')}else{await setDoc(remoteRef,{state,updatedAt:new Date().toISOString()});setStatus('Firebase 연결됨 · 초기 데이터 생성됨')}ready=true;render()}catch(e){console.error(e);setStatus('Firebase 연결 실패 · 현재 기기 저장으로 작동')}}
 async function save(){localStorage.setItem(LS,JSON.stringify(state));try{await setDoc(remoteRef,{state,updatedAt:new Date().toISOString()});setStatus('Firebase 저장 완료 '+new Date().toLocaleTimeString('ko-KR'))}catch(e){console.error(e);setStatus('Firebase 저장 실패 · 현재 기기만 저장됨')}checkWarns()}
 function id(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function today(){return new Date().toISOString().slice(0,10)}
@@ -90,7 +106,7 @@ window.addProduct=async()=>{if(!prName.value.trim())return alert('제품명을 �
 function screenBackup(s){s.innerHTML=`<div class="card"><h2>백업/복원</h2><button class="primary" onclick="backup()">백업 JSON 다운로드</button><button onclick="loadRemote()">Firebase 새로고침</button><br><br><textarea id="restoreText" rows="8" placeholder="백업 JSON을 붙여넣고 복원"></textarea><button onclick="restore()">복원</button><button class="danger" onclick="resetAll()">초기화</button></div><div class="card"><h2>작업 로그</h2><table><tbody>${state.logs.slice().reverse().slice(0,50).map(x=>`<tr><td>${x.at}</td><td>${x.type}</td><td>${x.text}</td></tr>`).join('')||'<tr><td>로그 없음</td></tr>'}</tbody></table></div>`}
 window.backup=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));a.download='nonpay_backup.json';a.click()}
 window.restore=async()=>{try{state=JSON.parse(restoreText.value);await save();render();toast('복원 완료')}catch(e){alert('JSON 형식이 아닙니다.')}}
-window.resetAll=async()=>{if(confirm('모든 데이터를 초기화할까요?')){state=structuredClone(seed);await save();render()}}
+window.resetAll=async()=>{if(confirm('모든 데이터를 초기화할까요?')){state=structuredClone(seedBase);await save();render()}}
 function warnList(){const arr=state.products.filter(x=>x.alert&&Number(x.stock||0)<=Number(x.warn||0));return arr.map(x=>`<div class="warn">${x.cat} · ${x.name}: 현재 ${x.stock} / 경고 ${x.warn}</div>`).join('')||'<div class="ok">경고 제품 없음</div>'}
 function checkWarns(){const arr=state.products.filter(x=>x.alert&&Number(x.stock||0)<=Number(x.warn||0));if(arr.length)console.warn('재고 경고',arr)}
 window.loadRemote=loadRemote;
