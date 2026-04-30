@@ -1,0 +1,15 @@
+[
+  {
+    "id": "NP001",
+    "cat": "비급여",
+    "vendor": "비급여",
+    "name": "floseal",
+    "type": "구매",
+    "stock": 0,
+    "proper": 120,
+    "landing": 0,
+    "warn": 24,
+    "alert": true,
+    "active": true
+  }
+]
