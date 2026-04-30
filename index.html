@@ -48,9 +48,10 @@ async function buildSeed(){
     return structuredClone(seedBase);
   }
 }
-function loadLocal(){try{return JSON.parse(localStorage.getItem(LS))||structuredClone(seed)}catch(e){return structuredClone(seed)}}
+function normalizeState(data={}){const base=structuredClone(seedBase);return {...base,...data,products:structuredClone(seed.products)}}
+function loadLocal(){try{return normalizeState(JSON.parse(localStorage.getItem(LS))||structuredClone(seed))}catch(e){return structuredClone(seed)}}
 function setStatus(t){document.getElementById('syncStatus').textContent=t}
-async function loadRemote(){try{const snap=await getDoc(remoteRef);if(snap.exists()){state=snap.data().state||state;localStorage.setItem(LS,JSON.stringify(state));setStatus('Firebase 연결됨 · 공용 데이터 불러옴')}else{await setDoc(remoteRef,{state,updatedAt:new Date().toISOString()});setStatus('Firebase 연결됨 · 초기 데이터 생성됨')}ready=true;render()}catch(e){console.error(e);setStatus('Firebase 연결 실패 · 현재 기기 저장으로 작동')}}
+async function loadRemote(){try{const snap=await getDoc(remoteRef);if(snap.exists()){state=normalizeState(snap.data().state||state);localStorage.setItem(LS,JSON.stringify(state));await setDoc(remoteRef,{state,updatedAt:new Date().toISOString()});setStatus('Firebase 연결됨 · products-db 기준 제품 동기화 완료')}else{state=normalizeState(state);await setDoc(remoteRef,{state,updatedAt:new Date().toISOString()});localStorage.setItem(LS,JSON.stringify(state));setStatus('Firebase 연결됨 · 초기 데이터 생성됨')}ready=true;render()}catch(e){console.error(e);setStatus('Firebase 연결 실패 · 현재 기기 저장으로 작동')}}
 async function save(){localStorage.setItem(LS,JSON.stringify(state));try{await setDoc(remoteRef,{state,updatedAt:new Date().toISOString()});setStatus('Firebase 저장 완료 '+new Date().toLocaleTimeString('ko-KR'))}catch(e){console.error(e);setStatus('Firebase 저장 실패 · 현재 기기만 저장됨')}checkWarns()}
 function id(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function today(){return new Date().toISOString().slice(0,10)}
