@@ -31,18 +31,23 @@ const db = getFirestore(app);
 const remoteRef = doc(db, "app", "main");
 const LS='nonpay_inventory_v1_firebase';
 const tabs=['대시보드','사용입력','당일현황','입고관리','랜딩입고체크','선호비급여','통계','제품설정','백업'];
-const seed={products:[
-{id:'NP001',cat:'비급여',vendor:'비급여',name:'Tendoregen',type:'구매',stock:10,proper:10,warn:3,alert:true,active:true},
-{id:'NP002',cat:'비급여',vendor:'비급여',name:'Floseal',type:'구매',stock:8,proper:8,warn:2,alert:true,active:true},
-{id:'NP003',cat:'비급여',vendor:'비급여',name:'Mediclore',type:'구매',stock:6,proper:6,warn:2,alert:true,active:true},
-{id:'DBM001',cat:'DBM',vendor:'Orthoblast',name:'인체조직 1cc',type:'랜딩',stock:5,landing:5,warn:1,alert:true,active:true},
-{id:'DBM002',cat:'DBM',vendor:'Orthoblast',name:'인체조직 3cc',type:'랜딩',stock:5,landing:5,warn:1,alert:true,active:true},
-{id:'DBM003',cat:'DBM',vendor:'BoneGrow',name:'인체조직 5cc',type:'랜딩',stock:4,landing:4,warn:1,alert:true,active:true},
-{id:'AN001',cat:'ANCHOR',kind:'Suture Anchor',vendor:'Depuy',name:'Healix Advance',type:'랜딩',stock:6,landing:6,warn:2,alert:true,active:true},
-{id:'AN002',cat:'ANCHOR',kind:'Knotless',vendor:'Arthrex',name:'SwiveLock',type:'랜딩',stock:6,landing:6,warn:2,alert:true,active:true},
-{id:'AN003',cat:'ANCHOR',kind:'Small Joint',vendor:'Zimmer',name:'JuggerKnot',type:'랜딩',stock:5,landing:5,warn:1,alert:true,active:true}
-],doctors:['김원장','박원장','이원장'],surgeries:['RCR','Spine fusion','ACL reconstruction','Hallux','Fracture fixation'],prefs:[{doctor:'김원장',surgery:'RCR',items:['NP001','NP002']},{doctor:'박원장',surgery:'Spine fusion',items:['NP003']}],uses:[],inbounds:[],landingChecks:[],logs:[]};
+const seedBase={products:[],doctors:['김원장','박원장','이원장'],surgeries:['RCR','Spine fusion','ACL reconstruction','Hallux','Fracture fixation'],prefs:[{doctor:'김원장',surgery:'RCR',items:['NP001','NP002']},{doctor:'박원장',surgery:'Spine fusion',items:['NP003']}],uses:[],inbounds:[],landingChecks:[],logs:[]};
+
+const seed=await buildSeed();
 let state=loadLocal(), current='대시보드', ready=false;
+
+async function buildSeed(){
+  try{
+    const res=await fetch('./products-db.json',{cache:'no-store'});
+    if(!res.ok) throw new Error('products-db.json load failed');
+    const products=await res.json();
+    if(!Array.isArray(products)) throw new Error('products-db.json is not an array');
+    return {...seedBase,products};
+  }catch(e){
+    console.error(e);
+    return structuredClone(seedBase);
+  }
+}
 function loadLocal(){try{return JSON.parse(localStorage.getItem(LS))||structuredClone(seed)}catch(e){return structuredClone(seed)}}
 function setStatus(t){document.getElementById('syncStatus').textContent=t}
 async function loadRemote(){try{const snap=await getDoc(remoteRef);if(snap.exists()){state=snap.data().state||state;localStorage.setItem(LS,JSON.stringify(state));setStatus('Firebase 연결됨 · 공용 데이터 불러옴')}else{await setDoc(remoteRef,{state,updatedAt:new Date().toISOString()});setStatus('Firebase 연결됨 · 초기 데이터 생성됨')}ready=true;render()}catch(e){console.error(e);setStatus('Firebase 연결 실패 · 현재 기기 저장으로 작동')}}
