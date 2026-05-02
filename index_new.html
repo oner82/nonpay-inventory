@@ -1,0 +1,3547 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>수술실 재고관리</title>
+  <style>
+
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --ink: #122033;
+      --muted: #6b7a90;
+      --line: #e1e8f2;
+      --brand: #2f6fd6;
+      --brand-dark: #1f4f99;
+      --nav: #f8fbff;
+      --nav-2: #eef4ff;
+      --warn: #ffb05c;
+      --danger: #ff6b6b;
+      --ok: #23c483;
+      --soft: #edf4ff;
+      --shadow: 0 12px 32px rgba(22, 39, 74, 0.08);
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+      border-bottom: 1px solid #dbe7f5;
+      box-shadow: 0 10px 24px rgba(31, 79, 153, 0.10);
+    }
+
+    .topbar { padding: 12px 12px 8px; }
+
+    .brand {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 120px;
+      gap: 12px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .brand-logo {
+      display: block;
+      justify-self: end;
+      width: 120px;
+      height: auto;
+      border-radius: 10px;
+      background: transparent;
+      padding: 0;
+      box-shadow: none;
+      filter: drop-shadow(0 1px 0 rgba(255,255,255,.65));
+    }
+
+    .brand-title { min-width: 0; }
+
+    h1 {
+      margin: 0;
+      font-size: 17px;
+      line-height: 1.22;
+      color: #122033;
+      letter-spacing: -0.04em;
+      word-break: keep-all;
+    }
+
+    .brand-subtitle {
+      margin-top: 3px;
+      color: #5f6f86;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .01em;
+    }
+
+    #status {
+      min-height: 22px;
+      color: #5f6f86;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    #status.ok { color: #1f7a4d; }
+    #status.error { color: #c2410c; }
+
+    #nav {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 10px 0 12px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .tab {
+      display: flex;
+      align-items: center;
+      flex: 0 0 auto;
+      min-height: 42px;
+      padding: 0 14px;
+      border: 1px solid #d7e2ef;
+      border-radius: 10px;
+      background: rgba(255,255,255,.72);
+      color: #2e405c;
+      font-size: 14px;
+      font-weight: 850;
+      cursor: pointer;
+    }
+
+    .tab.active {
+      border-color: rgba(47,111,214,.25);
+      background: linear-gradient(135deg, #3b82f6, #255ec4);
+      color: #fff;
+      box-shadow: 0 10px 24px rgba(30, 113, 216, .28);
+    }
+
+    main {
+      max-width: 1420px;
+      margin: 0 auto;
+      padding: 18px 14px 48px;
+    }
+
+    .page-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin: -4px 0 18px;
+      padding: 16px 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,.88);
+      box-shadow: var(--shadow);
+    }
+
+    .page-head h2 { margin: 0; font-size: 23px; letter-spacing: -0.04em; }
+
+    .page-user { color: var(--muted); font-size: 13px; font-weight: 850; text-align: right; }
+    .view { display: none; }
+    .view.active { display: block; }
+
+    .grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .card h2, .card h3 { margin: 0 0 14px; font-size: 18px; letter-spacing: -0.03em; }
+
+    .stat {
+      position: relative;
+      min-height: 116px;
+      padding: 22px 18px 18px 92px;
+      display: grid;
+      align-content: center;
+      overflow: hidden;
+    }
+
+    .stat::before {
+      content: attr(data-icon);
+      position: absolute;
+      left: 24px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: grid;
+      place-items: center;
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #71ddd4, #35b7c6);
+      color: #fff;
+      font-size: 22px;
+      font-weight: 950;
+      box-shadow: 0 14px 26px rgba(47, 128, 237, .20);
+    }
+    .stat:nth-child(2)::before { background: linear-gradient(135deg, #5aa7ff, #2e7df3); }
+    .stat:nth-child(3)::before { background: linear-gradient(135deg, #ffc46b, #ff9e42); }
+    .stat:nth-child(4)::before { background: linear-gradient(135deg, #ff8b8b, #f05252); }
+    .stat strong { display: block; font-size: 31px; line-height: 1.05; letter-spacing: -0.04em; }
+    .stat span, .muted { color: var(--muted); font-size: 14px; }
+
+    label { display: block; margin: 12px 0 6px; color: var(--muted); font-size: 14px; font-weight: 850; }
+    input, select, textarea {
+      width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+      background: #fff; color: var(--ink); font: inherit; outline: none;
+      box-shadow: inset 0 1px 0 rgba(16, 35, 63, .02);
+    }
+    input:focus, select:focus, textarea:focus { border-color: #9bc6ff; box-shadow: 0 0 0 4px rgba(31, 122, 224, .10); }
+    textarea { min-height: 170px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; }
+    button {
+      min-height: 46px; padding: 0 15px; border: 0; border-radius: 10px;
+      background: linear-gradient(135deg, #2f8df4, #176bd2); color: #fff; font-size: 14px; font-weight: 900;
+      cursor: pointer; box-shadow: 0 10px 20px rgba(24, 108, 210, .18);
+    }
+    button.secondary { border: 1px solid var(--line); background: #fff; color: var(--ink); box-shadow: none; }
+    button.danger { background: var(--danger); }
+    button.warn { background: var(--warn); }
+    .row { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 12px; }
+
+    .dashboard-shell { display: grid; gap: 16px; }
+    .dashboard-content { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    .dashboard-left, .dashboard-right { display: grid; gap: 16px; align-content: start; }
+    .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+    .toolbar select, .toolbar input { width: auto; min-width: 160px; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+    table.inventory-table { width: 100%; border-collapse: collapse; min-width: 760px; background: #fff; }
+    .inventory-table th, .inventory-table td { padding: 13px 14px; border-bottom: 1px solid var(--line); font-size: 13px; text-align: left; white-space: nowrap; }
+    .inventory-table th { color: #53647a; background: #f8fbff; font-weight: 900; }
+    .inventory-table tr:last-child td { border-bottom: 0; }
+    .code-link { color: #1976dc; font-weight: 900; }
+    .status-chip { display: inline-flex; align-items: center; min-height: 26px; padding: 0 10px; border-radius: 8px; font-size: 12px; font-weight: 950; background: #e9fbf1; color: #18a66a; }
+    .status-chip.low { background: #ffe9e9; color: #ef4444; }
+
+    .donut-card { display: grid; grid-template-columns: 170px 1fr; gap: 16px; align-items: center; }
+    .donut {
+      width: 168px; height: 168px; border-radius: 50%;
+      background: conic-gradient(#5b7fff 0 40%, #60a5fa 40% 63%, #5ee0c2 63% 80%, #ffc067 80% 92%, #ff8484 92% 100%);
+      position: relative; margin: 0 auto;
+    }
+    .donut::after { content: attr(data-total); position: absolute; inset: 36px; border-radius: 50%; background: #fff; display: grid; place-items: center; text-align: center; color: var(--ink); font-size: 24px; font-weight: 950; white-space: pre-line; box-shadow: inset 0 0 0 1px var(--line); }
+    .legend { display: grid; gap: 10px; }
+    .legend-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #53647a; font-size: 13px; font-weight: 850; }
+    .legend-row::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: #5b7fff; flex: 0 0 auto; }
+    .legend-row:nth-child(2)::before { background: #60a5fa; }
+    .legend-row:nth-child(3)::before { background: #5ee0c2; }
+    .legend-row:nth-child(4)::before { background: #ffc067; }
+    .legend-row:nth-child(5)::before { background: #ff8484; }
+
+    .quick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .quick-btn { min-height: 86px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink); box-shadow: none; display: grid; place-items: center; gap: 6px; }
+    .quick-icon { color: var(--brand); font-size: 26px; line-height: 1; }
+
+    .settings-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 12px; }
+    .settings-tab { flex: 0 0 auto; min-height: 42px; border: 1px solid var(--line); background: #fff; color: var(--ink); }
+    .settings-tab.active { border-color: var(--brand); background: var(--brand); color: #fff; }
+
+    .receipt-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 12px; }
+    .receipt-tab { flex: 0 0 auto; min-height: 42px; border: 1px solid var(--line); background: #fff; color: var(--ink); box-shadow: none; }
+    .receipt-tab.active { border-color: var(--brand); background: var(--brand); color: #fff; }
+    .receipt-wide { width: 100%; }
+    .compact-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: nowrap; }
+    .compact-main { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 900; }
+    .compact-meta { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 800; white-space: nowrap; }
+    .compact-actions { flex: 0 0 auto; display: flex; gap: 6px; align-items: center; }
+    .compact-actions button { min-height: 34px; padding: 0 10px; font-size: 13px; border-radius: 8px; }
+    .landing-line { padding: 10px 12px; }
+    .item { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: #fff; box-shadow: 0 6px 15px rgba(16,35,63,.04); }
+    .item + .item { margin-top: 10px; }
+    details.item { padding: 0; overflow: hidden; }
+    details.item > summary { display: flex; justify-content: space-between; gap: 10px; align-items: center; min-height: 52px; padding: 12px; font-weight: 900; cursor: pointer; list-style: none; }
+    details.item > summary::-webkit-details-marker { display: none; }
+    details.item > summary::after { content: "펼치기"; color: var(--brand-dark); font-size: 13px; font-weight: 900; }
+    details.item[open] > summary::after { content: "접기"; }
+    .details-body { padding: 0 12px 12px; }
+    .landing-line { border-left: 5px solid #facc15; }
+    .landing-line.received { border-left-color: #22c55e; background: #f0fdf4; }
+    .landing-line.pending { background: #fffbeb; }
+    .landing-simple { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+    .item-title { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; margin-bottom: 8px; font-weight: 900; }
+    .pill { display: inline-flex; align-items: center; min-height: 26px; padding: 0 9px; border-radius: 999px; background: var(--soft); color: var(--brand-dark); font-size: 12px; font-weight: 900; white-space: nowrap; }
+    .pill.low { background: #fff1f2; color: var(--danger); }
+    .meta { display: grid; gap: 4px; color: var(--muted); font-size: 14px; }
+    .usage-products { display: grid; gap: 8px; margin-top: 8px; }
+    .usage-product-group { display: grid; gap: 7px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: #f8fafc; }
+    .usage-product-group.nonpay { border-color: #fb923c; background: #fff7ed; }
+    .usage-product-group.tissue { border-color: #93c5fd; background: #eff6ff; }
+    .usage-product-group.anchor { border-color: #86efac; background: #f0fdf4; }
+    .usage-product-heading { display: flex; justify-content: space-between; gap: 8px; align-items: center; color: var(--ink); font-size: 14px; font-weight: 900; }
+    .usage-product-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .usage-chip { display: inline-flex; align-items: center; min-height: 30px; padding: 5px 8px; border: 1px solid rgba(15,23,42,.08); border-radius: 10px; background: rgba(255,255,255,.78); color: var(--ink); font-size: 13px; font-weight: 800; }
+    .summary-table { display: grid; gap: 6px; }
+    .summary-row { display: grid; grid-template-columns: 1fr; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+    details.summary-row { padding: 0; overflow: hidden; }
+    details.summary-row > summary { display: grid; grid-template-columns: minmax(180px, 1fr) auto; gap: 10px; align-items: center; min-height: 46px; padding: 8px 12px; cursor: pointer; list-style: none; }
+    details.summary-row > summary::-webkit-details-marker { display: none; }
+    .summary-row.nonpay { border-color: #fb923c; background: #fff7ed; }
+    .summary-headline { min-width: 0; display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; }
+    .summary-name { color: var(--ink); font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .summary-sub { color: var(--muted); font-size: 12px; font-weight: 800; flex: 0 0 auto; }
+    .summary-metrics { display: grid; grid-template-columns: repeat(3, 86px); gap: 6px; align-items: center; }
+    .metric { min-height: 30px; padding: 4px 8px; border-radius: 999px; background: rgba(255,255,255,.88); text-align: center; border: 1px solid rgba(15,23,42,.06); }
+    .metric strong { display: inline; color: var(--ink); font-size: 15px; line-height: 1; margin-right: 4px; }
+    .metric span { display: inline; color: var(--muted); font-size: 11px; font-weight: 900; }
+    .metric.stock-ok { background: #ecfdf5; color: #047857; border-color: #bbf7d0; }
+    .metric.stock-ok strong, .metric.stock-ok span { color: #047857; }
+    .metric.stock-warn { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+    .metric.stock-warn strong, .metric.stock-warn span { color: #b45309; }
+    .metric.stock-danger { background: #fff1f2; color: #be123c; border-color: #fecdd3; }
+    .metric.stock-danger strong, .metric.stock-danger span { color: #be123c; }
+    .product-picker { display: grid; gap: 8px; margin-top: 8px; }
+    .check-card { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+    .check-card input { min-height: 24px; width: 24px; margin: 0; }
+    .check-card.rule-card { grid-template-columns: 28px 1fr 82px; }
+    .check-card.rule-card input[type="number"], .check-card.use-card input[type="number"] { width: 82px; min-height: 40px; padding: 8px; text-align: center; font-weight: 900; }
+    .check-card.use-card { grid-template-columns: 28px 1fr 82px; }
+    .toggle-line { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; cursor: pointer; font-weight: 900; }
+    .toggle-line input { width: 24px; min-height: 24px; margin: 0; flex: 0 0 auto; }
+    .empty { padding: 16px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); background: #fff; text-align: center; }
+
+
+    @media (max-width: 720px) {
+      .topbar { padding: 10px 10px 6px; }
+      .brand { grid-template-columns: minmax(0, 1fr) 88px; gap: 8px; }
+      .brand-logo { width: 88px; padding: 0; border-radius: 0; justify-self: end; }
+      h1 { font-size: 15px; line-height: 1.2; }
+      .brand-subtitle { font-size: 10px; }
+      #status { min-height: 18px; margin-top: 6px; font-size: 11px; }
+      #nav { gap: 6px; padding: 7px 0 8px; }
+      .tab { min-height: 36px; padding: 0 11px; font-size: 13px; border-radius: 9px; }
+      main { padding: 12px 8px 36px; }
+      .page-head { margin-bottom: 10px; padding: 10px; min-height: 52px; }
+      .page-head h2 { font-size: 18px; }
+      details.summary-row > summary { grid-template-columns: 1fr; gap: 6px; }
+      .summary-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .summary-headline { white-space: normal; }
+      .summary-name { white-space: normal; }
+    }
+
+    @media (min-width: 720px) {
+      h1 { font-size: 20px; }
+      main { padding: 22px 20px 56px; }
+      .grid.two { grid-template-columns: minmax(320px, .8fr) 1.2fr; align-items: start; }
+      .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .row.two { grid-template-columns: 1fr 1fr; }
+      .row.three { grid-template-columns: 1fr 1fr 1fr; }
+      .quick-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
+    @media (min-width: 1100px) {
+      body { padding-left: 260px; }
+      header { position: fixed; left: 0; top: 0; bottom: 0; width: 260px; border-right: 1px solid #dbe7f5; border-bottom: 0; }
+      .topbar { display: grid; grid-template-rows: auto auto 1fr auto; height: 100%; padding: 22px 16px; }
+      .brand { grid-template-columns: 1fr; gap: 12px; align-items: start; }
+      .brand-logo { width: 88%; max-width: 205px; padding: 0; border-radius: 0; justify-self: end; }
+      h1 { font-size: 18px; line-height: 1.28; }
+      .brand-subtitle { font-size: 12px; color: #5f6f86; }
+      #status { margin: 10px 0 22px; font-size: 12px; }
+      #nav { display: grid; align-content: start; gap: 10px; overflow: visible; padding: 0; }
+      .tab { justify-content: flex-start; width: 100%; min-height: 48px; text-align: left; padding: 0 16px; }
+      main { max-width: none; padding: 0 28px 42px; }
+      .page-head { position: sticky; top: 0; z-index: 8; margin: 0 -28px 24px; min-height: 78px; padding: 18px 28px; border-width: 0 0 1px; border-radius: 0; background: rgba(255,255,255,.95); box-shadow: 0 8px 24px rgba(22,39,74,.06); }
+      .dashboard-content { grid-template-columns: minmax(0, 1.55fr) minmax(360px, .85fr); align-items: start; }
+      .quick-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    }
+
+  
+
+    /* responsive header/sidebar fix */
+    html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
+    body { min-width: 0; }
+    header { width: 100%; }
+    .topbar { width: 100%; max-width: 100%; }
+    .brand { width: 100%; min-width: 0; }
+    .brand-title { min-width: 0; }
+    .brand-logo { flex-shrink: 0; object-fit: contain; }
+    #nav { max-width: 100%; scrollbar-width: thin; }
+    main { width: 100%; max-width: 100%; overflow-x: hidden; }
+    .card, .page-head, .table-wrap { max-width: 100%; }
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+    @media (max-width: 1099px) {
+      body { padding-left: 0 !important; }
+      header {
+        position: sticky !important;
+        left: auto !important;
+        right: auto !important;
+        top: 0 !important;
+        bottom: auto !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+        border-right: 0 !important;
+        border-bottom: 1px solid #dbe7f5 !important;
+      }
+      .topbar {
+        display: block !important;
+        height: auto !important;
+        padding: 10px 12px 8px !important;
+      }
+      .brand {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) minmax(92px, 132px) !important;
+        gap: 8px !important;
+        align-items: center !important;
+      }
+      .brand-logo {
+        width: clamp(92px, 30vw, 132px) !important;
+        max-width: 100% !important;
+        justify-self: end !important;
+      }
+      h1 { font-size: clamp(14px, 4.2vw, 18px) !important; white-space: normal !important; }
+      .brand-subtitle { font-size: clamp(10px, 3vw, 12px) !important; }
+      #status { margin-top: 8px !important; min-height: 18px !important; font-size: 12px !important; }
+      #nav {
+        display: flex !important;
+        gap: 7px !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        flex-wrap: nowrap !important;
+        width: 100% !important;
+        padding: 8px 0 10px !important;
+        -webkit-overflow-scrolling: touch !important;
+      }
+      .tab {
+        flex: 0 0 auto !important;
+        min-height: 40px !important;
+        padding: 0 14px !important;
+        font-size: 14px !important;
+        white-space: nowrap !important;
+      }
+      main { padding: 14px 8px 40px !important; }
+      .page-head { margin: 0 0 14px !important; padding: 14px 16px !important; }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+      .stat { min-height: 96px !important; padding: 18px 14px 14px 76px !important; }
+      .stat::before { left: 18px !important; width: 48px !important; height: 48px !important; }
+      .toolbar { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px !important; }
+      .toolbar select, .toolbar input, .toolbar button { width: 100% !important; min-width: 0 !important; }
+    }
+
+    @media (max-width: 520px) {
+      .brand { grid-template-columns: minmax(0, 1fr) 104px !important; }
+      .brand-logo { width: 104px !important; }
+      #status { font-size: 11px !important; }
+      .tab { min-height: 38px !important; padding: 0 12px !important; font-size: 13px !important; }
+      .stats { grid-template-columns: 1fr !important; }
+      .quick-grid { grid-template-columns: 1fr 1fr !important; }
+      .toolbar { grid-template-columns: 1fr !important; }
+      table.inventory-table { min-width: 680px !important; }
+    }
+
+    @media (min-width: 1100px) {
+      body { padding-left: 260px !important; }
+      header {
+        position: fixed !important;
+        left: 0 !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        width: 260px !important;
+        max-width: 260px !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+      }
+      .topbar {
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 100vh !important;
+        height: auto !important;
+        padding: 22px 16px !important;
+      }
+      .brand {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 14px !important;
+        align-items: start !important;
+      }
+      .brand-logo {
+        width: 210px !important;
+        max-width: 100% !important;
+        justify-self: end !important;
+      }
+      #status { margin: 14px 0 16px !important; }
+      #nav {
+        display: grid !important;
+        grid-auto-rows: minmax(46px, auto) !important;
+        align-content: start !important;
+        gap: 10px !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        width: 100% !important;
+      }
+      .tab {
+        justify-content: flex-start !important;
+        width: 100% !important;
+        min-height: 46px !important;
+        text-align: left !important;
+        padding: 0 16px !important;
+      }
+      main { max-width: none !important; padding: 0 28px 44px !important; overflow-x: hidden !important; }
+      .page-head { margin: 0 -28px 24px !important; border-radius: 0 !important; }
+    }
+
+  
+
+    /* final layout fix: desktop logo bottom, mobile menu wrap, zoom allowed */
+    html, body {
+      overflow-x: auto !important;
+      -webkit-text-size-adjust: 100% !important;
+      touch-action: auto;
+    }
+
+    @media (min-width: 1100px) {
+      body { padding-left: 260px !important; }
+      header {
+        position: fixed !important;
+        left: 0 !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        width: 260px !important;
+        max-width: 260px !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+      }
+      .topbar {
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 100vh !important;
+        height: 100vh !important;
+        padding: 22px 16px 18px !important;
+      }
+      .brand { display: contents !important; }
+      .brand-title {
+        order: 0 !important;
+        width: 100% !important;
+        margin-bottom: 10px !important;
+      }
+      h1 { font-size: 18px !important; line-height: 1.28 !important; }
+      .brand-subtitle { font-size: 12px !important; color: #5f6f86 !important; }
+      #status {
+        order: 1 !important;
+        margin: 0 0 16px !important;
+        min-height: 20px !important;
+        font-size: 12px !important;
+      }
+      #nav {
+        order: 2 !important;
+        display: grid !important;
+        grid-auto-rows: minmax(46px, auto) !important;
+        align-content: start !important;
+        gap: 10px !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        width: 100% !important;
+      }
+      .tab {
+        justify-content: flex-start !important;
+        width: 100% !important;
+        min-height: 46px !important;
+        text-align: left !important;
+        padding: 0 16px !important;
+      }
+      .brand-logo {
+        order: 3 !important;
+        display: block !important;
+        width: 154px !important;
+        max-width: 74% !important;
+        height: auto !important;
+        margin: auto auto 0 !important;
+        justify-self: auto !important;
+        align-self: center !important;
+        opacity: .96 !important;
+      }
+      main { max-width: none !important; padding: 0 28px 44px !important; overflow-x: hidden !important; }
+      .page-head { margin: 0 -28px 24px !important; border-radius: 0 !important; }
+    }
+
+    @media (max-width: 1099px) {
+      body { padding-left: 0 !important; min-width: 0 !important; }
+      header {
+        position: relative !important;
+        left: auto !important;
+        right: auto !important;
+        top: auto !important;
+        bottom: auto !important;
+        width: 100% !important;
+        max-width: none !important;
+        border-right: 0 !important;
+        border-bottom: 1px solid #dbe7f5 !important;
+      }
+      .topbar {
+        display: block !important;
+        height: auto !important;
+        padding: 10px 10px 8px !important;
+      }
+      .brand {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) clamp(82px, 24vw, 118px) !important;
+        gap: 8px !important;
+        align-items: center !important;
+      }
+      .brand-logo {
+        width: clamp(82px, 24vw, 118px) !important;
+        max-width: 100% !important;
+        justify-self: end !important;
+      }
+      h1 { font-size: clamp(14px, 3.6vw, 18px) !important; white-space: normal !important; }
+      .brand-subtitle { font-size: clamp(10px, 2.7vw, 12px) !important; }
+      #status { margin-top: 8px !important; min-height: 18px !important; font-size: 12px !important; }
+      #nav {
+        display: grid !important;
+        grid-template-columns: repeat(6, max-content) !important;
+        gap: 8px !important;
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+        width: 100% !important;
+        padding: 8px 2px 10px !important;
+        -webkit-overflow-scrolling: touch !important;
+      }
+      .tab {
+        min-height: 40px !important;
+        padding: 0 14px !important;
+        font-size: 14px !important;
+        white-space: nowrap !important;
+      }
+      main { padding: 14px 8px 40px !important; width: 100% !important; max-width: none !important; overflow-x: visible !important; }
+      .page-head { margin: 0 0 14px !important; padding: 14px 16px !important; }
+      .table-wrap { overflow-x: auto !important; }
+    }
+
+    @media (max-width: 640px) {
+      #nav {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        overflow-x: visible !important;
+      }
+      .tab {
+        justify-content: center !important;
+        min-width: 0 !important;
+        width: 100% !important;
+        padding: 0 8px !important;
+        font-size: clamp(12px, 3.3vw, 14px) !important;
+      }
+      .brand { grid-template-columns: minmax(0, 1fr) 96px !important; }
+      .brand-logo { width: 96px !important; }
+    }
+
+    @media (max-width: 380px) {
+      #nav { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+      .brand { grid-template-columns: minmax(0, 1fr) 82px !important; }
+      .brand-logo { width: 82px !important; }
+    }
+
+
+    /* mobile usability fix: allow pinch gestures and prevent menu clipping */
+    @media (max-width: 1099px) {
+      html, body {
+        overflow-x: auto !important;
+        touch-action: auto !important;
+      }
+      header {
+        overflow: visible !important;
+      }
+      #nav {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        gap: 7px !important;
+        padding: 8px 2px 12px !important;
+        scroll-snap-type: x proximity;
+      }
+      .tab {
+        flex: 0 0 auto !important;
+        width: auto !important;
+        min-width: max-content !important;
+        max-width: none !important;
+        justify-content: center !important;
+        white-space: nowrap !important;
+        scroll-snap-align: start;
+      }
+      .dashboard-shell,
+      .dashboard-content,
+      .dashboard-left,
+      .dashboard-right {
+        min-width: 0 !important;
+      }
+    }
+
+    @media (max-width: 640px) {
+      main { padding: 10px 6px 34px !important; }
+      .card { padding: 12px !important; border-radius: 12px !important; }
+      .page-head { padding: 10px 12px !important; }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+      .stat { min-height: 82px !important; padding: 14px 10px 12px 62px !important; }
+      .stat::before { left: 12px !important; width: 42px !important; height: 42px !important; font-size: 17px !important; }
+      .stat strong { font-size: 23px !important; }
+      .stat span { font-size: 12px !important; }
+      .donut-card { grid-template-columns: 1fr !important; }
+      .donut { width: 136px !important; height: 136px !important; }
+      .donut::after { inset: 29px !important; font-size: 19px !important; }
+    }
+
+    @media (max-width: 380px) {
+      .stats { grid-template-columns: 1fr !important; }
+    }
+
+  
+
+    /* dashboard mobile compact inventory fix */
+    @media (max-width: 720px) {
+      .dashboard-content {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+        width: 100% !important;
+      }
+      .dashboard-left, .dashboard-right {
+        width: 100% !important;
+        min-width: 0 !important;
+      }
+      .dashboard-left > .card, .dashboard-right > .card {
+        width: 100% !important;
+        min-width: 0 !important;
+        padding: 12px !important;
+      }
+      .dashboard-left .table-wrap {
+        overflow-x: hidden !important;
+        width: 100% !important;
+        border-radius: 10px !important;
+      }
+      .dashboard-left table.inventory-table {
+        min-width: 0 !important;
+        width: 100% !important;
+        table-layout: fixed !important;
+      }
+      .dashboard-left .inventory-table th,
+      .dashboard-left .inventory-table td {
+        padding: 8px 5px !important;
+        font-size: 11px !important;
+        line-height: 1.2 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }
+      .dashboard-left .inventory-table th:nth-child(1),
+      .dashboard-left .inventory-table td:nth-child(1),
+      .dashboard-left .inventory-table th:nth-child(3),
+      .dashboard-left .inventory-table td:nth-child(3),
+      .dashboard-left .inventory-table th:nth-child(5),
+      .dashboard-left .inventory-table td:nth-child(5),
+      .dashboard-left .inventory-table th:nth-child(7),
+      .dashboard-left .inventory-table td:nth-child(7) {
+        display: none !important;
+      }
+      .dashboard-left .inventory-table th:nth-child(2),
+      .dashboard-left .inventory-table td:nth-child(2) { width: 58% !important; }
+      .dashboard-left .inventory-table th:nth-child(4),
+      .dashboard-left .inventory-table td:nth-child(4) { width: 20% !important; text-align: center !important; }
+      .dashboard-left .inventory-table th:nth-child(6),
+      .dashboard-left .inventory-table td:nth-child(6) { width: 22% !important; text-align: center !important; }
+      .dashboard-left .status-chip {
+        min-height: 22px !important;
+        padding: 0 7px !important;
+        border-radius: 999px !important;
+        font-size: 10px !important;
+      }
+      .dashboard-left .toolbar {
+        grid-template-columns: 1fr !important;
+      }
+      .dashboard-left .toolbar button {
+        min-height: 40px !important;
+      }
+    }
+
+  </style>
+</head>
+<body>
+  <header>
+    <div class="topbar">
+      <div class="brand">
+        <div class="brand-title">
+          <h1>수술실 비급여·재고관리</h1>
+          <div class="brand-subtitle">OR Inventory System</div>
+        </div>
+        <img class="brand-logo" src="data:image/png;base64,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" alt="윌스기념병원 로고">
+      </div>
+      <div id="status">Firebase 연결 준비 중</div>
+      <nav id="nav" aria-label="주요 메뉴"></nav>
+    </div>
+  </header>
+
+  <main id="app"></main>
+
+  <script>
+    let initializeApp;
+    let getFirestore;
+    let doc;
+    let getDoc;
+    let setDoc;
+    let runTransaction;
+    let onSnapshot;
+    let enableIndexedDbPersistence;
+
+    const status = document.getElementById("status");
+    const nav = document.getElementById("nav");
+    const app = document.getElementById("app");
+
+    const firebaseConfig = {
+      projectId: "nonpay-inventory"
+    };
+
+    const menus = [
+      ["dashboard", "대시보드"],
+      ["use", "사용입력"],
+      ["edit", "수정"],
+      ["history", "사용내역"],
+      ["receipts", "입고관리"],
+      ["settings", "설정"]
+    ];
+
+    const settingsMenus = [
+      ["products", "제품관리"],
+      ["doctors", "과관리"],
+      ["surgeries", "수술관리"],
+      ["usageRules", "수술별 사용관리"],
+      ["backup", "백업"]
+    ];
+
+    const blankState = () => ({
+      products: [],
+      doctors: [],
+      surgeries: [],
+      receipts: [],
+      usages: [],
+      usageRules: [],
+      hiddenLowProductIds: [],
+      backupVersions: [],
+      updatedAt: ""
+    });
+
+    const seedDoctors = [
+      "NS3",
+      "NS2",
+      "NS19",
+      "NS8",
+      "NS9",
+      "NS25",
+      "NS26",
+      "NS34",
+      "NS38",
+      "NS11",
+      "NS42",
+      "NS52",
+      "CS13",
+      "GS8",
+      "OS1",
+      "OS3",
+      "OS8",
+      "OS10",
+      "OS14",
+      "OS22",
+      "OS24",
+      "OS25",
+      "NS39",
+      "NS51",
+      "URO1"
+    ];
+    const defaultDepartmentOnlyNames = ["NS", "OS", "CS", "GS", "URO"];
+
+    const seedSurgeries = [
+      { department: "OS", name: "A/S 수술" },
+      { department: "OS", name: "A/S Shoulder" },
+      { department: "OS", name: "A/S Knee" },
+      { department: "OS", name: "A/S Ankle" },
+      { department: "OS", name: "A/S Elbow" },
+      { department: "OS", name: "기타수술" },
+      { department: "OS", name: "ORIF" },
+      { department: "OS", name: "Debri" },
+      { department: "OS", name: "Repair" },
+      { department: "OS", name: "Recon 등" },
+      { department: "OS", name: "A/S & HTO" },
+      { department: "OS", name: "TSRA/TARA" },
+      { department: "OS", name: "TKRA/UKA" },
+      { department: "OS", name: "THRA/BHR" },
+      { department: "OS", name: "Removal 수술" },
+      { department: "NS", name: "MD/MF/LF 50이상" },
+      { department: "NS", name: "MD/MF/LF 49이하" },
+      { department: "NS", name: "PEID(MIS) 50이상" },
+      { department: "NS", name: "PEID(MIS) 49이하" },
+      { department: "NS", name: "PEID(MIS) O-arm" },
+      { department: "NS", name: "Fusion 50이상" },
+      { department: "NS", name: "Fusion 49이하" },
+      { department: "NS", name: "ACDF 50이상" },
+      { department: "NS", name: "ACDF 49이하" },
+      { department: "NS", name: "TDR 50이상" },
+      { department: "NS", name: "TDR 49이하" },
+      { department: "NS", name: "Foraminotomy 50이상" },
+      { department: "NS", name: "Foraminotomy 49이하" },
+      { department: "NS", name: "Laminoplasty 50이상" },
+      { department: "NS", name: "Laminoplasty 49이하" },
+      { department: "NS", name: "Lateral mass screw" },
+      { department: "NS", name: "Corpectomy 50이상" },
+      { department: "NS", name: "Corpectomy 49이하" },
+      { department: "NS", name: "Hybride 50이상" },
+      { department: "NS", name: "Hybride 49이하" },
+      { department: "NS", name: "PVA" },
+      { department: "NS", name: "TBA" }
+    ];
+
+    const seedProductsText = `비급여	floseal			0	120
+인체조직	OSG 1cc	올소		15	15
+ANCHOR	Healicoil 4.5	남양	ANCHOR	10	10
+인체조직	OSG 3cc	올소		25	25
+ANCHOR	Healicoil 5.5	남양	ANCHOR	15	15
+비급여	M-clot			0	100
+인체조직	RAFUGEN 3cc	남양		15	15
+ANCHOR	Foot Print 4.5	남양	ANCHOR	5	5
+인체조직	Bone chip 15cc	한공조		3	3
+ANCHOR	Healmax 4.8	남양	ANCHOR	20	20
+비급여	Mediclore			0	80
+인체조직	Bone chip 30cc	한공조		3	3
+ANCHOR	Peek Lateral 4.5	남양	ANCHOR	30	30
+인체조직	Bone chip 15cc	두성		15	15
+ANCHOR	Osteoraptor	남양	ANCHOR	10	10
+비급여	Tendoregen3cc			0	120
+인체조직	Bone chip 30cc	두성		10	10
+ANCHOR	Flexible Cannula 6.5*75 (주황)	남양	Cannula	10	10
+인체조직	Bone chip 15cc	한솔		3	3
+ANCHOR	Flexible Cannula 8.0*75 (연두)	남양	Cannula	10	10
+비급여	Histoacyl			0	100
+인체조직	Bone chip 30cc	한솔		3	3
+ANCHOR	CG Derm 3*4	남양	etc	7	7
+인체조직	TriCotical bone 40*20	한솔		2	2
+ANCHOR	CG Derm 4*6	남양	etc	2	2
+비급여	Klotpad			0	50
+인체조직	Bongener 1cc	GSMedical		15	15
+ANCHOR	Endo Button	남양	etc	3	3
+인체조직	Osteopax	GSMedical		35	35
+ANCHOR	Brostrom	남양	small joint	10	10
+비급여	Tendoregen 1cc			0	50
+인체조직	EXO cement	GSMedical		10	10
+ANCHOR	Juggerknot 1.5	남양	small joint	15	15
+인체조직	grafton	Medtronic		5	5
+ANCHOR	Juggerknot 2.9	남양	small joint	13	13
+비급여	Exofin(OS)			0	150
+인체조직	BIO Dura (써지시스) 7*20	루모스메디칼		2	2
+ANCHOR	Juggerknot 1.4 short	남양	small joint	5	5
+인체조직	BIO Dura (써지시스) 7*10	루모스메디칼		2	2
+ANCHOR	Juggerknot 1.0 mini	남양	small joint	4	4
+비급여	타우로린			0	60
+인체조직	Duragen 1*3	서림		4	4
+ANCHOR	Swivelock 4.75 close	써지케어	ANCHOR	10	10
+인체조직	Duragen 3*3	서림		2	2
+ANCHOR	Swivelock 4.75 Tape	써지케어	ANCHOR	5	5
+비급여	HydroCool			0	50
+인체조직	Novosis 0.5g	CG bio		5	5
+ANCHOR	Swivelock 4.75 self punch	써지케어	ANCHOR	2	2
+인체조직	Novosis 1.0g	CG bio		5	5
+ANCHOR	Push Lock 2.9	써지케어	ANCHOR	10	10
+비급여	viscoseal			0	40
+인체조직	Lyoplant 6*14	네오메드		2	2
+ANCHOR	Fiber Tak 2.6	써지케어	ANCHOR	10	10
+인체조직	Neuro-Pach 4*5	네오메드		2	2
+ANCHOR	small joint 2.4	써지케어	small joint	6	6
+비급여	hyazen 1cc			0	30
+인체조직	Neuro-Pach 6*14	네오메드		1	1
+ANCHOR	small joint 3.0	써지케어	small joint	8	8
+인체조직	Lyoplant Onlay 10*12.5	네오메드		2	2
+ANCHOR	Passport cannula 8*3	써지케어	Cannula	10	10
+비급여	hyazen 3cc			0	40
+인체조직	Lyoplant Onlay 7.5*7.5	네오메드		3	3
+ANCHOR	Passport cannula 8*4	써지케어	Cannula	5	5
+인체조직	Lyoplant Onlay 5*5	네오메드		2	2
+ANCHOR	Passport cannula 10*4	써지케어	Cannula	10	10
+비급여	hemostop			0	70
+인체조직	Oxiplex	메디쉐어		7	7
+ANCHOR	Solid Cannula 5.5 Ring type	와이즈메디칼	Cannula	10	10
+인체조직	Novosis Trauma 0.5g	A-Tec		5	5
+ANCHOR	Solid Cannula 5.5 non screw	와이즈메디칼	Cannula	15	15
+비급여	wound clot			0	20
+인체조직	Novosis Trauma 1.0g	A-Tec		5	5
+ANCHOR	Solid Cannula 8.5	와이즈메디칼	Cannula	10	10
+ANCHOR	Iconix 1.4	와이즈메디칼	ANCHOR	10	10
+비급여	interguard			0	50
+ANCHOR	Iconix 2.3	와이즈메디칼	ANCHOR	5	5
+ANCHOR	Omeganut	골드메디	small joint	8	8
+비급여	이노그램			0	30
+ANCHOR	Mega suture 4.5(M)	골드메디	ANCHOR	10	10
+ANCHOR	Mega suture 5.5(M)	골드메디	ANCHOR	2	2
+비급여	Surgi Cure			0	5
+ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
+
+    let state = blankState();
+    let currentView = "dashboard";
+    let currentSettingsView = "products";
+    let currentReceiptView = "nonpay";
+    let pendingEditUsageId = "";
+    let db;
+    let ref;
+    let unsubscribe;
+    let hydrated = false;
+    let saving = false;
+
+    const uid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+    const today = () => {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+      return now.toISOString().slice(0, 10);
+    };
+    let renderedDate = today();
+    const num = (value) => Math.max(0, Number.parseInt(value, 10) || 0);
+    const alphaFirstCompare = (left, right) => String(left || "").localeCompare(String(right || ""), "en", {
+      numeric: true,
+      sensitivity: "base"
+    });
+    const byName = (a, b) => alphaFirstCompare(a.name, b.name);
+    const productById = (id) => state.products.find((item) => item.id === id);
+    const departmentById = (id) => state.doctors.find((item) => item.id === id);
+    const surgeryById = (id) => state.surgeries.find((item) => item.id === id);
+    const usageRuleById = (id) => state.usageRules.find((item) => item.id === id);
+
+    const setStatus = (message, type = "ok") => {
+      status.textContent = message;
+      status.className = type;
+    };
+
+    const normalizeState = (data) => ({
+      ...blankState(),
+      ...data,
+      products: Array.isArray(data?.products) ? data.products : [],
+      doctors: Array.isArray(data?.doctors) ? data.doctors : [],
+      surgeries: Array.isArray(data?.surgeries) ? data.surgeries : [],
+      receipts: Array.isArray(data?.receipts) ? data.receipts : [],
+      usages: Array.isArray(data?.usages) ? data.usages : [],
+      usageRules: Array.isArray(data?.usageRules) ? data.usageRules : [],
+      hiddenLowProductIds: Array.isArray(data?.hiddenLowProductIds) ? data.hiddenLowProductIds : [],
+      backupVersions: Array.isArray(data?.backupVersions) ? data.backupVersions : []
+    });
+
+    const normalizedName = (value) => String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+    const departmentCode = (value) => String(value || "").trim().replace(/[0-9]+$/g, "").toUpperCase();
+    const productCategory = (value) => String(value || "").trim() === "Anchor&etc" ? "ANCHOR" : String(value || "").trim();
+    const productCategoryLabel = (value) => productCategory(value) === "ANCHOR" ? "ANCHOR&etc" : productCategory(value);
+    const warningQtyFromBase = (value) => {
+      const qty = num(value);
+      if (qty <= 1) return 0;
+      return Math.max(1, Math.ceil(qty * 0.2));
+    };
+    const parseSeedProducts = () => seedProductsText.split("\n").map((line) => {
+      const [category, name, company, subcategory, landingQty, warningStock] = line.split("\t");
+      const baseQty = num(landingQty) || num(warningStock);
+      return {
+        category,
+        name,
+        company,
+        subcategory,
+        stock: baseQty,
+        baseStock: baseQty,
+        landingQty: num(landingQty),
+        warningStock: warningQtyFromBase(baseQty)
+      };
+    });
+    const productKey = (item) => [
+      normalizedName(productCategory(item.category)),
+      normalizedName(item.company),
+      normalizedName(item.subcategory || item.type),
+      normalizedName(item.name)
+    ].join("::");
+    const productLooseKey = (item) => [
+      normalizedName(productCategory(item.category)),
+      normalizedName(item.name)
+    ].join("::");
+
+    const mergeSeedList = (items, seedNames) => {
+      const existing = new Set(items.map((item) => normalizedName(item.name)));
+      const additions = seedNames
+        .map((name) => name.trim())
+        .filter((name) => name && !existing.has(normalizedName(name)))
+        .map((name) => ({ id: uid(), name }));
+      return additions.length ? { items: [...items, ...additions], added: additions.length } : { items, added: 0 };
+    };
+
+    const inferSurgeryDepartment = (name) => {
+      const text = normalizedName(name);
+      const osTerms = ["a/s", "shoulder", "knee", "ankle", "elbow", "orif", "debri", "repair", "recon", "tsra", "tara", "tkra", "uka", "thra", "bhr", "removal"];
+      return osTerms.some((term) => text.includes(term)) ? "OS" : "NS";
+    };
+
+    const surgeryKey = (item) => `${normalizedName(item.department || inferSurgeryDepartment(item.name))}::${normalizedName(item.name)}`;
+
+    const normalizeLegacyMasters = () => {
+      state.doctors = state.doctors
+        .map((item) => ({ ...item, name: String(item.name || "").trim().toUpperCase() }))
+        .filter((item) => item.name && !defaultDepartmentOnlyNames.includes(item.name));
+
+      const asChildNames = new Map([
+        ["shoulder", "A/S Shoulder"],
+        ["knee", "A/S Knee"],
+        ["ankle", "A/S Ankle"],
+        ["elbow", "A/S Elbow"]
+      ]);
+      state.surgeries = state.surgeries.map((item) => {
+        const fixedName = asChildNames.get(normalizedName(item.name)) || item.name;
+        return {
+          ...item,
+          name: fixedName,
+          department: departmentCode(item.department) || inferSurgeryDepartment(fixedName)
+        };
+      });
+      const seenSurgeries = new Set();
+      state.surgeries = state.surgeries.filter((item) => {
+        const key = surgeryKey(item);
+        if (seenSurgeries.has(key)) return false;
+        seenSurgeries.add(key);
+        return true;
+      });
+
+      state.products = state.products.map((item) => {
+        const category = productCategory(item.category);
+        const landingQty = num(item.landingQty);
+        const baseQty = num(item.stock) || landingQty || num(item.warningStock);
+        return {
+          ...item,
+          category,
+          company: category === "비급여" ? "" : String(item.company || "").trim(),
+          subcategory: category === "ANCHOR" ? String(item.subcategory || item.type || "").trim() : "",
+          landingQty,
+          baseStock: item.baseStock,
+          warningStock: num(item.warningStock) || warningQtyFromBase(baseQty)
+        };
+      });
+      const seenProducts = new Set();
+      state.products = state.products.filter((item) => {
+        const key = productKey(item);
+        if (seenProducts.has(key)) return false;
+        seenProducts.add(key);
+        return true;
+      });
+    };
+
+    const addSeedMasters = () => {
+      normalizeLegacyMasters();
+      const doctors = mergeSeedList(state.doctors, seedDoctors);
+      const existingSurgeries = new Set(state.surgeries.map(surgeryKey));
+      const surgeryAdditions = seedSurgeries
+        .filter((item) => !existingSurgeries.has(surgeryKey(item)))
+        .map((item) => ({ id: uid(), ...item }));
+      state.doctors = doctors.items;
+      state.surgeries = [...state.surgeries, ...surgeryAdditions];
+      const existingProducts = new Map(state.products.map((item) => [productKey(item), item]));
+      const existingProductsLoose = new Map(state.products.map((item) => [productLooseKey(item), item]));
+      let updatedProducts = 0;
+      const productAdditions = [];
+      parseSeedProducts().forEach((seed) => {
+        const exact = existingProducts.get(productKey(seed));
+        const loose = existingProductsLoose.get(productLooseKey(seed));
+        if (exact || loose) {
+          const target = exact || loose;
+          if (!target) return;
+          const next = {
+            ...target,
+            company: seed.company,
+            subcategory: seed.subcategory,
+            stock: target.stock,
+            baseStock: Number.isFinite(Number(target.baseStock)) ? num(target.baseStock) : seed.baseStock,
+            landingQty: num(target.landingQty) || seed.landingQty,
+            warningStock: num(target.warningStock) || seed.warningStock
+          };
+          if (JSON.stringify(target) !== JSON.stringify(next)) {
+            Object.assign(target, next);
+            updatedProducts += 1;
+          }
+          return;
+        }
+        productAdditions.push({ id: uid(), ...seed });
+      });
+      state.products = [...state.products, ...productAdditions];
+      return doctors.added + surgeryAdditions.length + productAdditions.length + updatedProducts;
+    };
+
+    const productMovementCounts = () => {
+      const used = new Map();
+      const received = new Map();
+      state.usages.forEach((usage) => {
+        (usage.productIds || []).forEach((id) => used.set(id, (used.get(id) || 0) + 1));
+      });
+      state.receipts.forEach((receipt) => {
+        received.set(receipt.productId, (received.get(receipt.productId) || 0) + num(receipt.qty));
+      });
+      return { used, received };
+    };
+
+    const reconcileProductStocks = () => {
+      const { used, received } = productMovementCounts();
+      const seedByKey = new Map(parseSeedProducts().map((item) => [productKey(item), item]));
+      const seedByLooseKey = new Map(parseSeedProducts().map((item) => [productLooseKey(item), item]));
+      let changed = 0;
+      state.products = state.products.map((product) => {
+        const seed = seedByKey.get(productKey(product)) || seedByLooseKey.get(productLooseKey(product));
+        const productUsed = used.get(product.id) || 0;
+        const productReceived = received.get(product.id) || 0;
+        const baseStock = Number.isFinite(Number(product.baseStock))
+          ? num(product.baseStock)
+          : seed
+            ? num(seed.baseStock)
+            : num(product.stock) - productReceived + productUsed;
+        const next = {
+          ...product,
+          baseStock,
+          stock: Math.max(0, baseStock + productReceived - productUsed)
+        };
+        if (num(product.baseStock) !== num(next.baseStock) || num(product.stock) !== num(next.stock)) changed += 1;
+        return next;
+      });
+      return changed;
+    };
+
+
+
+    const itemTimestamp = (item, fallback = "") => String(item?.updatedAt || item?.createdAt || fallback || "");
+
+    const mergeArrayById = (remoteItems = [], localItems = [], fallbackRemote = "", fallbackLocal = "") => {
+      const merged = new Map();
+      remoteItems.forEach((item) => {
+        if (!item?.id) return;
+        merged.set(item.id, item);
+      });
+      localItems.forEach((item) => {
+        if (!item?.id) return;
+        const current = merged.get(item.id);
+        if (!current) {
+          merged.set(item.id, item);
+          return;
+        }
+        const localTime = itemTimestamp(item, fallbackLocal);
+        const remoteTime = itemTimestamp(current, fallbackRemote);
+        if (localTime >= remoteTime) merged.set(item.id, { ...current, ...item });
+      });
+      return Array.from(merged.values());
+    };
+
+    const mergeStates = (remoteData, localData) => {
+      const remote = normalizeState(remoteData || {});
+      const local = normalizeState(localData || {});
+      const merged = normalizeState({
+        ...remote,
+        updatedAt: new Date().toISOString(),
+        products: mergeArrayById(remote.products, local.products, remote.updatedAt, local.updatedAt),
+        doctors: mergeArrayById(remote.doctors, local.doctors, remote.updatedAt, local.updatedAt),
+        surgeries: mergeArrayById(remote.surgeries, local.surgeries, remote.updatedAt, local.updatedAt),
+        receipts: mergeArrayById(remote.receipts, local.receipts, remote.updatedAt, local.updatedAt),
+        usages: mergeArrayById(remote.usages, local.usages, remote.updatedAt, local.updatedAt),
+        usageRules: mergeArrayById(remote.usageRules, local.usageRules, remote.updatedAt, local.updatedAt),
+        backupVersions: mergeArrayById(remote.backupVersions || [], local.backupVersions || [], remote.updatedAt, local.updatedAt),
+        hiddenLowProductIds: [...new Set([...(remote.hiddenLowProductIds || []), ...(local.hiddenLowProductIds || [])])]
+      });
+      const before = state;
+      state = merged;
+      reconcileProductStocks();
+      const reconciled = normalizeState(state);
+      state = before;
+      return reconciled;
+    };
+
+    const saveState = async (message = "저장 완료") => {
+      if (!ref) {
+        setStatus("Firebase 연결 전입니다", "error");
+        return;
+      }
+      saving = true;
+      state.updatedAt = new Date().toISOString();
+      try {
+        if (runTransaction && db) {
+          const merged = await runTransaction(db, async (transaction) => {
+            const serverSnap = await transaction.get(ref);
+            const remoteData = serverSnap.exists() ? serverSnap.data() : blankState();
+            const nextState = mergeStates(remoteData, state);
+            transaction.set(ref, nextState);
+            return nextState;
+          });
+          state = normalizeState(merged);
+        } else {
+          reconcileProductStocks();
+          await setDoc(ref, state);
+        }
+        setStatus(`${message} · 동시저장 보호`, "ok");
+      } catch (error) {
+        console.error(error);
+        setStatus(`저장 실패: ${error.message}`, "error");
+      } finally {
+        saving = false;
+      }
+    };
+
+    const renderNav = () => {
+      nav.innerHTML = menus.map(([key, label]) => `
+        <button class="tab ${currentView === key ? "active" : ""}" data-view="${key}" type="button">${label}</button>
+      `).join("");
+      nav.querySelectorAll("button").forEach((button) => {
+        button.addEventListener("click", () => {
+          currentView = button.dataset.view;
+          render();
+        });
+      });
+    };
+
+    const render = () => {
+      renderedDate = today();
+      renderNav();
+      const views = {
+        dashboard: renderDashboard,
+        receipts: renderReceipts,
+        use: renderUse,
+        history: renderHistory,
+        edit: renderEditUsage,
+        settings: renderSettings
+      };
+      const currentLabel = menus.find(([key]) => key === currentView)?.[1] || "대시보드";
+      app.innerHTML = `
+        <div class="page-head">
+          <h2>${escapeHtml(currentLabel)}</h2>
+          <div class="page-user">
+            <strong>수술실 재고관리</strong><br>
+            <span>${escapeHtml(today())}</span>
+          </div>
+        </div>
+        ${views[currentView]()}
+      `;
+      bindCommon();
+      bindView();
+    };
+
+    const bindCommon = () => {
+      app.querySelectorAll("[data-delete-product]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const id = button.dataset.deleteProduct;
+          const used = state.usages.some((usage) => usage.productIds.includes(id));
+          const received = state.receipts.some((receipt) => receipt.productId === id);
+          if ((used || received) && !confirm("내역에 사용된 제품입니다. 그래도 삭제할까요?")) return;
+          state.products = state.products.filter((item) => item.id !== id);
+          state.receipts = state.receipts.filter((item) => item.productId !== id);
+          state.usages = state.usages.map((usage) => ({ ...usage, productIds: usage.productIds.filter((productId) => productId !== id) }));
+          render();
+          await saveState();
+        });
+      });
+
+      app.querySelectorAll("[data-delete-doctor]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const id = button.dataset.deleteDoctor;
+          const department = state.doctors.find((item) => item.id === id);
+          if (!confirm("과를 삭제할까요?")) return;
+          state.doctors = state.doctors.filter((item) => item.id !== id);
+          state.surgeries = state.surgeries.filter((item) => item.department !== department?.name);
+          render();
+          await saveState();
+        });
+      });
+
+      app.querySelectorAll("[data-delete-surgery]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const id = button.dataset.deleteSurgery;
+          if (!confirm("수술을 삭제할까요?")) return;
+          state.surgeries = state.surgeries.filter((item) => item.id !== id);
+          render();
+          await saveState();
+        });
+      });
+    };
+
+    const bindView = () => {
+      const handlers = {
+        dashboard: bindDashboard,
+        receipts: bindReceipts,
+        use: bindUse,
+        history: bindHistory,
+        edit: bindEditUsage,
+        settings: bindSettings
+      };
+      handlers[currentView]?.();
+    };
+
+    const renderSettings = () => {
+      const views = {
+        products: renderProducts,
+        doctors: renderDoctors,
+        surgeries: renderSurgeries,
+        usageRules: renderUsageRules,
+        backup: renderBackup
+      };
+      return `
+        <section>
+          <div class="settings-tabs">
+            ${settingsMenus.map(([key, label]) => `<button class="settings-tab ${currentSettingsView === key ? "active" : ""}" data-settings-view="${key}" type="button">${label}</button>`).join("")}
+          </div>
+          ${views[currentSettingsView]()}
+        </section>
+      `;
+    };
+
+    const bindSettings = () => {
+      app.querySelectorAll("[data-settings-view]").forEach((button) => {
+        button.addEventListener("click", () => {
+          currentSettingsView = button.dataset.settingsView;
+          render();
+        });
+      });
+      const handlers = {
+        products: bindProducts,
+        doctors: bindDoctors,
+        surgeries: bindSurgeries,
+        usageRules: bindUsageRules,
+        backup: bindBackup
+      };
+      handlers[currentSettingsView]?.();
+    };
+
+    const bindDashboard = () => {
+      app.querySelectorAll("[data-go-view]").forEach((button) => {
+        button.addEventListener("click", () => {
+          currentView = button.dataset.goView;
+          render();
+        });
+      });
+      app.querySelectorAll("[data-hide-low-product]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const id = button.dataset.hideLowProduct;
+          state.hiddenLowProductIds = [...new Set([...(state.hiddenLowProductIds || []), id])];
+          render();
+          await saveState();
+        });
+      });
+      app.querySelectorAll("[data-show-low-product]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const id = button.dataset.showLowProduct;
+          state.hiddenLowProductIds = (state.hiddenLowProductIds || []).filter((item) => item !== id);
+          render();
+          await saveState();
+        });
+      });
+    };
+
+    const renderDashboard = () => {
+      const lowProducts = state.products.filter((item) => num(item.stock) <= num(item.warningStock));
+      const hiddenLowIds = new Set(state.hiddenLowProductIds || []);
+      const visibleLowProducts = lowProducts.filter((item) => !hiddenLowIds.has(item.id));
+      const hiddenLowProducts = lowProducts.filter((item) => hiddenLowIds.has(item.id));
+      const totalStock = state.products.reduce((sum, item) => sum + num(item.stock), 0);
+      const todayUsage = state.usages.filter((item) => item.date === today()).length;
+      const categoryCounts = ["비급여", "인체조직", "ANCHOR"].map((category) => ({
+        category,
+        count: state.products.filter((item) => productCategory(item.category) === category).length,
+        stock: state.products.filter((item) => productCategory(item.category) === category).reduce((sum, item) => sum + num(item.stock), 0)
+      }));
+      const inventoryRows = state.products.slice().sort((a, b) => num(a.stock) - num(b.stock)).slice(0, 8);
+      return `
+        <section class="dashboard-shell">
+          <div class="stats">
+            ${statCard("총 보유 품목", state.products.length.toLocaleString(), "□")}
+            ${statCard("총 재고 수량", totalStock.toLocaleString(), "▦")}
+            ${statCard("오늘 사용", todayUsage.toLocaleString(), "↗")}
+            ${statCard("재고 부족", lowProducts.length.toLocaleString(), "!")}
+          </div>
+
+          <div class="dashboard-content">
+            <div class="dashboard-left">
+              <div class="card">
+                <h2>재고 현황</h2>
+                <div class="toolbar">
+                  <select aria-label="전체 카테고리"><option>전체 카테고리</option><option>비급여</option><option>인체조직</option><option>ANCHOR&etc</option></select>
+                  <input aria-label="품목 검색" placeholder="품목명, 업체 검색">
+                  <button type="button" data-go-view="settings">검색</button>
+                  <button class="secondary" type="button" data-go-view="history">엑셀 다운로드</button>
+                </div>
+                <div class="table-wrap">
+                  <table class="inventory-table">
+                    <thead>
+                      <tr>
+                        <th>품목 코드</th><th>품목명</th><th>카테고리</th><th>현재 재고</th><th>최소 재고</th><th>상태</th><th>업체</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${inventoryRows.map((item, index) => {
+                        const low = num(item.stock) <= num(item.warningStock);
+                        return `<tr>
+                          <td><span class="code-link">OR${String(index + 1).padStart(5, "0")}</span></td>
+                          <td>${escapeHtml(item.name)}</td>
+                          <td>${escapeHtml(productCategoryLabel(item.category))}</td>
+                          <td>${num(item.stock).toLocaleString()}</td>
+                          <td>${num(item.warningStock).toLocaleString()}</td>
+                          <td><span class="status-chip ${low ? "low" : ""}">${low ? "부족" : "정상"}</span></td>
+                          <td>${escapeHtml(item.company || "-")}</td>
+                        </tr>`;
+                      }).join("") || `<tr><td colspan="7">등록된 제품이 없습니다.</td></tr>`}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+
+            <div class="dashboard-right">
+              <div class="card">
+                <h2>재고 현황 요약</h2>
+                <div class="donut-card">
+                  <div class="donut" data-total="${totalStock.toLocaleString()}개"></div>
+                  <div class="legend">
+                    ${categoryCounts.map((item) => `<div class="legend-row"><span>${escapeHtml(productCategoryLabel(item.category))}</span><strong>${item.stock.toLocaleString()}</strong></div>`).join("")}
+                    <div class="legend-row"><span>재고 부족</span><strong>${lowProducts.length}</strong></div>
+                    <div class="legend-row"><span>오늘 사용</span><strong>${todayUsage}</strong></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card">
+                <h2>재고 부족 품목</h2>
+                ${visibleLowProducts.slice(0, 4).map(lowProductItem).join("") || `<div class="empty">표시할 재고 부족 품목이 없습니다.</div>`}
+                ${hiddenLowProducts.length ? `<details class="item"><summary><span>감춰진 경고 재고</span><span class="pill">${hiddenLowProducts.length}</span></summary><div class="details-body">${hiddenLowProducts.map((item) => lowProductItem(item, true)).join("")}</div></details>` : ""}
+              </div>
+
+              <div class="card">
+                <h2>최근 사용 내역</h2>
+                ${state.usages.slice().reverse().slice(0, 3).map((item) => usageItem(item, { showDelete: false })).join("") || `<div class="empty">사용내역이 없습니다.</div>`}
+              </div>
+            </div>
+          </div>
+        </section>
+      `;
+    };
+
+    const statCard = (label, value, icon) => `
+      <div class="card stat" data-icon="${escapeHtml(icon)}">
+        <strong>${value}</strong>
+        <span>${label}</span>
+      </div>
+    `;
+
+    const renderProducts = () => `
+      <section class="grid two">
+        <form class="card" id="productForm">
+          <h2 id="productFormTitle">제품 추가</h2>
+          <input type="hidden" id="productId">
+          <label for="productCategory">분류</label>
+          <select id="productCategory" required>
+            <option>비급여</option>
+            <option>인체조직</option>
+            <option value="ANCHOR">ANCHOR&etc</option>
+          </select>
+          <label for="productName">제품명</label>
+          <input id="productName" required autocomplete="off">
+          <div id="productCompanyWrap">
+            <label for="productCompany">업체명</label>
+            <input id="productCompany" autocomplete="off">
+          </div>
+          <div id="productSubcategoryWrap">
+            <label for="productSubcategory">세부 분류</label>
+            <select id="productSubcategory">
+              <option value="">선택</option>
+              <option>ANCHOR</option>
+              <option>Cannula</option>
+              <option>etc</option>
+              <option>small joint</option>
+            </select>
+          </div>
+          <div class="row two">
+            <div>
+              <label for="productStock">현재고</label>
+              <input id="productStock" type="number" min="0" value="0" required>
+            </div>
+            <div>
+              <label for="productWarning">경고수량</label>
+              <input id="productWarning" type="number" min="0" value="1" required>
+            </div>
+          </div>
+          <div id="productLandingWrap">
+            <label for="productLanding">랜딩수량</label>
+            <input id="productLanding" type="number" min="0" value="0">
+          </div>
+          <div class="actions">
+            <button type="submit">제품 저장</button>
+            <button class="secondary" type="button" id="productReset">새로 입력</button>
+          </div>
+        </form>
+        <div class="card">
+          <h2>제품 목록</h2>
+          ${renderGroupedProducts(true)}
+        </div>
+      </section>
+    `;
+
+    const productItem = (item) => {
+      const low = num(item.stock) <= num(item.warningStock);
+      const detail = [
+        `분류: ${escapeHtml(productCategoryLabel(item.category))}`,
+        item.company ? `업체: ${escapeHtml(item.company)}` : "",
+        item.subcategory ? `세부: ${escapeHtml(item.subcategory)}` : ""
+      ].filter(Boolean).join(" · ");
+      return `
+        <div class="item">
+          <div class="item-title">
+            <span>${escapeHtml(item.name)}</span>
+            <span class="pill ${low ? "low" : ""}">${low ? "경고" : item.category}</span>
+          </div>
+          <div class="meta">
+            <span>${detail}</span>
+            <span>현재고: ${num(item.stock)} · 경고수량: ${num(item.warningStock)}${item.category === "비급여" ? "" : ` · 랜딩수량: ${num(item.landingQty)}`}</span>
+          </div>
+          <div class="actions">
+            <button class="secondary" type="button" data-edit-product="${item.id}">수정</button>
+            <button class="danger" type="button" data-delete-product="${item.id}">삭제</button>
+          </div>
+        </div>
+      `;
+    };
+
+    const lowProductItem = (item, hidden = false) => {
+      const shortage = Math.max(0, num(item.warningStock) - num(item.stock));
+      const reason = num(item.stock) <= num(item.warningStock)
+        ? `현재고 ${num(item.stock)}개가 경고수량 ${num(item.warningStock)}개 이하입니다.${shortage ? ` ${shortage}개 더 있어야 경고에서 벗어납니다.` : ""}`
+        : "";
+      return `
+        <div class="item">
+          <div class="item-title">
+            <span>${escapeHtml(item.name)}</span>
+            <span class="pill low">경고</span>
+          </div>
+          <div class="meta">
+            <span>분류: ${escapeHtml(productCategoryLabel(item.category))}${item.company ? ` · 업체: ${escapeHtml(item.company)}` : ""}${item.subcategory ? ` · 세부: ${escapeHtml(item.subcategory)}` : ""}</span>
+            <span>현재고: ${num(item.stock)} · 경고수량: ${num(item.warningStock)}${item.category === "비급여" ? "" : ` · 랜딩수량: ${num(item.landingQty)}`}</span>
+            <span>${escapeHtml(reason)}</span>
+          </div>
+          <div class="actions">
+            <button class="secondary" type="button" data-${hidden ? "show" : "hide"}-low-product="${item.id}">${hidden ? "다시 보이기" : "감추기"}</button>
+          </div>
+        </div>
+      `;
+    };
+
+    const renderGroupedProducts = (withActions) => {
+      if (!state.products.length) return `<div class="empty">제품을 추가해 주세요.</div>`;
+      const categories = ["비급여", "인체조직", "ANCHOR"];
+      return categories.map((category) => {
+        const categoryItems = state.products.filter((item) => productCategory(item.category) === category).sort(byName);
+        if (!categoryItems.length) return "";
+        if (category === "비급여") {
+          return `
+            <details class="item">
+              <summary><span>비급여</span><span class="pill">${categoryItems.length}</span></summary>
+              <div class="details-body">
+                ${categoryItems.map((item) => withActions ? productItem(item) : productCheckItem(item)).join("")}
+              </div>
+            </details>
+          `;
+        }
+        const companies = [...new Set(categoryItems.map((item) => item.company || "업체 없음"))].sort(alphaFirstCompare);
+        return `
+          <details class="item">
+            <summary><span>${escapeHtml(productCategoryLabel(category))}</span><span class="pill">${categoryItems.length}</span></summary>
+            <div class="details-body">
+              ${companies.map((company) => renderProductCompanyGroup(categoryItems, company, category, withActions)).join("")}
+            </div>
+          </details>
+        `;
+      }).join("");
+    };
+
+    const renderProductCompanyGroup = (items, company, category, withActions) => {
+      const companyItems = items.filter((item) => (item.company || "업체 없음") === company).sort(byName);
+      if (category !== "ANCHOR") {
+        return `
+          <details class="item">
+            <summary><span>${escapeHtml(company)}</span><span class="pill">${companyItems.length}</span></summary>
+            <div class="details-body">
+              ${companyItems.map((item) => withActions ? productItem(item) : productCheckItem(item)).join("")}
+            </div>
+          </details>
+        `;
+      }
+      const subcategories = [...new Set(companyItems.map((item) => item.subcategory || "분류 없음"))].sort(alphaFirstCompare);
+      return `
+        <details class="item">
+          <summary><span>${escapeHtml(company)}</span><span class="pill">${companyItems.length}</span></summary>
+          <div class="details-body">
+            ${subcategories.map((subcategory) => {
+              const subItems = companyItems.filter((item) => (item.subcategory || "분류 없음") === subcategory).sort(byName);
+              return `
+                <details class="item">
+                  <summary><span>${escapeHtml(subcategory)}</span><span class="pill">${subItems.length}</span></summary>
+                  <div class="details-body">
+                    ${subItems.map((item) => withActions ? productItem(item) : productCheckItem(item)).join("")}
+                  </div>
+                </details>
+              `;
+            }).join("")}
+          </div>
+        </details>
+      `;
+    };
+
+    const productCheckItem = (item) => `
+      <label class="check-card use-card">
+        <input type="checkbox" value="${item.id}" data-use-product="${item.id}" ${num(item.stock) < 1 ? "disabled" : ""}>
+        <span>${escapeHtml(item.name)}<br><span class="muted">${escapeHtml(item.company || item.category)}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ""}</span></span>
+        <input type="number" min="1" max="${Math.max(1, num(item.stock))}" value="1" data-use-qty="${item.id}" aria-label="${escapeHtml(item.name)} 사용 수량">
+      </label>
+    `;
+
+    const bindProducts = () => {
+      const form = document.getElementById("productForm");
+      const syncProductFields = () => {
+        const category = document.getElementById("productCategory").value;
+        document.getElementById("productCompanyWrap").style.display = category === "비급여" ? "none" : "block";
+        document.getElementById("productSubcategoryWrap").style.display = category === "ANCHOR" ? "block" : "none";
+        document.getElementById("productLandingWrap").style.display = category === "비급여" ? "none" : "block";
+        if (category === "비급여") {
+          document.getElementById("productCompany").value = "";
+          document.getElementById("productSubcategory").value = "";
+          document.getElementById("productLanding").value = "0";
+        }
+      };
+      document.getElementById("productCategory").addEventListener("change", syncProductFields);
+      document.getElementById("productReset").addEventListener("click", () => {
+        form.reset();
+        document.getElementById("productId").value = "";
+        document.getElementById("productFormTitle").textContent = "제품 추가";
+        syncProductFields();
+      });
+      app.querySelectorAll("[data-edit-product]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const item = productById(button.dataset.editProduct);
+          if (!item) return;
+          document.getElementById("productFormTitle").textContent = "제품 수정";
+          document.getElementById("productId").value = item.id;
+          document.getElementById("productCategory").value = item.category;
+          document.getElementById("productName").value = item.name;
+          document.getElementById("productCompany").value = item.company || "";
+          document.getElementById("productSubcategory").value = item.subcategory || "";
+          document.getElementById("productStock").value = num(item.stock);
+          document.getElementById("productWarning").value = num(item.warningStock);
+          document.getElementById("productLanding").value = num(item.landingQty);
+          syncProductFields();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+      });
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const id = document.getElementById("productId").value || uid();
+        const next = {
+          id,
+          category: document.getElementById("productCategory").value,
+          name: document.getElementById("productName").value.trim(),
+          company: document.getElementById("productCategory").value === "비급여" ? "" : document.getElementById("productCompany").value.trim(),
+          subcategory: document.getElementById("productCategory").value === "ANCHOR" ? document.getElementById("productSubcategory").value : "",
+          stock: num(document.getElementById("productStock").value),
+          warningStock: num(document.getElementById("productWarning").value),
+          landingQty: document.getElementById("productCategory").value === "비급여" ? 0 : num(document.getElementById("productLanding").value)
+        };
+        if (!next.name) return;
+        const { used, received } = productMovementCounts();
+        next.baseStock = num(next.stock) - (received.get(id) || 0) + (used.get(id) || 0);
+        state.products = [...state.products.filter((item) => item.id !== id), next];
+        reconcileProductStocks();
+        render();
+        await saveState();
+      });
+      syncProductFields();
+    };
+
+    const renderDoctors = () => renderSimpleManager("doctors", "과", "doctor");
+
+    const renderSurgeries = () => `
+      <section class="grid two">
+        <form class="card" id="surgeryForm">
+          <h2 id="surgeryFormTitle">수술 추가</h2>
+          <input type="hidden" id="surgeryId">
+          <label for="surgeryDepartment">수술 과</label>
+          <select id="surgeryDepartment" required>
+            <option value="">과 선택</option>
+            ${departmentOptions()}
+          </select>
+          <label for="surgeryName">수술명</label>
+          <input id="surgeryName" required autocomplete="off">
+          <div class="actions">
+            <button type="submit">수술 저장</button>
+            <button class="secondary" type="button" id="surgeryReset">새로 입력</button>
+          </div>
+        </form>
+        <div class="card">
+          <h2>수술 목록</h2>
+          ${renderGroupedSurgeries()}
+        </div>
+      </section>
+    `;
+
+    const renderSimpleManager = (collection, label, key) => `
+      <section class="grid two">
+        <form class="card" id="${key}Form">
+          <h2 id="${key}FormTitle">${label} 추가</h2>
+          <input type="hidden" id="${key}Id">
+          <input type="hidden" id="${key}OldName">
+          ${key === "doctor" ? `
+            <label for="${key}Department">과 선택</label>
+            <select id="${key}Department">
+              <option value="">과 선택</option>
+              ${departmentOptions()}
+            </select>
+            <label for="${key}NewDepartment">새 과 추가</label>
+            <input id="${key}NewDepartment" autocomplete="off" placeholder="예: ENT">
+            <label for="${key}Number">의사코드</label>
+            <input id="${key}Number" required autocomplete="off" inputmode="numeric" placeholder="예: 3">
+          ` : `
+            <label for="${key}Name">${label} 코드</label>
+            <input id="${key}Name" required autocomplete="off">
+          `}
+          <div class="actions">
+            <button type="submit">${label} 저장</button>
+            <button class="secondary" type="button" id="${key}Reset">새로 입력</button>
+          </div>
+        </form>
+        <div class="card">
+          <h2>${label} 목록</h2>
+          ${key === "doctor" ? renderGroupedDoctors() : state[collection].slice().sort(byName).map((item) => `
+            <div class="item">
+              <div class="item-title"><span>${escapeHtml(item.name)}</span></div>
+              <div class="actions">
+                <button class="secondary" type="button" data-edit-${key}="${item.id}">수정</button>
+                <button class="danger" type="button" data-delete-${key === "doctor" ? "doctor" : "surgery"}="${item.id}">삭제</button>
+              </div>
+            </div>
+          `).join("") || `<div class="empty">${label}을 추가해 주세요.</div>`}
+        </div>
+      </section>
+    `;
+
+    const departmentPriority = (name) => {
+      if (name === "NS") return 0;
+      if (name === "OS") return 1;
+      return 2;
+    };
+
+    const departmentCompare = (left, right) => departmentPriority(left) - departmentPriority(right) || alphaFirstCompare(left, right);
+
+    const departmentNames = () => [...new Set(state.doctors.map((item) => departmentCode(item.name)).filter(Boolean))]
+      .sort(departmentCompare);
+
+    const departmentOptions = (selected = "") => departmentNames()
+      .map((name) => `<option value="${escapeHtml(name)}" ${name === selected ? "selected" : ""}>${escapeHtml(name)}</option>`)
+      .join("");
+
+    const renderGroupedDoctors = () => {
+      if (!state.doctors.length) return `<div class="empty">과를 추가해 주세요.</div>`;
+      return departmentNames().map((department) => {
+        const items = state.doctors
+          .filter((item) => departmentCode(item.name) === department)
+          .sort(byName);
+        return `
+          <details class="item">
+            <summary><span>${escapeHtml(department)}</span><span class="pill">${items.length}</span></summary>
+            <div class="details-body">
+            ${items.map((item) => `
+              <div class="item">
+                <div class="item-title"><span>${escapeHtml(item.name)}</span></div>
+                <div class="actions">
+                  <button class="secondary" type="button" data-edit-doctor="${item.id}">수정</button>
+                  <button class="danger" type="button" data-delete-doctor="${item.id}">삭제</button>
+                </div>
+              </div>
+            `).join("")}
+            </div>
+          </details>
+        `;
+      }).join("");
+    };
+
+    const landingReceiptKey = (usageId, productId) => `${usageId}::${productId}`;
+
+    const landingReceiptByLine = () => {
+      const map = new Map();
+      state.receipts
+        .filter((item) => item.type === "landing")
+        .forEach((item) => map.set(landingReceiptKey(item.usageId, item.productId), item));
+      return map;
+    };
+
+    const landingUsageLines = (includeReceived = true) => {
+      const received = landingReceiptByLine();
+      return state.usages.flatMap((usage) => {
+        const counts = (usage.productIds || []).reduce((map, productId) => {
+          map.set(productId, (map.get(productId) || 0) + 1);
+          return map;
+        }, new Map());
+        return Array.from(counts.entries()).map(([productId, qty]) => {
+        const product = productById(productId);
+        if (!product || productCategory(product.category) === "비급여") return null;
+        const receipt = received.get(landingReceiptKey(usage.id, productId));
+        if (!includeReceived && receipt) return null;
+        return { usage, product, receipt, qty };
+      });
+      }).filter(Boolean);
+    };
+
+    const renderLandingBoard = () => {
+      const lines = landingUsageLines(true);
+      if (!lines.length) return `<div class="empty">랜딩 입고 확인 대상이 없습니다.</div>`;
+      const companies = [...new Set(lines.map((line) => line.product.company || "업체 없음"))].sort(alphaFirstCompare);
+      return companies.map((company) => {
+        const companyLines = lines.filter((line) => (line.product.company || "업체 없음") === company);
+        const pendingCount = companyLines.filter((line) => !line.receipt).length;
+        const categoryLabels = [...new Set(companyLines.map((line) => productCategoryLabel(line.product.category)))].sort(alphaFirstCompare).join(", ");
+        const productIds = [...new Set(companyLines.map((line) => line.product.id))]
+          .sort((a, b) => alphaFirstCompare(productById(a)?.name || "", productById(b)?.name || ""));
+        return `
+          <details class="item">
+            <summary><span>${escapeHtml(company)} 랜딩 입고</span><span class="pill">${pendingCount ? `대기 ${pendingCount}` : "완료"}</span></summary>
+            <div class="details-body">
+              <div class="meta"><span>${escapeHtml(categoryLabels)}</span></div>
+              ${pendingCount ? `<div class="actions"><button type="button" data-receive-company="${escapeHtml(company)}">업체 전체 랜딩 입고</button></div>` : ""}
+              ${productIds.map((productId) => {
+                const product = productById(productId);
+                const productLines = companyLines
+                  .filter((line) => line.product.id === productId)
+                  .sort((a, b) => alphaFirstCompare(a.usage.date, b.usage.date) || alphaFirstCompare(a.usage.patientName, b.usage.patientName));
+                const productPending = productLines.filter((line) => !line.receipt).length;
+                return `
+                  <details class="item">
+                    <summary><span>${escapeHtml(product?.name || "삭제된 제품")}</span><span class="pill">${productPending ? `대기 ${productPending}` : "완료"}</span></summary>
+                    <div class="details-body">
+                      <div class="meta"><span>${escapeHtml(productCategoryLabel(product?.category))}${product?.subcategory ? ` · ${escapeHtml(product.subcategory)}` : ""}</span></div>
+                      ${productLines.map(landingLineItem).join("")}
+                    </div>
+                  </details>
+                `;
+              }).join("")}
+            </div>
+          </details>
+        `;
+      }).join("");
+    };
+
+    const landingLineItem = ({ usage, product, receipt, qty }) => `
+      <div class="item landing-line ${receipt ? "received" : "pending"}">
+        <div class="compact-line">
+          <div class="compact-main">${escapeHtml(product?.name || "삭제된 제품")} · ${escapeHtml(usage.patientName)} · 사용 ${escapeHtml(usage.date)} · ${Math.max(1, num(qty))}개</div>
+          <div class="compact-meta">${receipt ? `입고 ${escapeHtml(receipt.date)} · ${num(receipt.qty)}개` : "입고 대기"}</div>
+          <span class="pill ${receipt ? "" : "low"}">${receipt ? "확인" : "대기"}</span>
+          ${receipt ? "" : `<div class="compact-actions"><button type="button" data-receive-landing="${usage.id}::${product.id}">입고 확인</button></div>`}
+        </div>
+      </div>
+    `;
+
+    const renderReceiptHistory = () => {
+      if (!state.receipts.length) return `<div class="empty">입고내역이 없습니다.</div>`;
+      const productIds = [...new Set(state.receipts.map((item) => item.productId))]
+        .sort((a, b) => alphaFirstCompare(productById(a)?.name || "", productById(b)?.name || ""));
+      return productIds.map((productId) => {
+        const product = productById(productId);
+        const receipts = state.receipts
+          .filter((item) => item.productId === productId)
+          .slice()
+          .sort((a, b) => alphaFirstCompare(b.date, a.date) || alphaFirstCompare(a.patientName || "", b.patientName || ""));
+        return `
+          <details class="item">
+            <summary><span>${escapeHtml(product?.name || "삭제된 제품")}</span><span class="pill">${receipts.reduce((sum, item) => sum + num(item.qty), 0)}개</span></summary>
+            <div class="details-body">
+              <div class="meta">
+                <span>${escapeHtml(productCategoryLabel(product?.category))}${product?.company ? ` · ${escapeHtml(product.company)}` : ""}${product?.subcategory ? ` · ${escapeHtml(product.subcategory)}` : ""}</span>
+              </div>
+              ${receipts.map((item) => `
+                <div class="item landing-line received">
+                  <div class="compact-line">
+                    <div class="compact-main">${escapeHtml(product?.name || "삭제된 제품")} · ${item.type === "landing" ? `사용 ${escapeHtml(item.usageDate || "-")} · ${escapeHtml(item.patientName || "-")}` : "비급여 입고"} · ${num(item.qty)}개</div>
+                    <div class="compact-meta">입고 ${escapeHtml(item.date)}</div>
+                    <span class="pill">${item.type === "landing" ? "랜딩" : "비급여"}</span>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          </details>
+        `;
+      }).join("");
+    };
+
+    const renderGroupedSurgeries = () => {
+      const departments = departmentNames();
+      const surgeryDepartments = state.surgeries.map((item) => item.department || inferSurgeryDepartment(item.name));
+      const names = [...new Set([...departments, ...surgeryDepartments])].filter(Boolean).sort(alphaFirstCompare);
+      if (!state.surgeries.length) return `<div class="empty">수술을 추가해 주세요.</div>`;
+      return names.map((department) => {
+        const items = state.surgeries
+          .filter((item) => (item.department || inferSurgeryDepartment(item.name)) === department)
+          .sort(byName);
+        if (!items.length) return "";
+        return `
+          <details class="item">
+            <summary><span>${escapeHtml(department)} 수술</span><span class="pill">${items.length}</span></summary>
+            <div class="details-body">
+              ${items.map((item) => `
+                <div class="item">
+                  <div class="item-title"><span>${escapeHtml(item.name)}</span></div>
+                  <div class="actions">
+                    <button class="secondary" type="button" data-edit-surgery="${item.id}">수정</button>
+                    <button class="danger" type="button" data-delete-surgery="${item.id}">삭제</button>
+                  </div>
+               </div>
+              `).join("")}
+            </div>
+          </details>
+        `;
+      }).join("");
+    };
+
+    const bindSimpleManager = (collection, label, key) => {
+      const form = document.getElementById(`${key}Form`);
+      document.getElementById(`${key}Reset`).addEventListener("click", () => {
+        form.reset();
+          document.getElementById(`${key}Id`).value = "";
+          document.getElementById(`${key}OldName`).value = "";
+          document.getElementById(`${key}FormTitle`).textContent = `${label} 추가`;
+        });
+      if (key === "doctor") {
+        document.getElementById(`${key}NewDepartment`).addEventListener("input", () => {
+          if (document.getElementById(`${key}NewDepartment`).value.trim()) {
+            document.getElementById(`${key}Department`).value = "";
+          }
+        });
+        document.getElementById(`${key}Department`).addEventListener("change", () => {
+          if (document.getElementById(`${key}Department`).value) {
+            document.getElementById(`${key}NewDepartment`).value = "";
+          }
+        });
+      }
+      app.querySelectorAll(`[data-edit-${key}]`).forEach((button) => {
+        button.addEventListener("click", () => {
+          const item = state[collection].find((entry) => entry.id === button.dataset[`edit${capitalize(key)}`]);
+          if (!item) return;
+          document.getElementById(`${key}FormTitle`).textContent = `${label} 수정`;
+          document.getElementById(`${key}Id`).value = item.id;
+          document.getElementById(`${key}OldName`).value = item.name;
+          if (key === "doctor") {
+            document.getElementById(`${key}Department`).value = departmentCode(item.name);
+            document.getElementById(`${key}NewDepartment`).value = "";
+            document.getElementById(`${key}Number`).value = item.name.replace(departmentCode(item.name), "");
+          } else {
+            document.getElementById(`${key}Name`).value = item.name;
+          }
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+      });
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const id = document.getElementById(`${key}Id`).value || uid();
+        const oldName = document.getElementById(`${key}OldName`).value;
+        const name = key === "doctor"
+          ? `${(document.getElementById(`${key}NewDepartment`).value.trim() || document.getElementById(`${key}Department`).value).toUpperCase()}${document.getElementById(`${key}Number`).value.trim()}`
+          : document.getElementById(`${key}Name`).value.trim();
+        if (key === "doctor" && (!document.getElementById(`${key}Number`).value.trim() || !(document.getElementById(`${key}NewDepartment`).value.trim() || document.getElementById(`${key}Department`).value))) {
+          alert("과와 의사코드를 모두 입력해 주세요.");
+          return;
+        }
+        if (!name) return;
+        state[collection] = [...state[collection].filter((item) => item.id !== id), { id, name }];
+        if (key === "doctor" && oldName && oldName !== name) {
+          state.surgeries = state.surgeries.map((item) => item.department === oldName ? { ...item, department: name } : item);
+        }
+        render();
+        await saveState();
+      });
+    };
+
+    const bindDoctors = () => bindSimpleManager("doctors", "과", "doctor");
+    const bindSurgeries = () => {
+      const form = document.getElementById("surgeryForm");
+      document.getElementById("surgeryReset").addEventListener("click", () => {
+        form.reset();
+        document.getElementById("surgeryId").value = "";
+        document.getElementById("surgeryFormTitle").textContent = "수술 추가";
+      });
+      app.querySelectorAll("[data-edit-surgery]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const item = surgeryById(button.dataset.editSurgery);
+          if (!item) return;
+          document.getElementById("surgeryFormTitle").textContent = "수술 수정";
+          document.getElementById("surgeryId").value = item.id;
+          document.getElementById("surgeryDepartment").value = item.department || inferSurgeryDepartment(item.name);
+          document.getElementById("surgeryName").value = item.name;
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+      });
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const id = document.getElementById("surgeryId").value || uid();
+        const department = document.getElementById("surgeryDepartment").value;
+        const name = document.getElementById("surgeryName").value.trim();
+        if (!department || !name) return;
+        state.surgeries = [...state.surgeries.filter((item) => item.id !== id), { id, department, name }];
+        render();
+        await saveState();
+      });
+    };
+
+    const renderUsageRules = () => `
+      <section class="grid two">
+        <form class="card" id="usageRuleForm">
+          <h2 id="usageRuleFormTitle">수술별 사용관리 추가</h2>
+          <input type="hidden" id="usageRuleId">
+          <label for="ruleDepartment">과</label>
+          <select id="ruleDepartment" required>
+            <option value="">과 선택</option>
+            ${departmentNames().map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}
+          </select>
+          <label for="ruleDoctor">원장코드</label>
+          <select id="ruleDoctor" required>
+            <option value="">원장코드 선택</option>
+            ${state.doctors.slice().sort(byName).map((item) => `<option value="${item.id}" data-department="${escapeHtml(departmentCode(item.name))}">${escapeHtml(item.name)}</option>`).join("")}
+          </select>
+          <label for="ruleSurgery">수술</label>
+          <select id="ruleSurgery" required>
+            <option value="">수술 선택</option>
+            ${state.surgeries.slice().sort((a, b) => alphaFirstCompare(a.department || inferSurgeryDepartment(a.name), b.department || inferSurgeryDepartment(b.name)) || alphaFirstCompare(a.name, b.name)).map((item) => `<option value="${item.id}" data-department="${escapeHtml(item.department || inferSurgeryDepartment(item.name))}">${escapeHtml(item.department || inferSurgeryDepartment(item.name))} - ${escapeHtml(item.name)}</option>`).join("")}
+          </select>
+          <label>추천 항목</label>
+          <div class="product-picker">
+            ${renderRuleProductSelector()}
+          </div>
+          <div class="actions">
+            <button type="submit">설정 저장</button>
+            <button class="secondary" type="button" id="usageRuleReset">새로 입력</button>
+          </div>
+        </form>
+        <div class="card">
+          <h2>수술별 사용관리 목록</h2>
+          ${state.usageRules.slice().sort((a, b) => alphaFirstCompare(a.department, b.department) || alphaFirstCompare(departmentById(a.doctorId)?.name, departmentById(b.doctorId)?.name) || alphaFirstCompare(surgeryById(a.surgeryId)?.name, surgeryById(b.surgeryId)?.name)).map(ruleItem).join("") || `<div class="empty">등록된 규칙이 없습니다.</div>`}
+        </div>
+      </section>
+    `;
+
+    const ruleItems = (rule) => Array.isArray(rule.items)
+      ? rule.items
+      : Array.isArray(rule.nonpayItems)
+      ? rule.nonpayItems
+      : (rule.nonpayProductIds || []).map((productId) => ({ productId, qty: 1 }));
+
+    const renderRuleProductSelector = () => {
+      if (!state.products.length) return `<div class="empty">제품이 없습니다.</div>`;
+      const categories = ["비급여", "인체조직", "ANCHOR"];
+      return categories.map((category) => {
+        const items = state.products.filter((item) => productCategory(item.category) === category).sort(byName);
+        if (!items.length) return "";
+        return `
+          <details class="item">
+            <summary><span>${escapeHtml(productCategoryLabel(category))}</span><span class="pill">${items.length}</span></summary>
+            <div class="details-body">
+              ${items.map(ruleProductItem).join("")}
+            </div>
+          </details>
+        `;
+      }).join("");
+    };
+
+    const ruleProductItem = (item) => `
+      <label class="check-card rule-card">
+        <input type="checkbox" value="${item.id}" data-rule-product>
+        <span>${escapeHtml(item.name)}<br><span class="muted">${escapeHtml(productCategoryLabel(item.category))}${item.company ? ` · ${escapeHtml(item.company)}` : ""}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ""} · 현재고 ${num(item.stock)}</span></span>
+        <input type="number" min="1" value="1" data-rule-product-qty="${item.id}" aria-label="${escapeHtml(item.name)} 추천 수량">
+      </label>
+    `;
+
+    const ruleItem = (rule) => {
+      const doctor = departmentById(rule.doctorId);
+      const surgery = surgeryById(rule.surgeryId);
+      const items = ruleItems(rule);
+      const names = items.map((item) => `${productById(item.productId)?.name || "삭제된 제품"} ${num(item.qty) || 1}개`).join(", ");
+      return `
+        <div class="item">
+          <div class="item-title">
+            <span>${escapeHtml(rule.department)} · ${escapeHtml(doctor?.name || "-")} · ${escapeHtml(surgery?.name || "-")}</span>
+            <span class="pill">추천</span>
+          </div>
+          <div class="meta"><span>추천 항목: ${escapeHtml(names || "-")}</span></div>
+          <div class="actions">
+            <button class="secondary" type="button" data-edit-rule="${rule.id}">수정</button>
+            <button class="danger" type="button" data-delete-rule="${rule.id}">삭제</button>
+          </div>
+        </div>
+      `;
+    };
+
+    const bindUsageRules = () => {
+      const form = document.getElementById("usageRuleForm");
+      const filterRuleOptions = () => {
+        const department = document.getElementById("ruleDepartment").value;
+        ["ruleDoctor", "ruleSurgery"].forEach((id) => {
+          const select = document.getElementById(id);
+          Array.from(select.options).forEach((option) => {
+            if (!option.value) return;
+            const matches = !department || option.dataset.department === department;
+            option.hidden = !matches;
+            option.disabled = !matches;
+          });
+          if (select.selectedOptions[0]?.disabled) select.value = "";
+        });
+      };
+      document.getElementById("ruleDepartment").addEventListener("change", filterRuleOptions);
+      document.getElementById("usageRuleReset").addEventListener("click", () => {
+        form.reset();
+        document.getElementById("usageRuleId").value = "";
+        document.getElementById("usageRuleFormTitle").textContent = "수술별 사용관리 추가";
+        filterRuleOptions();
+      });
+      app.querySelectorAll("[data-edit-rule]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const rule = usageRuleById(button.dataset.editRule);
+          if (!rule) return;
+          document.getElementById("usageRuleFormTitle").textContent = "수술별 사용관리 수정";
+          document.getElementById("usageRuleId").value = rule.id;
+          document.getElementById("ruleDepartment").value = rule.department;
+          filterRuleOptions();
+          document.getElementById("ruleDoctor").value = rule.doctorId;
+          document.getElementById("ruleSurgery").value = rule.surgeryId;
+          const items = ruleItems(rule);
+          app.querySelectorAll("[data-rule-product]").forEach((input) => {
+            const item = items.find((entry) => entry.productId === input.value);
+            input.checked = Boolean(item);
+            const qtyInput = app.querySelector(`[data-rule-product-qty="${input.value}"]`);
+            if (qtyInput) qtyInput.value = item ? Math.max(1, num(item.qty)) : 1;
+          });
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+      });
+      app.querySelectorAll("[data-delete-rule]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          if (!confirm("수술별 사용관리 규칙을 삭제할까요?")) return;
+          state.usageRules = state.usageRules.filter((item) => item.id !== button.dataset.deleteRule);
+          render();
+          await saveState();
+        });
+      });
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const id = document.getElementById("usageRuleId").value || uid();
+        const items = Array.from(app.querySelectorAll("[data-rule-product]:checked")).map((input) => ({
+          productId: input.value,
+          qty: Math.max(1, num(app.querySelector(`[data-rule-product-qty="${input.value}"]`)?.value))
+        }));
+        const rule = {
+          id,
+          department: document.getElementById("ruleDepartment").value,
+          doctorId: document.getElementById("ruleDoctor").value,
+          surgeryId: document.getElementById("ruleSurgery").value,
+          items,
+          nonpayItems: items.filter((item) => productCategory(productById(item.productId)?.category) === "비급여"),
+          nonpayProductIds: items.filter((item) => productCategory(productById(item.productId)?.category) === "비급여").map((item) => item.productId)
+        };
+        if (!rule.department || !rule.doctorId || !rule.surgeryId) return;
+        state.usageRules = [...state.usageRules.filter((item) => item.id !== id), rule];
+        render();
+        await saveState();
+      });
+      filterRuleOptions();
+    };
+
+    const renderReceipts = () => `
+      <section class="grid">
+        <div class="receipt-tabs">
+          <button class="receipt-tab ${currentReceiptView === "nonpay" ? "active" : ""}" data-receipt-view="nonpay" type="button">비급여 입고관리</button>
+          <button class="receipt-tab ${currentReceiptView === "landing" ? "active" : ""}" data-receipt-view="landing" type="button">랜딩 입고관리</button>
+          <button class="receipt-tab ${currentReceiptView === "history" ? "active" : ""}" data-receipt-view="history" type="button">입고내역</button>
+        </div>
+        ${currentReceiptView === "nonpay" ? `
+          <form class="card receipt-wide" id="nonpayReceiptForm">
+            <h2>비급여 입고 등록</h2>
+            <label for="nonpayReceiptProduct">제품 선택</label>
+            <select id="nonpayReceiptProduct" required>
+              <option value="">비급여 제품을 선택하세요</option>
+              ${state.products.filter((item) => productCategory(item.category) === "비급여").sort(byName).map((item) => `<option value="${item.id}">${escapeHtml(item.name)} / 현재고 ${num(item.stock)}</option>`).join("")}
+            </select>
+            <label for="nonpayReceiptQty">입고 수량</label>
+            <input id="nonpayReceiptQty" type="number" min="1" value="1" required>
+            <div class="actions"><button type="submit">비급여 입고 저장</button></div>
+          </form>
+        ` : ""}
+        ${currentReceiptView === "landing" ? `
+          <div class="card receipt-wide">
+            <h2>랜딩 입고 확인</h2>
+            ${renderLandingBoard()}
+          </div>
+        ` : ""}
+        ${currentReceiptView === "history" ? `
+          <div class="card receipt-wide">
+            <h2>입고내역</h2>
+            ${renderReceiptHistory()}
+          </div>
+        ` : ""}
+      </section>
+    `;
+
+    const bindReceipts = () => {
+      app.querySelectorAll("[data-receipt-view]").forEach((button) => {
+        button.addEventListener("click", () => {
+          currentReceiptView = button.dataset.receiptView;
+          render();
+        });
+      });
+      document.getElementById("nonpayReceiptForm")?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const productId = document.getElementById("nonpayReceiptProduct").value;
+        const qty = Math.max(1, num(document.getElementById("nonpayReceiptQty").value));
+        const product = productById(productId);
+        if (!product) return;
+        product.stock = num(product.stock) + qty;
+        state.receipts.push({ id: uid(), type: "nonpay", productId, qty, date: today(), createdAt: new Date().toISOString() });
+        render();
+        await saveState();
+      });
+      const receiveLandingLine = async (usageId, productId) => {
+        const usage = state.usages.find((item) => item.id === usageId);
+        const product = productById(productId);
+        if (!usage || !product) return;
+        const exists = state.receipts.some((item) => item.type === "landing" && item.usageId === usageId && item.productId === productId);
+        if (exists) return;
+        const line = landingUsageLines(true).find((item) => item.usage.id === usageId && item.product.id === productId);
+        const qty = Math.max(1, num(line?.qty));
+        product.stock = num(product.stock) + qty;
+        state.receipts.push({
+          id: uid(),
+          type: "landing",
+          usageId,
+          productId,
+          qty,
+          date: today(),
+          usageDate: usage.date,
+          patientName: usage.patientName,
+          company: product.company || "",
+          subcategory: product.subcategory || "",
+          createdAt: new Date().toISOString()
+        });
+      };
+      app.querySelectorAll("[data-receive-landing]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const [usageId, productId] = button.dataset.receiveLanding.split("::");
+          await receiveLandingLine(usageId, productId);
+          render();
+          await saveState();
+        });
+      });
+      app.querySelectorAll("[data-receive-company]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const company = button.dataset.receiveCompany;
+          const lines = landingUsageLines(false).filter((line) => (line.product.company || "업체 없음") === company);
+          lines.forEach((line) => {
+            const product = line.product;
+            const qty = Math.max(1, num(line.qty));
+            product.stock = num(product.stock) + qty;
+            state.receipts.push({
+              id: uid(),
+              type: "landing",
+              usageId: line.usage.id,
+              productId: product.id,
+              qty,
+              date: today(),
+              usageDate: line.usage.date,
+              patientName: line.usage.patientName,
+              company: product.company || "",
+              subcategory: product.subcategory || "",
+              createdAt: new Date().toISOString()
+            });
+          });
+          render();
+          await saveState();
+        });
+      });
+    };
+
+    const renderUse = () => `
+      <section class="grid">
+        <form class="card" id="useForm">
+          <h2>사용입력</h2>
+          <div class="row two">
+            <div>
+              <label for="patientName">환자명</label>
+              <input id="patientName" required autocomplete="off">
+            </div>
+            <div>
+              <label>비급여 제한</label>
+              <button class="secondary" type="button" id="useRestrictNonpay" data-restrict="false">비급여 제한 꺼짐</button>
+            </div>
+          </div>
+          <div class="row two">
+            <div>
+              <label for="useDepartment">과</label>
+              <select id="useDepartment" required>
+                <option value="">과 선택</option>
+                ${departmentNames().map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}
+              </select>
+            </div>
+            <div>
+              <label for="useDoctor">원장 코드</label>
+              <select id="useDoctor" required>
+                <option value="">원장 코드 선택</option>
+                ${state.doctors.slice().sort(byName).map((item) => `<option value="${item.id}" data-department="${escapeHtml(departmentCode(item.name))}">${escapeHtml(item.name)}</option>`).join("")}
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label for="useSurgery">수술</label>
+              <select id="useSurgery" required>
+                <option value="">수술 선택</option>
+                ${state.surgeries.slice().sort((a, b) => alphaFirstCompare(a.department || inferSurgeryDepartment(a.name), b.department || inferSurgeryDepartment(b.name)) || alphaFirstCompare(a.name, b.name)).map((item) => `<option value="${item.id}" data-department="${escapeHtml(item.department || inferSurgeryDepartment(item.name))}">${escapeHtml(item.department || inferSurgeryDepartment(item.name))} - ${escapeHtml(item.name)}</option>`).join("")}
+              </select>
+            </div>
+          </div>
+          <div id="useRecommendation"></div>
+          <div class="card">
+            <h3>사용내용</h3>
+            <div id="selectedUseList" class="meta"><span>선택된 제품이 없습니다.</span></div>
+          </div>
+          <div class="card">
+            <h3>제품 검색</h3>
+            <label for="useProductSearch">제품명 검색</label>
+            <input id="useProductSearch" autocomplete="off" placeholder="제품명을 입력하면 바로 찾을 수 있습니다">
+            <div id="useProductSearchResults" class="product-picker"></div>
+          </div>
+          <label>제품 여러 개 선택</label>
+          <div class="product-picker">
+            ${renderGroupedProducts(false)}
+          </div>
+          <div class="actions"><button type="submit">사용내역 저장</button></div>
+        </form>
+      </section>
+    `;
+
+    const usageProductItems = (usage) => Array.from((usage?.productIds || []).reduce((map, id) => {
+      map.set(id, (map.get(id) || 0) + 1);
+      return map;
+    }, new Map()).entries()).map(([productId, qty]) => ({ productId, qty }));
+
+    const renderUseItemsList = (items, target) => {
+      if (!items.length) {
+        target.innerHTML = `<span>선택된 제품이 없습니다.</span>`;
+        return;
+      }
+      const categories = ["비급여", "인체조직", "ANCHOR"];
+      target.innerHTML = categories.map((category) => {
+        const categoryItems = items
+          .map((item) => ({ ...item, product: productById(item.productId) }))
+          .filter((item) => item.product && productCategory(item.product.category) === category);
+        if (!categoryItems.length) return "";
+        return `
+          <div class="item">
+            <div class="item-title"><span>${escapeHtml(productCategoryLabel(category))}</span><span class="pill">${categoryItems.length}</span></div>
+            <div class="meta">
+              ${categoryItems.map((item) => `<span>${escapeHtml(item.product.name)} · ${item.qty}개</span>`).join("")}
+            </div>
+          </div>
+        `;
+      }).join("");
+    };
+
+    const renderEditUsage = () => `
+      <section class="grid">
+        <div class="card">
+          <h2>환자 사용내역 선택</h2>
+          <label for="editUsageSelect">환자 선택</label>
+          <select id="editUsageSelect">
+            <option value="">수정할 환자 사용내역을 선택하세요</option>
+            ${state.usages.slice().reverse().map((usage) => {
+              const doctor = departmentById(usage.doctorId);
+              const surgery = surgeryById(usage.surgeryId);
+              return `<option value="${usage.id}">${escapeHtml(usage.date)} · ${escapeHtml(usage.patientName)} · ${escapeHtml(doctor?.name || "-")} · ${escapeHtml(surgery?.name || "-")}</option>`;
+            }).join("")}
+          </select>
+        </div>
+        <form class="card" id="editUsageForm" style="display:none;">
+          <h2>사용내용 수정</h2>
+          <input type="hidden" id="editUsageId">
+          <div class="row two">
+            <div>
+              <label for="editPatientName">환자명</label>
+              <input id="editPatientName" required autocomplete="off">
+            </div>
+            <div>
+              <label for="editUsageDate">사용일</label>
+              <input id="editUsageDate" type="date" required>
+            </div>
+          </div>
+          <div class="row two">
+            <div>
+              <label for="editDepartment">과</label>
+              <select id="editDepartment" required>
+                <option value="">과 선택</option>
+                ${departmentNames().map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}
+              </select>
+            </div>
+            <div>
+              <label for="editDoctor">원장 코드</label>
+              <select id="editDoctor" required>
+                <option value="">원장 코드 선택</option>
+                ${state.doctors.slice().sort(byName).map((item) => `<option value="${item.id}" data-department="${escapeHtml(departmentCode(item.name))}">${escapeHtml(item.name)}</option>`).join("")}
+              </select>
+            </div>
+          </div>
+          <label for="editSurgery">수술</label>
+          <select id="editSurgery" required>
+            <option value="">수술 선택</option>
+            ${state.surgeries.slice().sort((a, b) => alphaFirstCompare(a.department || inferSurgeryDepartment(a.name), b.department || inferSurgeryDepartment(b.name)) || alphaFirstCompare(a.name, b.name)).map((item) => `<option value="${item.id}" data-department="${escapeHtml(item.department || inferSurgeryDepartment(item.name))}">${escapeHtml(item.department || inferSurgeryDepartment(item.name))} - ${escapeHtml(item.name)}</option>`).join("")}
+          </select>
+          <div class="card">
+            <h3>수정될 사용내용</h3>
+            <div id="editSelectedUseList" class="meta"><span>선택된 제품이 없습니다.</span></div>
+          </div>
+          <div class="card">
+            <h3>제품 검색</h3>
+            <label for="editProductSearch">제품명 검색</label>
+            <input id="editProductSearch" autocomplete="off" placeholder="제품명을 입력하면 바로 찾을 수 있습니다">
+            <div id="editProductSearchResults" class="product-picker"></div>
+          </div>
+          <label>제품 여러 개 선택</label>
+          <div class="product-picker">
+            ${renderGroupedProducts(false)}
+          </div>
+          <div class="actions">
+            <button type="submit">수정 저장</button>
+            <button class="secondary" type="button" id="editUsageCancel">선택 해제</button>
+          </div>
+        </form>
+      </section>
+    `;
+
+    const bindEditUsage = () => {
+      const select = document.getElementById("editUsageSelect");
+      const form = document.getElementById("editUsageForm");
+      const useDepartment = document.getElementById("editDepartment");
+      const doctorSelect = document.getElementById("editDoctor");
+      const surgerySelect = document.getElementById("editSurgery");
+      const selectedList = document.getElementById("editSelectedUseList");
+      const productSearch = document.getElementById("editProductSearch");
+      const productSearchResults = document.getElementById("editProductSearchResults");
+      const selectedItems = () => Array.from(app.querySelectorAll("[data-use-product]:checked")).map((input) => ({
+        productId: input.value,
+        qty: Math.max(1, num(app.querySelector(`[data-use-qty="${input.value}"]`)?.value))
+      }));
+      const renderSelected = () => renderUseItemsList(selectedItems(), selectedList);
+      const selectProduct = (productId, qty = 1) => {
+        const checkbox = app.querySelector(`[data-use-product="${productId}"]`);
+        const qtyInput = app.querySelector(`[data-use-qty="${productId}"]`);
+        if (checkbox) checkbox.checked = true;
+        if (qtyInput) qtyInput.value = Math.max(1, num(qty));
+        renderSelected();
+      };
+      const clearProducts = () => {
+        app.querySelectorAll("[data-use-product]").forEach((input) => {
+          input.checked = false;
+          input.disabled = false;
+        });
+        app.querySelectorAll("[data-use-qty]").forEach((input) => {
+          input.value = 1;
+          input.disabled = false;
+        });
+      };
+      const syncEditStockLimits = (usage) => {
+        const originalCounts = usageProductItems(usage).reduce((map, item) => {
+          map.set(item.productId, item.qty);
+          return map;
+        }, new Map());
+        app.querySelectorAll("[data-use-product]").forEach((input) => {
+          const product = productById(input.value);
+          const available = num(product?.stock) + (originalCounts.get(input.value) || 0);
+          const qtyInput = app.querySelector(`[data-use-qty="${input.value}"]`);
+          input.disabled = false;
+          if (qtyInput) {
+            qtyInput.disabled = false;
+            qtyInput.max = Math.max(1, available);
+          }
+        });
+      };
+      const filterOptions = () => {
+        const department = useDepartment.value;
+        [doctorSelect, surgerySelect].forEach((list) => {
+          Array.from(list.options).forEach((option) => {
+            if (!option.value) return;
+            const matches = !department || option.dataset.department === department;
+            option.hidden = !matches;
+            option.disabled = !matches;
+          });
+          if (list.selectedOptions[0]?.disabled) list.value = "";
+        });
+      };
+      const renderSearch = () => {
+        const query = normalizedName(productSearch.value);
+        if (!query) {
+          productSearchResults.innerHTML = `<div class="empty">제품명을 입력해 주세요.</div>`;
+          return;
+        }
+        const results = state.products
+          .filter((item) => normalizedName(`${item.name} ${item.company || ""} ${item.subcategory || ""} ${productCategoryLabel(item.category)}`).includes(query))
+          .sort(byName)
+          .slice(0, 12);
+        productSearchResults.innerHTML = results.length ? results.map((item) => `
+          <label class="check-card use-card">
+            <input type="checkbox" value="${item.id}" data-edit-search-product="${item.id}" ${app.querySelector(`[data-use-product="${item.id}"]`)?.checked ? "checked" : ""}>
+            <span>${escapeHtml(item.name)}<br><span class="muted">${escapeHtml(productCategoryLabel(item.category))}${item.company ? ` · ${escapeHtml(item.company)}` : ""}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ""} · 현재고 ${num(item.stock)}</span></span>
+            <input type="number" min="1" value="${Math.max(1, num(app.querySelector(`[data-use-qty="${item.id}"]`)?.value) || 1)}" data-edit-search-qty="${item.id}" aria-label="${escapeHtml(item.name)} 수정 수량">
+          </label>
+        `).join("") : `<div class="empty">검색 결과가 없습니다.</div>`;
+        productSearchResults.querySelectorAll("[data-edit-search-product]").forEach((input) => {
+          input.addEventListener("change", () => {
+            const qty = productSearchResults.querySelector(`[data-edit-search-qty="${input.value}"]`)?.value;
+            const linked = app.querySelector(`[data-use-product="${input.value}"]`);
+            if (input.checked) {
+              selectProduct(input.value, qty);
+            } else if (linked) {
+              linked.checked = false;
+              renderSelected();
+            }
+          });
+        });
+        productSearchResults.querySelectorAll("[data-edit-search-qty]").forEach((input) => {
+          input.addEventListener("input", () => selectProduct(input.dataset.editSearchQty, input.value));
+        });
+      };
+      const loadUsage = (id) => {
+        const usage = state.usages.find((item) => item.id === id);
+        if (!usage) {
+          form.style.display = "none";
+          return;
+        }
+        form.style.display = "";
+        form.querySelectorAll("input, select, textarea, button").forEach((element) => {
+          element.disabled = false;
+        });
+        syncEditStockLimits(usage);
+        document.getElementById("editUsageId").value = usage.id;
+        document.getElementById("editPatientName").value = usage.patientName || "";
+        document.getElementById("editUsageDate").value = usage.date || today();
+        const surgery = surgeryById(usage.surgeryId);
+        useDepartment.value = surgery?.department || inferSurgeryDepartment(surgery?.name || "") || departmentCode(departmentById(usage.doctorId)?.name || "");
+        filterOptions();
+        doctorSelect.value = usage.doctorId || "";
+        surgerySelect.value = usage.surgeryId || "";
+        clearProducts();
+        usageProductItems(usage).forEach((item) => selectProduct(item.productId, item.qty));
+        renderSearch();
+        renderSelected();
+      };
+      select.addEventListener("change", () => loadUsage(select.value));
+      useDepartment.addEventListener("change", filterOptions);
+      app.querySelectorAll("[data-use-product], [data-use-qty]").forEach((input) => {
+        input.addEventListener("change", () => {
+          renderSelected();
+          renderSearch();
+        });
+        input.addEventListener("input", () => {
+          renderSelected();
+          renderSearch();
+        });
+      });
+      productSearch.addEventListener("input", renderSearch);
+      document.getElementById("editUsageCancel").addEventListener("click", () => {
+        select.value = "";
+        form.style.display = "none";
+        pendingEditUsageId = "";
+      });
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const id = document.getElementById("editUsageId").value;
+        const usage = state.usages.find((item) => item.id === id);
+        if (!usage) return;
+        const newItems = selectedItems();
+        const newProductIds = newItems.flatMap((item) => Array.from({ length: item.qty }, () => item.productId));
+        if (!document.getElementById("editPatientName").value.trim() || !doctorSelect.value || !surgerySelect.value) {
+          alert("환자명, 원장 코드, 수술을 모두 입력해 주세요.");
+          return;
+        }
+        if (!newProductIds.length) {
+          alert("제품을 하나 이상 선택해 주세요.");
+          return;
+        }
+        usage.productIds.forEach((productId) => {
+          const product = productById(productId);
+          if (product) product.stock = num(product.stock) + 1;
+        });
+        const unavailable = newItems.find((item) => num(productById(item.productId)?.stock) < item.qty);
+        if (unavailable) {
+          usage.productIds.forEach((productId) => {
+            const product = productById(productId);
+            if (product) product.stock = Math.max(0, num(product.stock) - 1);
+          });
+          alert("재고가 부족한 제품이 있습니다.");
+          return;
+        }
+        const hasLandingReceipt = state.receipts.some((receipt) => receipt.type === "landing" && receipt.usageId === usage.id);
+        if (hasLandingReceipt && !confirm("이미 랜딩 입고 확인된 사용내역입니다. 입고내역은 보존됩니다. 그래도 수정할까요?")) {
+          usage.productIds.forEach((productId) => {
+            const product = productById(productId);
+            if (product) product.stock = Math.max(0, num(product.stock) - 1);
+          });
+          return;
+        }
+        newItems.forEach((item) => {
+          const product = productById(item.productId);
+          if (product) product.stock = Math.max(0, num(product.stock) - item.qty);
+        });
+        const next = {
+          ...usage,
+          patientName: document.getElementById("editPatientName").value.trim(),
+          doctorId: doctorSelect.value,
+          surgeryId: surgerySelect.value,
+          productIds: newProductIds,
+          date: document.getElementById("editUsageDate").value,
+          updatedAt: new Date().toISOString()
+        };
+        state.usages = state.usages.map((item) => item.id === usage.id ? next : item);
+        currentView = "edit";
+        pendingEditUsageId = id;
+        render();
+        await saveState("수정 완료");
+      });
+      filterOptions();
+      renderSearch();
+      if (pendingEditUsageId) {
+        select.value = pendingEditUsageId;
+        loadUsage(pendingEditUsageId);
+      }
+    };
+
+    const bindUse = () => {
+      const useDepartment = document.getElementById("useDepartment");
+      const departmentSelect = document.getElementById("useDoctor");
+      const surgerySelect = document.getElementById("useSurgery");
+      const useRestrictNonpay = document.getElementById("useRestrictNonpay");
+      const recommendation = document.getElementById("useRecommendation");
+      const selectedUseList = document.getElementById("selectedUseList");
+      const productSearch = document.getElementById("useProductSearch");
+      const productSearchResults = document.getElementById("useProductSearchResults");
+      let manualRestrictNonpay = false;
+      const setRestrictButton = (value) => {
+        manualRestrictNonpay = Boolean(value);
+        useRestrictNonpay.dataset.restrict = value ? "true" : "false";
+        useRestrictNonpay.textContent = value ? "비급여 제한 켜짐" : "비급여 제한 꺼짐";
+        useRestrictNonpay.classList.toggle("danger", Boolean(value));
+        useRestrictNonpay.classList.toggle("secondary", !value);
+      };
+      const isRestrictOn = () => manualRestrictNonpay;
+      const currentUseRule = () => state.usageRules.find((rule) =>
+        rule.department === useDepartment.value &&
+        rule.doctorId === departmentSelect.value &&
+        rule.surgeryId === surgerySelect.value
+      );
+      const selectedUseItems = () => Array.from(app.querySelectorAll("[data-use-product]:checked")).map((input) => ({
+        productId: input.value,
+        qty: Math.max(1, num(app.querySelector(`[data-use-qty="${input.value}"]`)?.value))
+      }));
+      const renderSelectedUseList = () => {
+        const items = selectedUseItems();
+        if (!items.length) {
+          selectedUseList.innerHTML = `<span>선택된 제품이 없습니다.</span>`;
+          return;
+        }
+        const categories = ["비급여", "인체조직", "ANCHOR"];
+        selectedUseList.innerHTML = categories.map((category) => {
+          const categoryItems = items
+            .map((item) => ({ ...item, product: productById(item.productId) }))
+            .filter((item) => item.product && productCategory(item.product.category) === category);
+          if (!categoryItems.length) return "";
+          return `
+            <div class="item">
+              <div class="item-title"><span>${escapeHtml(productCategoryLabel(category))}</span><span class="pill">${categoryItems.length}</span></div>
+              <div class="meta">
+                ${categoryItems.map((item) => `<span>${escapeHtml(item.product.name)} · ${item.qty}개</span>`).join("")}
+              </div>
+            </div>
+          `;
+        }).join("");
+      };
+      const selectUseProduct = (productId, qty = 1) => {
+        const checkbox = app.querySelector(`[data-use-product="${productId}"]`);
+        const qtyInput = app.querySelector(`[data-use-qty="${productId}"]`);
+        if (checkbox) checkbox.checked = true;
+        if (qtyInput) qtyInput.value = Math.max(1, num(qty));
+        renderSelectedUseList();
+      };
+      const renderProductSearchResults = () => {
+        const query = normalizedName(productSearch.value);
+        if (!query) {
+          productSearchResults.innerHTML = `<div class="empty">제품명을 입력해 주세요.</div>`;
+          return;
+        }
+        const results = state.products
+          .filter((item) => normalizedName(`${item.name} ${item.company || ""} ${item.subcategory || ""} ${productCategoryLabel(item.category)}`).includes(query))
+          .sort(byName)
+          .slice(0, 12);
+        productSearchResults.innerHTML = results.length ? results.map((item) => `
+          <label class="check-card use-card">
+            <input type="checkbox" value="${item.id}" data-search-product="${item.id}" ${app.querySelector(`[data-use-product="${item.id}"]`)?.checked ? "checked" : ""}>
+            <span>${escapeHtml(item.name)}<br><span class="muted">${escapeHtml(productCategoryLabel(item.category))}${item.company ? ` · ${escapeHtml(item.company)}` : ""}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ""} · 현재고 ${num(item.stock)}</span></span>
+            <input type="number" min="1" max="${Math.max(1, num(item.stock))}" value="${Math.max(1, num(app.querySelector(`[data-use-qty="${item.id}"]`)?.value) || 1)}" data-search-qty="${item.id}" aria-label="${escapeHtml(item.name)} 검색 사용 수량">
+          </label>
+        `).join("") : `<div class="empty">검색 결과가 없습니다.</div>`;
+        productSearchResults.querySelectorAll("[data-search-product]").forEach((input) => {
+          input.addEventListener("change", () => {
+            const qty = productSearchResults.querySelector(`[data-search-qty="${input.value}"]`)?.value;
+            if (input.checked) selectUseProduct(input.value, qty);
+          });
+        });
+        productSearchResults.querySelectorAll("[data-search-qty]").forEach((input) => {
+          input.addEventListener("input", () => selectUseProduct(input.dataset.searchQty, input.value));
+        });
+      };
+      const renderUseRecommendation = () => {
+        const rule = currentUseRule();
+        const restrictActive = isRestrictOn();
+        if (!rule) {
+          recommendation.innerHTML = "";
+          app.querySelectorAll("[data-use-product]").forEach((input) => input.closest(".check-card").style.display = "");
+          renderSelectedUseList();
+          return;
+        }
+        const recommendedItems = ruleItems(rule);
+        const recommended = recommendedItems.map((item) => ({ ...item, product: productById(item.productId) })).filter((item) => item.product);
+        recommendation.innerHTML = `
+          <div class="item ${restrictActive ? "landing-line pending" : ""}">
+            <div class="item-title">
+              <span>${restrictActive ? "비급여 제한" : "추천 항목"}</span>
+              <span class="pill ${restrictActive ? "low" : ""}">${recommended.length}</span>
+            </div>
+            <div class="meta"><span>${escapeHtml(restrictActive ? "이 환자는 비급여 제한으로 선택되어 있습니다. 추천 비급여만 숨겨지고, 인체조직/ANCHOR 추천은 선택할 수 있습니다." : "추천 항목을 선택하고 수량을 조절해 사용내용에 넣을 수 있습니다.")}</span></div>
+            ${recommended.filter((item) => !(restrictActive && productCategory(item.product.category) === "비급여")).map((item) => `
+              <label class="check-card use-card">
+                <input type="checkbox" value="${item.productId}" data-recommend-product="${item.productId}">
+                <span>${escapeHtml(item.product.name)}<br><span class="muted">추천 ${Math.max(1, num(item.qty))}개 · 현재고 ${num(item.product.stock)}</span></span>
+                <input type="number" min="1" max="${Math.max(1, num(item.product.stock))}" value="${Math.max(1, num(item.qty))}" data-recommend-qty="${item.productId}" aria-label="${escapeHtml(item.product.name)} 추천 사용 수량">
+              </label>
+            `).join("")}
+          </div>
+        `;
+        app.querySelectorAll("[data-use-product]").forEach((input) => {
+          const product = productById(input.value);
+          const recommendedItem = recommendedItems.find((item) => item.productId === input.value);
+          const isRecommended = Boolean(recommendedItem);
+          if (product && productCategory(product.category) === "비급여" && restrictActive && isRecommended) {
+            input.checked = false;
+            input.closest(".check-card").style.display = "none";
+          } else {
+            input.closest(".check-card").style.display = "";
+          }
+        });
+        app.querySelectorAll("[data-recommend-product]").forEach((input) => {
+          input.addEventListener("change", () => {
+            const linked = app.querySelector(`[data-use-product="${input.value}"]`);
+            const qtyInput = app.querySelector(`[data-use-qty="${input.value}"]`);
+            const recommendQty = app.querySelector(`[data-recommend-qty="${input.value}"]`);
+            if (linked) linked.checked = input.checked;
+            if (qtyInput && recommendQty) qtyInput.value = Math.max(1, num(recommendQty.value));
+            renderSelectedUseList();
+          });
+        });
+        app.querySelectorAll("[data-recommend-qty]").forEach((input) => {
+          input.addEventListener("input", () => {
+            const linked = app.querySelector(`[data-use-product="${input.dataset.recommendQty}"]`);
+            const qtyInput = app.querySelector(`[data-use-qty="${input.dataset.recommendQty}"]`);
+            if (linked) linked.checked = true;
+            if (qtyInput) qtyInput.value = Math.max(1, num(input.value));
+            renderSelectedUseList();
+          });
+        });
+        renderSelectedUseList();
+      };
+      const filterUseOptions = () => {
+        const department = useDepartment.value;
+        Array.from(departmentSelect.options).forEach((option) => {
+          if (!option.value) return;
+          const matches = !department || option.dataset.department === department;
+          option.hidden = !matches;
+          option.disabled = !matches;
+        });
+        if (departmentSelect.selectedOptions[0]?.disabled) departmentSelect.value = "";
+        Array.from(surgerySelect.options).forEach((option) => {
+          if (!option.value) return;
+          const matches = !department || option.dataset.department === department;
+          option.hidden = !matches;
+          option.disabled = !matches;
+        });
+        if (surgerySelect.selectedOptions[0]?.disabled) surgerySelect.value = "";
+        renderUseRecommendation();
+      };
+      useDepartment.addEventListener("change", filterUseOptions);
+      departmentSelect.addEventListener("change", renderUseRecommendation);
+      surgerySelect.addEventListener("change", renderUseRecommendation);
+      useRestrictNonpay.addEventListener("click", () => {
+        setRestrictButton(!isRestrictOn());
+        renderUseRecommendation();
+      });
+      app.querySelectorAll("[data-use-product], [data-use-qty]").forEach((input) => {
+        input.addEventListener("change", renderSelectedUseList);
+        input.addEventListener("input", renderSelectedUseList);
+      });
+      productSearch.addEventListener("input", renderProductSearchResults);
+      renderProductSearchResults();
+      filterUseOptions();
+      document.getElementById("useForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const rule = currentUseRule();
+        const restrictActive = isRestrictOn();
+        const useItems = selectedUseItems();
+        const productIds = useItems.flatMap((item) => Array.from({ length: item.qty }, () => item.productId));
+        const uniqueProductIds = useItems.map((item) => item.productId);
+        const selectedNonpayIds = uniqueProductIds.filter((id) => productCategory(productById(id)?.category) === "비급여");
+        if (restrictActive && selectedNonpayIds.length && !confirm("비급여 제한으로 설정된 수술입니다. 그래도 비급여를 사용할까요?")) {
+          return;
+        }
+        const expectedRecommendations = rule
+          ? ruleItems(rule).filter((item) => !(restrictActive && productCategory(productById(item.productId)?.category) === "비급여"))
+          : [];
+        const missingRecommended = expectedRecommendations
+          .map((item) => item.productId)
+          .filter((id) => !uniqueProductIds.includes(id));
+        if (missingRecommended.length) {
+          const missingNames = missingRecommended.map((id) => productById(id)?.name).filter(Boolean).join(", ");
+          if (!confirm(`추천 항목이 선택되지 않았습니다: ${missingNames}\n정말 사용하지 않겠습니까?\n확인을 누르면 사용안함으로 저장합니다.`)) {
+            return;
+          }
+        }
+        const changedRecommended = expectedRecommendations.filter((item) => {
+            const selected = useItems.find((useItem) => useItem.productId === item.productId);
+            return selected && selected.qty !== Math.max(1, num(item.qty));
+          });
+        if (changedRecommended.length) {
+          const changedNames = changedRecommended.map((item) => {
+            const product = productById(item.productId);
+            const selected = useItems.find((useItem) => useItem.productId === item.productId);
+            return `${product?.name || "삭제된 제품"} 추천 ${Math.max(1, num(item.qty))}개 / 선택 ${selected?.qty || 0}개`;
+          }).join(", ");
+          if (!confirm(`추천 항목 수량과 다릅니다: ${changedNames}\n그래도 저장할까요?`)) {
+            return;
+          }
+        }
+        if (!productIds.length) {
+          alert("제품을 하나 이상 선택해 주세요.");
+          return;
+        }
+        const unavailable = useItems.find((item) => num(productById(item.productId)?.stock) < item.qty);
+        if (unavailable) {
+          alert("재고가 부족한 제품이 있습니다.");
+          return;
+        }
+        useItems.forEach((item) => {
+          const product = productById(item.productId);
+          product.stock = num(product.stock) - item.qty;
+        });
+        state.usages.push({
+          id: uid(),
+          patientName: document.getElementById("patientName").value.trim(),
+          doctorId: document.getElementById("useDoctor").value,
+          surgeryId: document.getElementById("useSurgery").value,
+          productIds,
+          date: today(),
+          createdAt: new Date().toISOString()
+        });
+        currentView = "edit";
+        pendingEditUsageId = state.usages[state.usages.length - 1]?.id || "";
+        render();
+        await saveState();
+      });
+    };
+
+    const inDateRange = (date, start, end) => {
+      if (!date) return false;
+      if (start && date < start) return false;
+      if (end && date > end) return false;
+      return true;
+    };
+
+    const filteredHistoryUsages = (start, end, query) => {
+      const normalizedQuery = normalizedName(query || "");
+      return state.usages.filter((usage) => {
+        if (!inDateRange(usage.date, start, end)) return false;
+        if (!normalizedQuery) return true;
+        const doctor = departmentById(usage.doctorId);
+        const surgery = surgeryById(usage.surgeryId);
+        const productText = usage.productIds.map((id) => {
+          const product = productById(id);
+          return `${product?.name || ""} ${product?.company || ""} ${product?.subcategory || ""}`;
+        }).join(" ");
+        return normalizedName(`${usage.patientName || ""} ${doctor?.name || ""} ${surgery?.name || ""} ${productText}`).includes(normalizedQuery);
+      });
+    };
+
+    const historyPeriodText = (start = "", end = "") => start || end
+      ? `${start || "처음"} ~ ${end || "오늘"}`
+      : "전체 기간";
+
+    const historyMovementCounts = (start = "", end = "") => {
+      const usageCounts = new Map();
+      filteredHistoryUsages(start, end, "").forEach((usage) => {
+        usage.productIds.forEach((id) => usageCounts.set(id, (usageCounts.get(id) || 0) + 1));
+      });
+      const receiptCounts = new Map();
+      state.receipts
+        .filter((receipt) => inDateRange(receipt.date, start, end))
+        .forEach((receipt) => receiptCounts.set(receipt.productId, (receiptCounts.get(receipt.productId) || 0) + num(receipt.qty)));
+      return { usageCounts, receiptCounts };
+    };
+
+    const productUsageSort = (category) => (a, b) => {
+      const normalizedCategory = productCategory(category);
+      if (normalizedCategory === "인체조직") {
+        return alphaFirstCompare(a.company || "업체 없음", b.company || "업체 없음") ||
+          alphaFirstCompare(a.name, b.name);
+      }
+      if (normalizedCategory === "ANCHOR") {
+        return alphaFirstCompare(a.company || "업체 없음", b.company || "업체 없음") ||
+          alphaFirstCompare(a.subcategory || "분류 없음", b.subcategory || "분류 없음") ||
+          alphaFirstCompare(a.name, b.name);
+      }
+      return alphaFirstCompare(a.name, b.name);
+    };
+
+    const productUsageSummaryRows = (category, start = "", end = "", query = "") => {
+      const normalizedQuery = normalizedName(query || "");
+      const { usageCounts, receiptCounts } = historyMovementCounts(start, end);
+      return state.products
+        .filter((product) => productCategory(product.category) === category)
+        .filter((product) => {
+          if (!normalizedQuery) return (usageCounts.get(product.id) || 0) || (receiptCounts.get(product.id) || 0);
+          return normalizedName(`${product.name} ${product.company || ""} ${product.subcategory || ""} ${productCategoryLabel(product.category)}`).includes(normalizedQuery);
+        })
+        .sort(productUsageSort(category))
+        .map((product) => ({
+          product,
+          received: receiptCounts.get(product.id) || 0,
+          used: usageCounts.get(product.id) || 0
+        }));
+    };
+
+    const stockStatusClass = (product) => {
+      const stock = num(product?.stock);
+      const warning = num(product?.warningStock);
+      if (stock <= warning) return "stock-danger";
+      if (warning > 0 && stock <= warning * 2) return "stock-warn";
+      return "stock-ok";
+    };
+
+    const productUsagePatientRows = (productId, start = "", end = "") => filteredHistoryUsages(start, end, "")
+      .map((usage) => {
+        const qty = (usage.productIds || []).filter((id) => id === productId).length;
+        if (!qty) return null;
+        const doctor = departmentById(usage.doctorId);
+        const surgery = surgeryById(usage.surgeryId);
+        return { usage, qty, doctor, surgery };
+      })
+      .filter(Boolean)
+      .sort((a, b) => alphaFirstCompare(b.usage.date, a.usage.date) || alphaFirstCompare(a.usage.patientName, b.usage.patientName));
+
+    const productUsageSummaryHtml = (start = "", end = "", query = "") => {
+      const periodText = historyPeriodText(start, end);
+      const categories = ["비급여", "인체조직", "ANCHOR"];
+      const groups = categories.map((category) => {
+        const productRows = productUsageSummaryRows(category, start, end, query);
+        const rows = productRows.map(({ product, received, used }) => {
+          const isNonpay = productCategory(product.category) === "비급여";
+          const patientRows = productUsagePatientRows(product.id, start, end);
+          return `
+            <details class="summary-row ${isNonpay ? "nonpay" : ""}">
+              <summary>
+                <div class="summary-headline">
+                  <span class="summary-name">${escapeHtml(product.name)}</span>
+                  ${product.company || product.subcategory ? `<span class="summary-sub">${product.company ? `${escapeHtml(product.company)}` : ""}${product.subcategory ? `${product.company ? " · " : ""}${escapeHtml(product.subcategory)}` : ""}</span>` : ""}
+                </div>
+                <div class="summary-metrics">
+                  <div class="metric"><strong>${received}</strong><span>${isNonpay ? "입고" : "랜딩"}</span></div>
+                  <div class="metric"><strong>${used}</strong><span>사용</span></div>
+                  <div class="metric ${stockStatusClass(product)}"><strong>${num(product.stock)}</strong><span>재고</span></div>
+                </div>
+              </summary>
+              <div class="details-body">
+                ${patientRows.length ? patientRows.map(({ usage, qty, doctor, surgery }) => `
+                  <div class="item">
+                    <div class="item-title"><span>${escapeHtml(usage.patientName)}</span><span class="pill">${qty}개</span></div>
+                    <div class="meta">
+                      <span>사용일: ${escapeHtml(usage.date)}</span>
+                      <span>과/원장 코드: ${escapeHtml(doctor?.name || "-")} · 수술: ${escapeHtml(surgery?.department || inferSurgeryDepartment(surgery?.name || ""))} - ${escapeHtml(surgery?.name || "-")}</span>
+                    </div>
+                  </div>
+                `).join("") : `<div class="empty">해당 기간 사용 환자가 없습니다.</div>`}
+              </div>
+            </details>
+          `;
+        }).join("");
+        return `
+          <details class="item">
+            <summary><span>${escapeHtml(productCategoryLabel(category))} 제품 사용내역</span><span class="pill">${productRows.length}</span></summary>
+            <div class="details-body">
+              <div class="actions"><button class="secondary" type="button" data-export-history-category="${escapeHtml(category)}">엑셀 저장</button></div>
+              <div class="summary-table">${rows || `<div class="empty">해당 제품 사용내역이 없습니다.</div>`}</div>
+            </div>
+          </details>
+        `;
+      }).join("");
+      return `
+        <div class="meta" style="margin-bottom:10px;">
+          <span>조회 기간: ${escapeHtml(periodText)}${query ? ` · 검색어: ${escapeHtml(query)}` : ""}</span>
+        </div>
+        ${groups}
+      `;
+    };
+
+    const renderHistory = () => `
+      <section class="grid">
+        <div class="card">
+          <h2>사용내역 검색</h2>
+          <div class="row three">
+            <div>
+              <label for="historyStart">시작일</label>
+              <input id="historyStart" type="date">
+            </div>
+            <div>
+              <label for="historyEnd">종료일</label>
+              <input id="historyEnd" type="date">
+            </div>
+            <div>
+              <label for="historySearch">제품 검색</label>
+              <input id="historySearch" list="historyProductList" autocomplete="off" placeholder="제품명 입력">
+              <datalist id="historyProductList">
+                ${state.products.slice().sort(byName).map((product) => `<option value="${escapeHtml(product.name)}"></option>`).join("")}
+              </datalist>
+            </div>
+          </div>
+          <div class="actions">
+            <button type="button" id="historyApply">기간 적용</button>
+            <button class="secondary" type="button" id="historyReset">초기화</button>
+          </div>
+        </div>
+        <div class="card">
+          <details class="item">
+            <summary><span>제품군별 제품 사용내역</span><span class="pill">3</span></summary>
+            <div class="details-body" id="historyProductSummary">${productUsageSummaryHtml()}</div>
+          </details>
+        </div>
+        <div class="card">
+          <details class="item">
+            <summary><span>환자별 사용내역</span><span class="pill">${state.usages.length}</span></summary>
+            <div class="details-body">
+              <div class="actions"><button class="secondary" type="button" id="exportHistoryPatients">엑셀 저장</button></div>
+              <div id="historyPatientList">${state.usages.slice().reverse().map(usageItem).join("") || `<div class="empty">사용내역이 없습니다.</div>`}</div>
+            </div>
+          </details>
+        </div>
+      </section>
+    `;
+
+    const usageItem = (usage, options = {}) => {
+      const showDelete = options.showDelete !== false;
+      const showEdit = options.showEdit !== false && showDelete;
+      const doctor = departmentById(usage.doctorId);
+      const surgery = surgeryById(usage.surgeryId);
+      const surgeryDepartment = surgery ? (surgery.department || inferSurgeryDepartment(surgery.name)) : "-";
+      const productCounts = usage.productIds.reduce((map, id) => {
+        map.set(id, (map.get(id) || 0) + 1);
+        return map;
+      }, new Map());
+      const groupedProducts = ["비급여", "인체조직", "ANCHOR"].map((category) => {
+        const items = Array.from(productCounts.entries())
+          .map(([id, qty]) => ({ product: productById(id), id, qty }))
+          .filter((item) => productCategory(item.product?.category) === category)
+          .sort((a, b) => alphaFirstCompare(a.product?.name || "", b.product?.name || ""));
+        return { category, items };
+      }).filter((group) => group.items.length);
+      const missingProducts = Array.from(productCounts.entries())
+        .map(([id, qty]) => ({ id, qty, product: productById(id) }))
+        .filter((item) => !item.product);
+      const groupClass = (category) => category === "비급여" ? "nonpay" : category === "인체조직" ? "tissue" : "anchor";
+      return `
+        <div class="item">
+          <div class="item-title">
+            <span>${escapeHtml(usage.patientName)}</span>
+            <span class="pill">${usage.date}</span>
+          </div>
+          <div class="meta">
+            <span>과/원장 코드: ${escapeHtml(doctor?.name || "-")} · 수술: ${escapeHtml(surgeryDepartment)} - ${escapeHtml(surgery?.name || "-")}</span>
+            <div class="usage-products">
+              ${groupedProducts.map((group) => `
+                <div class="usage-product-group ${groupClass(group.category)}">
+                  <div class="usage-product-heading">
+                    <span>${escapeHtml(productCategoryLabel(group.category))}</span>
+                    <span class="pill ${group.category === "비급여" ? "low" : ""}">${group.items.reduce((sum, item) => sum + item.qty, 0)}개</span>
+                  </div>
+                  <div class="usage-product-chips">
+                    ${group.items.map((item) => `<span class="usage-chip">${escapeHtml(item.product.name)}${item.qty > 1 ? ` · ${item.qty}개` : ""}</span>`).join("")}
+                  </div>
+                </div>
+              `).join("")}
+              ${missingProducts.length ? `
+                <div class="usage-product-group">
+                  <div class="usage-product-heading"><span>삭제된 제품</span><span class="pill">${missingProducts.reduce((sum, item) => sum + item.qty, 0)}개</span></div>
+                  <div class="usage-product-chips">${missingProducts.map((item) => `<span class="usage-chip">삭제된 제품${item.qty > 1 ? ` · ${item.qty}개` : ""}</span>`).join("")}</div>
+                </div>
+              ` : ""}
+            </div>
+          </div>
+          ${showDelete ? `<div class="actions">
+            ${showEdit ? `<button class="secondary" type="button" data-edit-usage="${usage.id}">사용내용 수정</button>` : ""}
+            <button class="danger" type="button" data-delete-usage="${usage.id}">사용내역 삭제</button>
+          </div>` : ""}
+        </div>
+      `;
+    };
+
+    const excelCell = (value) => `<td>${escapeHtml(value ?? "")}</td>`;
+    const downloadExcel = (filename, headers, rows) => {
+      const table = `
+        <html>
+          <head><meta charset="utf-8"></head>
+          <body>
+            <table border="1">
+              <thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
+              <tbody>${rows.map((row) => `<tr>${row.map(excelCell).join("")}</tr>`).join("")}</tbody>
+            </table>
+          </body>
+        </html>
+      `;
+      const blob = new Blob(["\ufeff", table], { type: "application/vnd.ms-excel;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    };
+
+    const historyFilterValues = () => ({
+      start: document.getElementById("historyStart")?.value || "",
+      end: document.getElementById("historyEnd")?.value || "",
+      query: document.getElementById("historySearch")?.value || ""
+    });
+
+    const exportHistoryCategory = (category) => {
+      const { start, end, query } = historyFilterValues();
+      const rows = productUsageSummaryRows(category, start, end, query).map(({ product, received, used }) => [
+        historyPeriodText(start, end),
+        productCategoryLabel(product.category),
+        product.name,
+        product.company || "",
+        product.subcategory || "",
+        productCategory(product.category) === "비급여" ? received : received,
+        used,
+        num(product.stock)
+      ]);
+      downloadExcel(
+        `제품군별_${productCategoryLabel(category)}_${start || "all"}_${end || "all"}.xls`,
+        ["조회기간", "제품군", "제품명", "업체명", "세부분류", productCategory(category) === "비급여" ? "입고량" : "랜딩입고", "사용량", "현재고"],
+        rows
+      );
+    };
+
+    const exportHistoryPatients = () => {
+      const { start, end, query } = historyFilterValues();
+      const rows = filteredHistoryUsages(start, end, query).slice().reverse().map((usage) => {
+        const doctor = departmentById(usage.doctorId);
+        const surgery = surgeryById(usage.surgeryId);
+        const productText = usage.productIds.map((id) => productById(id)?.name || "삭제된 제품").join(", ");
+        return [
+          historyPeriodText(start, end),
+          usage.date,
+          usage.patientName,
+          doctor?.name || "",
+          surgery?.department || inferSurgeryDepartment(surgery?.name || ""),
+          surgery?.name || "",
+          productText
+        ];
+      });
+      downloadExcel(
+        `환자별_사용내역_${start || "all"}_${end || "all"}.xls`,
+        ["조회기간", "사용일", "환자명", "원장코드", "과", "수술", "사용제품"],
+        rows
+      );
+    };
+
+    const bindHistory = () => {
+      const startInput = document.getElementById("historyStart");
+      const endInput = document.getElementById("historyEnd");
+      const searchInput = document.getElementById("historySearch");
+      const summary = document.getElementById("historyProductSummary");
+      const patientList = document.getElementById("historyPatientList");
+      const bindHistoryExports = () => {
+        app.querySelectorAll("[data-export-history-category]").forEach((button) => {
+          button.addEventListener("click", () => exportHistoryCategory(button.dataset.exportHistoryCategory));
+        });
+        document.getElementById("exportHistoryPatients")?.addEventListener("click", exportHistoryPatients);
+      };
+      const updateHistory = () => {
+        const start = startInput.value;
+        const end = endInput.value;
+        const query = searchInput.value;
+        summary.innerHTML = productUsageSummaryHtml(start, end, query);
+        const usages = filteredHistoryUsages(start, end, query).slice().reverse();
+        patientList.innerHTML = usages.map(usageItem).join("") || `<div class="empty">사용내역이 없습니다.</div>`;
+        bindHistoryDeleteButtons();
+        bindHistoryExports();
+      };
+      [startInput, endInput, searchInput].forEach((input) => {
+        input.addEventListener("input", updateHistory);
+        input.addEventListener("change", updateHistory);
+      });
+      document.getElementById("historyApply").addEventListener("click", updateHistory);
+      document.getElementById("historyReset").addEventListener("click", () => {
+        startInput.value = "";
+        endInput.value = "";
+        searchInput.value = "";
+        updateHistory();
+      });
+      const bindHistoryDeleteButtons = () => {
+        app.querySelectorAll("[data-edit-usage]").forEach((button) => {
+          button.addEventListener("click", () => {
+            pendingEditUsageId = button.dataset.editUsage;
+            currentView = "edit";
+            render();
+          });
+        });
+        app.querySelectorAll("[data-delete-usage]").forEach((button) => {
+          button.addEventListener("click", async () => {
+            const usage = state.usages.find((item) => item.id === button.dataset.deleteUsage);
+            if (!usage || !confirm("사용내역을 삭제하고 재고를 복구할까요?")) return;
+            usage.productIds.forEach((id) => {
+              const product = productById(id);
+              if (product) product.stock = num(product.stock) + 1;
+            });
+            state.usages = state.usages.filter((item) => item.id !== usage.id);
+            render();
+            await saveState();
+          });
+        });
+      };
+      bindHistoryDeleteButtons();
+      bindHistoryExports();
+    };
+
+    const renderBackup = () => {
+      const versions = (state.backupVersions || [])
+        .slice()
+        .sort((a, b) => alphaFirstCompare(b.createdAt || b.date, a.createdAt || a.date));
+      return `
+      <section class="grid two">
+        <div class="card">
+          <h2>서버 백업 저장</h2>
+          <p class="muted">현재 데이터를 Firestore 서버에 날짜별 버전으로 저장합니다. 입력/수정 데이터는 평소에도 자동 저장되며, 이 기능은 특정 시점으로 되돌리기 위한 별도 백업입니다.</p>
+          <label for="backupLabel">백업 이름</label>
+          <input id="backupLabel" autocomplete="off" placeholder="예: 월말 점검 전, 5월 정기 백업">
+          <div class="actions">
+            <button type="button" id="saveServerBackup">현재 상태 서버 백업</button>
+          </div>
+        </div>
+        <div class="card">
+          <h2>날짜별 백업 버전</h2>
+          ${versions.length ? versions.map((item) => `
+            <div class="item">
+              <div class="item-title">
+                <span>${escapeHtml(item.label || "백업")}</span>
+                <span class="pill">${escapeHtml((item.createdAt || "").slice(0, 10) || item.date || "-")}</span>
+              </div>
+              <div class="meta">
+                <span>저장시각: ${escapeHtml(formatDateTime(item.createdAt || item.date || ""))}</span>
+              </div>
+              <div class="actions">
+                <button class="secondary" type="button" data-download-server-backup="${escapeHtml(item.id)}">JSON 다운로드</button>
+                <button class="warn" type="button" data-restore-server-backup="${escapeHtml(item.id)}">이 버전으로 복원</button>
+              </div>
+            </div>
+          `).join("") : `<div class="empty">저장된 백업 버전이 없습니다.</div>`}
+        </div>
+      </section>
+    `;
+    };
+
+    const formatDateTime = (value) => {
+      if (!value) return "-";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      return date.toLocaleString("ko-KR", { hour12: false });
+    };
+
+    const stateSnapshotForBackup = () => {
+      const snapshot = JSON.parse(JSON.stringify(state));
+      delete snapshot.backupVersions;
+      snapshot.backedUpAt = new Date().toISOString();
+      return snapshot;
+    };
+
+    const bindBackup = () => {
+      document.getElementById("saveServerBackup")?.addEventListener("click", async () => {
+        if (!db) {
+          alert("Firebase 연결 후 백업할 수 있습니다.");
+          return;
+        }
+        const createdAt = new Date().toISOString();
+        const id = `backup-${createdAt.replace(/[:.]/g, "-")}`;
+        const label = document.getElementById("backupLabel")?.value.trim() || `${today()} 백업`;
+        try {
+          await setDoc(doc(db, "backups", id), {
+            id,
+            label,
+            date: today(),
+            createdAt,
+            data: stateSnapshotForBackup()
+          });
+          state.backupVersions = [
+            { id, label, date: today(), createdAt },
+            ...(state.backupVersions || []).filter((item) => item.id !== id)
+          ].slice(0, 50);
+          render();
+          await saveState("서버 백업 저장 완료");
+        } catch (error) {
+          console.error(error);
+          alert(`백업 저장 실패: ${error.message}`);
+        }
+      });
+
+      app.querySelectorAll("[data-download-server-backup]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          try {
+            const snap = await getDoc(doc(db, "backups", button.dataset.downloadServerBackup));
+            if (!snap.exists()) {
+              alert("백업 데이터를 찾을 수 없습니다.");
+              return;
+            }
+            const backup = snap.data();
+            const blob = new Blob([JSON.stringify(backup.data || backup, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${backup.id || "nonpay-backup"}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+          } catch (error) {
+            console.error(error);
+            alert(`백업 다운로드 실패: ${error.message}`);
+          }
+        });
+      });
+
+      app.querySelectorAll("[data-restore-server-backup]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          if (!confirm("현재 데이터를 선택한 백업 버전으로 교체할까요?")) return;
+          try {
+            const snap = await getDoc(doc(db, "backups", button.dataset.restoreServerBackup));
+            if (!snap.exists()) {
+              alert("백업 데이터를 찾을 수 없습니다.");
+              return;
+            }
+            const backup = snap.data();
+            const currentVersions = state.backupVersions || [];
+            state = normalizeState(backup.data || {});
+            state.backupVersions = currentVersions;
+            addSeedMasters();
+            reconcileProductStocks();
+            render();
+            await saveState("백업 버전 복원 완료");
+          } catch (error) {
+            console.error(error);
+            alert(`백업 복원 실패: ${error.message}`);
+          }
+        });
+      });
+    };
+
+    const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    }[char]));
+
+    const capitalize = (value) => value.charAt(0).toUpperCase() + value.slice(1);
+
+    const boot = async () => {
+      render();
+      try {
+        const firebaseApp = initializeApp(firebaseConfig);
+        db = getFirestore(firebaseApp);
+        ref = doc(db, "app", "main");
+        try {
+          await enableIndexedDbPersistence(db);
+        } catch (error) {
+          console.info("Offline persistence unavailable", error);
+        }
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          state = normalizeState(snap.data());
+        } else {
+          await setDoc(ref, state);
+        }
+        const addedSeedCount = addSeedMasters();
+        const reconciledStockCount = reconcileProductStocks();
+        hydrated = true;
+        setStatus("Firebase 연결됨", "ok");
+        if (addedSeedCount > 0 || reconciledStockCount > 0) {
+          await saveState("Firebase 연결됨 · 저장 완료");
+        }
+        render();
+        unsubscribe = onSnapshot(ref, (snapshot) => {
+          if (!snapshot.exists() || saving) return;
+          state = normalizeState(snapshot.data());
+          reconcileProductStocks();
+          if (hydrated) render();
+        }, (error) => {
+          console.error(error);
+          setStatus(`Firebase 연결 오류: ${error.message}`, "error");
+        });
+      } catch (error) {
+        console.error(error);
+        setStatus(`Firebase 연결 실패: ${error.message}`, "error");
+      }
+    };
+
+    window.addEventListener("beforeunload", () => {
+      if (unsubscribe) unsubscribe();
+    });
+
+    const loadFirebaseAndBoot = async () => {
+      render();
+      try {
+        setStatus("Firebase 모듈 불러오는 중", "ok");
+        const appModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js");
+        const firestoreModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js");
+        initializeApp = appModule.initializeApp;
+        getFirestore = firestoreModule.getFirestore;
+        doc = firestoreModule.doc;
+        getDoc = firestoreModule.getDoc;
+        setDoc = firestoreModule.setDoc;
+        runTransaction = firestoreModule.runTransaction;
+        onSnapshot = firestoreModule.onSnapshot;
+        enableIndexedDbPersistence = firestoreModule.enableIndexedDbPersistence;
+        await boot();
+      } catch (error) {
+        console.error(error);
+        setStatus(`Firebase 모듈 로딩 실패: ${error.message}`, "error");
+      }
+    };
+
+    setInterval(() => {
+      const nextDate = today();
+      if (nextDate !== renderedDate) {
+        render();
+      } else {
+        const pageDate = document.querySelector(".page-user span");
+        if (pageDate) pageDate.textContent = nextDate;
+      }
+    }, 30000);
+
+    loadFirebaseAndBoot();
+  </script>
+</body>
+</html>
