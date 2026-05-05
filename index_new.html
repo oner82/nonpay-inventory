@@ -765,6 +765,458 @@
       }
     }
 
+
+    /* tablet dashboard overlap fix: keep dashboard cards stacked until there is enough real width */
+    @media (min-width: 721px) and (max-width: 1280px) {
+      .dashboard-content {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+        width: 100% !important;
+      }
+      .dashboard-left,
+      .dashboard-right {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+      }
+      .dashboard-left > .card,
+      .dashboard-right > .card {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+      }
+      .dashboard-left .table-wrap {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+      }
+      .dashboard-left table.inventory-table {
+        width: 100% !important;
+        min-width: 760px !important;
+      }
+      .donut-card {
+        grid-template-columns: 170px minmax(0, 1fr) !important;
+        max-width: 100% !important;
+      }
+    }
+
+    @media (min-width: 1100px) and (max-width: 1280px) {
+      .page-head {
+        margin-bottom: 18px !important;
+      }
+    }
+
+
+    /* ===== 최종 정리: 태블릿 대시보드 겹침 방지 + PC 좌측 병원배너 고정 ===== */
+    @media (min-width: 1100px) {
+      header {
+        overflow: hidden !important;
+      }
+
+      .topbar {
+        display: flex !important;
+        flex-direction: column !important;
+        height: 100vh !important;
+        min-height: 100vh !important;
+        padding: 18px 16px !important;
+        overflow: hidden !important;
+      }
+
+      .brand {
+        order: 0 !important;
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 8px !important;
+        align-items: start !important;
+        flex: 0 0 auto !important;
+        margin-bottom: 8px !important;
+      }
+
+      .brand-title {
+        order: 0 !important;
+        width: 100% !important;
+        margin: 0 !important;
+      }
+
+      .brand-logo {
+        order: 1 !important;
+        display: block !important;
+        width: 150px !important;
+        max-width: 78% !important;
+        height: auto !important;
+        margin: 6px auto 0 !important;
+        align-self: center !important;
+        justify-self: center !important;
+        opacity: .98 !important;
+      }
+
+      #status {
+        order: 1 !important;
+        flex: 0 0 auto !important;
+        margin: 4px 0 14px !important;
+      }
+
+      #nav {
+        order: 2 !important;
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        padding-right: 2px !important;
+      }
+    }
+
+    @media (min-width: 1100px) and (max-width: 1500px) {
+      .dashboard-content {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+        width: 100% !important;
+      }
+
+      .dashboard-left,
+      .dashboard-right,
+      .dashboard-left > .card,
+      .dashboard-right > .card {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+      }
+
+      .dashboard-right {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+        margin-top: 0 !important;
+      }
+
+      .dashboard-left .table-wrap {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+      }
+
+      .dashboard-left table.inventory-table {
+        width: 100% !important;
+        min-width: 760px !important;
+      }
+
+      .donut-card {
+        grid-template-columns: 170px minmax(0, 1fr) !important;
+      }
+    }
+
+    @media (min-width: 721px) and (max-width: 1099px) {
+      .dashboard-content {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+      }
+
+      .dashboard-left,
+      .dashboard-right,
+      .dashboard-left > .card,
+      .dashboard-right > .card {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+      }
+    }
+
+
+
+    /* 2026-05-05 tablet/history/search popup refinements */
+    @media (min-width: 721px) and (max-width: 1200px) {
+      .row.three {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      }
+      .row.three > div {
+        min-width: 0 !important;
+      }
+      .row.three > div:nth-child(3) {
+        grid-column: 1 / -1 !important;
+      }
+      .row.three input,
+      .row.three select,
+      .row.three button {
+        width: 100% !important;
+        min-width: 0 !important;
+      }
+    }
+
+    .search-compact-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+    }
+    .search-compact-card h3 { margin: 0; }
+    .search-compact-card .secondary { min-width: 150px; }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(15, 23, 42, .38);
+      backdrop-filter: blur(2px);
+    }
+    .modal-backdrop[hidden] { display: none !important; }
+    .search-modal-panel {
+      width: min(720px, 96vw);
+      max-height: min(82vh, 760px);
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 12px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: 0 28px 70px rgba(15, 23, 42, .28);
+    }
+    .search-modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .search-modal-head h3 { margin: 0; }
+    .search-modal-close {
+      width: 42px;
+      min-height: 42px;
+      padding: 0;
+      border-radius: 999px;
+      background: #f8fafc;
+      color: var(--ink);
+      border: 1px solid var(--line);
+      box-shadow: none;
+      font-size: 22px;
+    }
+    .search-modal-results {
+      overflow: auto;
+      padding-right: 2px;
+      -webkit-overflow-scrolling: touch;
+    }
+    @media (max-width: 720px) {
+      .search-compact-card { align-items: stretch; flex-direction: column; }
+      .search-compact-card .secondary { width: 100%; }
+      .modal-backdrop { padding: 10px; align-items: end; }
+      .search-modal-panel {
+        width: 100%;
+        max-height: 86vh;
+        border-radius: 18px 18px 0 0;
+      }
+    }
+
+
+    /* 2026-05-05 final tablet history filter fix: iPad landscape uses wide viewport */
+    .history-filter-grid {
+      display: grid !important;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+      gap: 12px !important;
+      align-items: end !important;
+    }
+    .history-filter-grid > div {
+      min-width: 0 !important;
+      width: 100% !important;
+    }
+    .history-filter-grid input,
+    .history-filter-grid select,
+    .history-filter-grid button {
+      width: 100% !important;
+      min-width: 0 !important;
+      max-width: 100% !important;
+    }
+
+    @media (min-width: 721px) and (max-width: 1500px) {
+      .history-filter-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+      }
+      .history-filter-grid > div:nth-child(3) {
+        grid-column: 1 / -1 !important;
+      }
+      .history-filter-grid #historySearch {
+        max-width: 100% !important;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .history-filter-grid {
+        grid-template-columns: 1fr !important;
+      }
+      .history-filter-grid > div:nth-child(3) {
+        grid-column: auto !important;
+      }
+    }
+
+
+    /* 2026-05-05 use input compact search + selected item buttons */
+    .use-recommendation-gap { margin-top: 14px; }
+    .use-content-card { margin-top: 18px; }
+    .use-content-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .use-content-head h3 { margin: 0; }
+    .icon-search-btn {
+      width: auto !important;
+      min-width: 0 !important;
+      min-height: 36px !important;
+      padding: 0 11px !important;
+      border: 1px solid var(--line) !important;
+      border-radius: 999px !important;
+      background: #fff !important;
+      color: var(--brand-dark) !important;
+      box-shadow: none !important;
+      font-size: 13px !important;
+      white-space: nowrap !important;
+    }
+    .selected-use-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: stretch;
+    }
+    .selected-use-chip {
+      display: grid;
+      grid-template-columns: minmax(150px, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      max-width: 100%;
+      padding: 8px 9px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #f8fbff;
+      box-shadow: 0 4px 10px rgba(16,35,63,.04);
+    }
+    .selected-use-chip.nonpay { background: #fff7ed; border-color: #fed7aa; }
+    .selected-use-chip.tissue { background: #eff6ff; border-color: #bfdbfe; }
+    .selected-use-chip.anchor { background: #f0fdf4; border-color: #bbf7d0; }
+    .selected-use-name {
+      min-width: 0;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 900;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .selected-use-name span {
+      margin-left: 5px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 850;
+    }
+    .selected-use-controls {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex: 0 0 auto;
+    }
+    .selected-use-controls button {
+      min-height: 30px !important;
+      width: 30px;
+      padding: 0 !important;
+      border-radius: 8px !important;
+      box-shadow: none !important;
+      font-size: 13px !important;
+    }
+    .selected-use-controls .remove-selected {
+      width: auto;
+      min-width: 44px;
+      padding: 0 8px !important;
+      background: #fff1f2 !important;
+      color: #be123c !important;
+      border: 1px solid #fecdd3 !important;
+    }
+    .selected-use-controls input {
+      width: 48px !important;
+      min-height: 30px !important;
+      padding: 3px 6px !important;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 900;
+      border-radius: 8px;
+    }
+    @media (max-width: 720px) {
+      .use-content-head { align-items: flex-start; }
+      .selected-use-chip { grid-template-columns: 1fr; width: 100%; }
+      .selected-use-controls { justify-content: flex-end; }
+    }
+
+
+    /* 2026-05-05 PC 가로모드: 병원 배너를 제목 위로 이동 */
+    @media (min-width: 1100px) {
+      .brand-logo {
+        order: -1 !important;
+        justify-self: start !important;
+        width: 176px !important;
+        margin: 0 0 12px 0 !important;
+      }
+      .brand-title {
+        order: 0 !important;
+        text-align: left !important;
+      }
+    }
+
+    /* 2026-05-05 수량 버튼형 조절 */
+    .qty-stepper {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+      min-width: 112px;
+      width: 112px;
+    }
+    .qty-stepper button {
+      width: 32px !important;
+      min-width: 32px !important;
+      min-height: 32px !important;
+      padding: 0 !important;
+      border-radius: 8px !important;
+      border: 1px solid var(--line) !important;
+      background: #fff !important;
+      color: var(--brand-dark) !important;
+      box-shadow: none !important;
+      font-size: 16px !important;
+      line-height: 1 !important;
+      font-weight: 950 !important;
+    }
+    .qty-stepper input {
+      width: 40px !important;
+      min-height: 32px !important;
+      padding: 3px 4px !important;
+      text-align: center !important;
+      font-size: 14px !important;
+      font-weight: 950 !important;
+      border-radius: 8px !important;
+      background: #f8fbff !important;
+    }
+    .check-card.use-card { grid-template-columns: 28px minmax(0, 1fr) 112px !important; }
+    .check-card.use-card > span { min-width: 0; }
+    @media (max-width: 520px) {
+      .check-card.use-card { grid-template-columns: 28px minmax(0, 1fr) !important; }
+      .qty-stepper { grid-column: 2; justify-content: flex-start; margin-top: 4px; }
+    }
+
+
+  
+
+    /* 수술별 사용관리 수량 버튼/과-원장-수술 단계 선택 보정 */
+    .rule-card .qty-stepper { justify-self: end; }
+    select option[disabled] { color: #9ca3af; }
+    @media (max-width: 720px) {
+      .rule-card .qty-stepper { justify-self: start; }
+    }
+
   </style>
 </head>
 <body>
@@ -1434,86 +1886,166 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
 
     const renderDashboard = () => {
-      const lowProducts = state.products.filter((item) => num(item.stock) <= num(item.warningStock));
+      const lowProducts = state.products
+        .filter((item) => num(item.stock) <= num(item.warningStock))
+        .sort((a, b) => num(a.stock) - num(b.stock) || alphaFirstCompare(a.name, b.name));
       const hiddenLowIds = new Set(state.hiddenLowProductIds || []);
       const visibleLowProducts = lowProducts.filter((item) => !hiddenLowIds.has(item.id));
       const hiddenLowProducts = lowProducts.filter((item) => hiddenLowIds.has(item.id));
+
+      const todayText = today();
+      const todayDate = new Date(`${todayText}T00:00:00`);
+      const dateDistance = (dateText) => {
+        const date = new Date(`${dateText || ""}T00:00:00`);
+        if (Number.isNaN(date.getTime())) return 9999;
+        return Math.floor((todayDate - date) / 86400000);
+      };
+
+      const todayUsages = state.usages.filter((item) => item.date === todayText);
+      const recentUsages = state.usages.filter((item) => {
+        const distance = dateDistance(item.date);
+        return distance >= 0 && distance <= 6;
+      });
+      const todayProductCount = todayUsages.reduce((sum, item) => sum + (item.productIds || []).length, 0);
+      const pendingLandingLines = landingUsageLines(false);
       const totalStock = state.products.reduce((sum, item) => sum + num(item.stock), 0);
-      const todayUsage = state.usages.filter((item) => item.date === today()).length;
-      const categoryCounts = ["비급여", "인체조직", "ANCHOR"].map((category) => ({
+
+      const todayCategoryCounts = ["비급여", "인체조직", "ANCHOR"].map((category) => ({
         category,
-        count: state.products.filter((item) => productCategory(item.category) === category).length,
-        stock: state.products.filter((item) => productCategory(item.category) === category).reduce((sum, item) => sum + num(item.stock), 0)
+        count: todayUsages.reduce((sum, usage) => sum + (usage.productIds || []).filter((id) => productCategory(productById(id)?.category) === category).length, 0)
       }));
-      const inventoryRows = state.products.slice().sort((a, b) => num(a.stock) - num(b.stock)).slice(0, 8);
+
+      const productUseMap = new Map();
+      recentUsages.forEach((usage) => {
+        (usage.productIds || []).forEach((productId) => {
+          productUseMap.set(productId, (productUseMap.get(productId) || 0) + 1);
+        });
+      });
+      const topUsedProducts = Array.from(productUseMap.entries())
+        .map(([productId, count]) => ({ product: productById(productId), count }))
+        .filter((item) => item.product)
+        .sort((a, b) => b.count - a.count || alphaFirstCompare(a.product.name, b.product.name))
+        .slice(0, 8);
+
+      const pendingByCompany = Array.from(pendingLandingLines.reduce((map, line) => {
+        const company = line.product.company || "업체 없음";
+        const current = map.get(company) || { company, lines: 0, qty: 0, products: new Set() };
+        current.lines += 1;
+        current.qty += Math.max(1, num(line.qty));
+        current.products.add(line.product.name);
+        map.set(company, current);
+        return map;
+      }, new Map()).values()).sort((a, b) => b.lines - a.lines || alphaFirstCompare(a.company, b.company));
+
+      const todayUsageBrief = todayUsages.slice().reverse().slice(0, 5);
+      const lowPriorityProducts = visibleLowProducts.slice(0, 6);
+
       return `
         <section class="dashboard-shell">
           <div class="stats">
-            ${statCard("총 보유 품목", state.products.length.toLocaleString(), "□")}
-            ${statCard("총 재고 수량", totalStock.toLocaleString(), "▦")}
-            ${statCard("오늘 사용", todayUsage.toLocaleString(), "↗")}
-            ${statCard("재고 부족", lowProducts.length.toLocaleString(), "!")}
+            ${statCard("오늘 사용 환자", todayUsages.length.toLocaleString(), "P")}
+            ${statCard("오늘 사용 제품", todayProductCount.toLocaleString(), "✓")}
+            ${statCard("랜딩 입고 대기", pendingLandingLines.length.toLocaleString(), "↙")}
+            ${statCard("재고 부족 확인", lowProducts.length.toLocaleString(), "!")}
           </div>
 
           <div class="dashboard-content">
             <div class="dashboard-left">
               <div class="card">
-                <h2>재고 현황</h2>
-                <div class="toolbar">
-                  <select aria-label="전체 카테고리"><option>전체 카테고리</option><option>비급여</option><option>인체조직</option><option>ANCHOR&etc</option></select>
-                  <input aria-label="품목 검색" placeholder="품목명, 업체 검색">
-                  <button type="button" data-go-view="settings">검색</button>
-                  <button class="secondary" type="button" data-go-view="history">엑셀 다운로드</button>
+                <h2>오늘 사용 현황</h2>
+                <div class="summary-table">
+                  <details class="summary-row" open>
+                    <summary>
+                      <div class="summary-headline">
+                        <span class="summary-name">오늘 입력된 사용내역</span>
+                        <span class="summary-sub">${todayUsages.length}건 · 제품 ${todayProductCount}개</span>
+                      </div>
+                      <div class="summary-metrics">
+                        ${todayCategoryCounts.map((item) => `<div class="metric"><strong>${item.count}</strong><span>${escapeHtml(productCategoryLabel(item.category))}</span></div>`).join("")}
+                      </div>
+                    </summary>
+                  </details>
                 </div>
-                <div class="table-wrap">
-                  <table class="inventory-table">
-                    <thead>
-                      <tr>
-                        <th>품목 코드</th><th>품목명</th><th>카테고리</th><th>현재 재고</th><th>최소 재고</th><th>상태</th><th>업체</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      ${inventoryRows.map((item, index) => {
-                        const low = num(item.stock) <= num(item.warningStock);
-                        return `<tr>
-                          <td><span class="code-link">OR${String(index + 1).padStart(5, "0")}</span></td>
-                          <td>${escapeHtml(item.name)}</td>
-                          <td>${escapeHtml(productCategoryLabel(item.category))}</td>
-                          <td>${num(item.stock).toLocaleString()}</td>
-                          <td>${num(item.warningStock).toLocaleString()}</td>
-                          <td><span class="status-chip ${low ? "low" : ""}">${low ? "부족" : "정상"}</span></td>
-                          <td>${escapeHtml(item.company || "-")}</td>
-                        </tr>`;
-                      }).join("") || `<tr><td colspan="7">등록된 제품이 없습니다.</td></tr>`}
-                    </tbody>
-                  </table>
+                ${todayUsageBrief.length ? todayUsageBrief.map((item) => usageItem(item, { showDelete: false })).join("") : `<div class="empty">오늘 입력된 사용내역이 없습니다.</div>`}
+                <div class="actions">
+                  <button type="button" data-go-view="use">사용입력 바로가기</button>
+                  <button class="secondary" type="button" data-go-view="history">사용내역 확인</button>
+                  <button class="secondary" type="button" data-go-view="edit">사용내용 수정</button>
                 </div>
               </div>
 
+              <div class="card">
+                <h2>랜딩 입고 대기</h2>
+                ${pendingByCompany.length ? pendingByCompany.slice(0, 6).map((item) => `
+                  <div class="item landing-line pending">
+                    <div class="compact-line">
+                      <div class="compact-main">${escapeHtml(item.company)}</div>
+                      <div class="compact-meta">대기 ${item.lines}건 · ${item.qty}개 · 품목 ${item.products.size}</div>
+                      <span class="pill low">확인 필요</span>
+                    </div>
+                  </div>
+                `).join("") : `<div class="empty">랜딩 입고 대기 항목이 없습니다.</div>`}
+                <div class="actions">
+                  <button type="button" data-go-view="receipts">입고관리로 이동</button>
+                </div>
+              </div>
+
+              <div class="card">
+                <h2>최근 7일 많이 사용한 제품</h2>
+                ${topUsedProducts.length ? topUsedProducts.map((item, index) => `
+                  <div class="item">
+                    <div class="item-title">
+                      <span>${index + 1}. ${escapeHtml(item.product.name)}</span>
+                      <span class="pill">${item.count}개</span>
+                    </div>
+                    <div class="meta">
+                      <span>${escapeHtml(productCategoryLabel(item.product.category))}${item.product.company ? ` · ${escapeHtml(item.product.company)}` : ""}${item.product.subcategory ? ` · ${escapeHtml(item.product.subcategory)}` : ""}</span>
+                      <span>현재고 ${num(item.product.stock)} · 경고수량 ${num(item.product.warningStock)}</span>
+                    </div>
+                  </div>
+                `).join("") : `<div class="empty">최근 7일 사용 데이터가 없습니다.</div>`}
+              </div>
             </div>
 
             <div class="dashboard-right">
               <div class="card">
-                <h2>재고 현황 요약</h2>
-                <div class="donut-card">
-                  <div class="donut" data-total="${totalStock.toLocaleString()}개"></div>
-                  <div class="legend">
-                    ${categoryCounts.map((item) => `<div class="legend-row"><span>${escapeHtml(productCategoryLabel(item.category))}</span><strong>${item.stock.toLocaleString()}</strong></div>`).join("")}
-                    <div class="legend-row"><span>재고 부족</span><strong>${lowProducts.length}</strong></div>
-                    <div class="legend-row"><span>오늘 사용</span><strong>${todayUsage}</strong></div>
-                  </div>
+                <h2>재고 부족 우선 확인</h2>
+                ${lowPriorityProducts.length ? lowPriorityProducts.map(lowProductItem).join("") : `<div class="empty">표시할 재고 부족 품목이 없습니다.</div>`}
+                ${hiddenLowProducts.length ? `<details class="item"><summary><span>감춰진 경고 재고</span><span class="pill">${hiddenLowProducts.length}</span></summary><div class="details-body">${hiddenLowProducts.map((item) => lowProductItem(item, true)).join("")}</div></details>` : ""}
+                <div class="actions">
+                  <button class="secondary" type="button" data-go-view="settings">제품관리</button>
                 </div>
               </div>
 
               <div class="card">
-                <h2>재고 부족 품목</h2>
-                ${visibleLowProducts.slice(0, 4).map(lowProductItem).join("") || `<div class="empty">표시할 재고 부족 품목이 없습니다.</div>`}
-                ${hiddenLowProducts.length ? `<details class="item"><summary><span>감춰진 경고 재고</span><span class="pill">${hiddenLowProducts.length}</span></summary><div class="details-body">${hiddenLowProducts.map((item) => lowProductItem(item, true)).join("")}</div></details>` : ""}
+                <h2>분류별 현재 재고</h2>
+                <div class="summary-table">
+                  ${["비급여", "인체조직", "ANCHOR"].map((category) => {
+                    const items = state.products.filter((item) => productCategory(item.category) === category);
+                    const stock = items.reduce((sum, item) => sum + num(item.stock), 0);
+                    const low = items.filter((item) => num(item.stock) <= num(item.warningStock)).length;
+                    return `
+                      <details class="summary-row ${category === "비급여" ? "nonpay" : ""}" open>
+                        <summary>
+                          <div class="summary-headline">
+                            <span class="summary-name">${escapeHtml(productCategoryLabel(category))}</span>
+                            <span class="summary-sub">${items.length}품목</span>
+                          </div>
+                          <div class="summary-metrics">
+                            <div class="metric"><strong>${stock}</strong><span>재고</span></div>
+                            <div class="metric ${low ? "stock-danger" : "stock-ok"}"><strong>${low}</strong><span>부족</span></div>
+                            <div class="metric"><strong>${items.reduce((sum, item) => sum + num(item.warningStock), 0)}</strong><span>경고합</span></div>
+                          </div>
+                        </summary>
+                      </details>
+                    `;
+                  }).join("")}
+                </div>
               </div>
 
               <div class="card">
                 <h2>최근 사용 내역</h2>
-                ${state.usages.slice().reverse().slice(0, 3).map((item) => usageItem(item, { showDelete: false })).join("") || `<div class="empty">사용내역이 없습니다.</div>`}
+                ${state.usages.slice().reverse().slice(0, 4).map((item) => usageItem(item, { showDelete: false })).join("") || `<div class="empty">사용내역이 없습니다.</div>`}
               </div>
             </div>
           </div>
@@ -1690,11 +2222,32 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       `;
     };
 
+
+    const qtyStepper = (inputAttrs, value, max = 999) => `
+      <div class="qty-stepper">
+        <button type="button" onclick="event.preventDefault();event.stopPropagation();adjustQtyButton(this,-1)" aria-label="수량 줄이기">−</button>
+        <input type="number" min="1" max="${Math.max(1, num(max))}" value="${Math.max(1, num(value))}" ${inputAttrs} readonly>
+        <button type="button" onclick="event.preventDefault();event.stopPropagation();adjustQtyButton(this,1)" aria-label="수량 늘리기">+</button>
+      </div>
+    `;
+
+    window.adjustQtyButton = (button, delta) => {
+      const wrap = button.closest('.qty-stepper');
+      const input = wrap?.querySelector('input');
+      if (!input) return;
+      const min = Math.max(1, num(input.min || 1));
+      const max = Math.max(min, num(input.max || 9999));
+      const next = Math.min(max, Math.max(min, num(input.value || 1) + delta));
+      input.value = next;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
     const productCheckItem = (item) => `
       <label class="check-card use-card">
         <input type="checkbox" value="${item.id}" data-use-product="${item.id}" ${num(item.stock) < 1 ? "disabled" : ""}>
         <span>${escapeHtml(item.name)}<br><span class="muted">${escapeHtml(item.company || item.category)}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ""}</span></span>
-        <input type="number" min="1" max="${Math.max(1, num(item.stock))}" value="1" data-use-qty="${item.id}" aria-label="${escapeHtml(item.name)} 사용 수량">
+        ${qtyStepper(`data-use-qty="${item.id}" aria-label="${escapeHtml(item.name)} 사용 수량"`, 1, Math.max(1, num(item.stock)))}
       </label>
     `;
 
@@ -2154,7 +2707,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       <label class="check-card rule-card">
         <input type="checkbox" value="${item.id}" data-rule-product>
         <span>${escapeHtml(item.name)}<br><span class="muted">${escapeHtml(productCategoryLabel(item.category))}${item.company ? ` · ${escapeHtml(item.company)}` : ""}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ""} · 현재고 ${num(item.stock)}</span></span>
-        <input type="number" min="1" value="1" data-rule-product-qty="${item.id}" aria-label="${escapeHtml(item.name)} 추천 수량">
+        ${qtyStepper(`data-rule-product-qty="${item.id}" aria-label="${escapeHtml(item.name)} 추천 수량"`, 1, Math.max(1, num(item.stock)))}
       </label>
     `;
 
@@ -2182,18 +2735,27 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const form = document.getElementById("usageRuleForm");
       const filterRuleOptions = () => {
         const department = document.getElementById("ruleDepartment").value;
-        ["ruleDoctor", "ruleSurgery"].forEach((id) => {
-          const select = document.getElementById(id);
-          Array.from(select.options).forEach((option) => {
-            if (!option.value) return;
-            const matches = !department || option.dataset.department === department;
-            option.hidden = !matches;
-            option.disabled = !matches;
-          });
-          if (select.selectedOptions[0]?.disabled) select.value = "";
-        });
+        const doctorSelect = document.getElementById("ruleDoctor");
+        const surgerySelect = document.getElementById("ruleSurgery");
+        const currentDoctor = doctorSelect.value;
+        const currentSurgery = surgerySelect.value;
+        const doctors = department
+          ? state.doctors.slice().sort(byName).filter((item) => departmentCode(item.name) === department)
+          : [];
+        doctorSelect.innerHTML = `<option value="">${department ? "원장코드 선택" : "과를 먼저 선택하세요"}</option>` + doctors
+          .map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`)
+          .join("");
+        if (doctors.some((item) => item.id === currentDoctor)) doctorSelect.value = currentDoctor;
+        const surgeries = department && doctorSelect.value
+          ? state.surgeries.slice().sort((a, b) => alphaFirstCompare(a.name, b.name)).filter((item) => (item.department || inferSurgeryDepartment(item.name)) === department)
+          : [];
+        surgerySelect.innerHTML = `<option value="">${department && doctorSelect.value ? "수술 선택" : "원장코드를 먼저 선택하세요"}</option>` + surgeries
+          .map((item) => `<option value="${item.id}">${escapeHtml(item.department || inferSurgeryDepartment(item.name))} - ${escapeHtml(item.name)}</option>`)
+          .join("");
+        if (surgeries.some((item) => item.id === currentSurgery)) surgerySelect.value = currentSurgery;
       };
       document.getElementById("ruleDepartment").addEventListener("change", filterRuleOptions);
+      document.getElementById("ruleDoctor").addEventListener("change", filterRuleOptions);
       document.getElementById("usageRuleReset").addEventListener("click", () => {
         form.reset();
         document.getElementById("usageRuleId").value = "";
@@ -2403,16 +2965,26 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               </select>
             </div>
           </div>
-          <div id="useRecommendation"></div>
-          <div class="card">
-            <h3>사용내용</h3>
+          <div id="useRecommendation" class="use-recommendation-gap"></div>
+          <div class="card use-content-card">
+            <div class="use-content-head">
+              <h3>사용내용</h3>
+              <button class="icon-search-btn" type="button" id="openUseProductSearch" aria-haspopup="dialog" aria-controls="useProductSearchModal" title="제품 검색">🔍 제품 검색</button>
+            </div>
             <div id="selectedUseList" class="meta"><span>선택된 제품이 없습니다.</span></div>
           </div>
-          <div class="card">
-            <h3>제품 검색</h3>
-            <label for="useProductSearch">제품명 검색</label>
-            <input id="useProductSearch" autocomplete="off" placeholder="제품명을 입력하면 바로 찾을 수 있습니다">
-            <div id="useProductSearchResults" class="product-picker"></div>
+          <div class="modal-backdrop" id="useProductSearchModal" hidden role="dialog" aria-modal="true" aria-labelledby="useProductSearchTitle">
+            <div class="search-modal-panel">
+              <div class="search-modal-head">
+                <h3 id="useProductSearchTitle">제품 검색</h3>
+                <button class="search-modal-close" type="button" id="closeUseProductSearch" aria-label="제품 검색 닫기">×</button>
+              </div>
+              <div>
+                <label for="useProductSearch">제품명 검색</label>
+                <input id="useProductSearch" autocomplete="off" placeholder="제품명, 업체, 종류를 입력하세요">
+              </div>
+              <div id="useProductSearchResults" class="product-picker search-modal-results"></div>
+            </div>
           </div>
           <label>제품 여러 개 선택</label>
           <div class="product-picker">
@@ -2433,21 +3005,72 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         target.innerHTML = `<span>선택된 제품이 없습니다.</span>`;
         return;
       }
-      const categories = ["비급여", "인체조직", "ANCHOR"];
-      target.innerHTML = categories.map((category) => {
-        const categoryItems = items
-          .map((item) => ({ ...item, product: productById(item.productId) }))
-          .filter((item) => item.product && productCategory(item.product.category) === category);
-        if (!categoryItems.length) return "";
-        return `
-          <div class="item">
-            <div class="item-title"><span>${escapeHtml(productCategoryLabel(category))}</span><span class="pill">${categoryItems.length}</span></div>
-            <div class="meta">
-              ${categoryItems.map((item) => `<span>${escapeHtml(item.product.name)} · ${item.qty}개</span>`).join("")}
-            </div>
-          </div>
-        `;
-      }).join("");
+      const chipClass = (category) => {
+        const key = productCategory(category);
+        if (key === "비급여") return "nonpay";
+        if (key === "인체조직") return "tissue";
+        if (key === "ANCHOR") return "anchor";
+        return "";
+      };
+      const safeItems = items
+        .map((item) => ({ ...item, product: productById(item.productId) }))
+        .filter((item) => item.product && num(item.qty) > 0);
+      if (!safeItems.length) {
+        target.innerHTML = `<span>선택된 제품이 없습니다.</span>`;
+        return;
+      }
+      target.innerHTML = `
+        <div class="selected-use-buttons">
+          ${safeItems.map((item) => {
+            const product = item.product;
+            const linkedQty = app.querySelector(`[data-use-qty="${item.productId}"]`);
+            const maxQty = Math.max(1, num(linkedQty?.max || product.stock || 999));
+            const meta = [productCategoryLabel(product.category), product.company, product.subcategory].filter(Boolean).join(" · ");
+            return `
+              <div class="selected-use-chip ${chipClass(product.category)}">
+                <div class="selected-use-name" title="${escapeHtml(product.name)}">
+                  ${escapeHtml(product.name)}<span>${escapeHtml(meta)}</span>
+                </div>
+                <div class="selected-use-controls">
+                  <button type="button" class="secondary" data-edit-selected-dec="${item.productId}" aria-label="수량 줄이기">−</button>
+                  <input type="number" min="0" max="${maxQty}" value="${Math.max(1, num(item.qty))}" data-edit-selected-qty="${item.productId}" aria-label="${escapeHtml(product.name)} 수량" readonly>
+                  <button type="button" class="secondary" data-edit-selected-inc="${item.productId}" aria-label="수량 늘리기">+</button>
+                  <button type="button" class="remove-selected" data-edit-selected-remove="${item.productId}">삭제</button>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+      const syncProductQty = (productId, nextQty) => {
+        const checkbox = app.querySelector(`[data-use-product="${productId}"]`);
+        const qtyInput = app.querySelector(`[data-use-qty="${productId}"]`);
+        const maxQty = Math.max(1, num(qtyInput?.max || 999));
+        const safeQty = Math.min(maxQty, Math.max(0, num(nextQty)));
+        if (safeQty <= 0) {
+          if (checkbox) checkbox.checked = false;
+          if (qtyInput) qtyInput.value = 1;
+        } else {
+          if (checkbox) checkbox.checked = true;
+          if (qtyInput) qtyInput.value = safeQty;
+        }
+        renderUseItemsList(Array.from(app.querySelectorAll("[data-use-product]:checked")).map((input) => ({
+          productId: input.value,
+          qty: Math.max(1, num(app.querySelector(`[data-use-qty="${input.value}"]`)?.value))
+        })), target);
+      };
+      target.querySelectorAll("[data-edit-selected-remove]").forEach((button) => {
+        button.addEventListener("click", () => syncProductQty(button.dataset.editSelectedRemove, 0));
+      });
+      target.querySelectorAll("[data-edit-selected-dec], [data-edit-selected-inc]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const productId = button.dataset.editSelectedDec || button.dataset.editSelectedInc;
+          const linked = app.querySelector(`[data-use-qty="${productId}"]`);
+          const currentQty = Math.max(1, num(linked?.value || 1));
+          const nextQty = button.dataset.editSelectedDec ? currentQty - 1 : currentQty + 1;
+          syncProductQty(productId, nextQty);
+        });
+      });
     };
 
     const renderEditUsage = () => `
@@ -2569,15 +3192,22 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       };
       const filterOptions = () => {
         const department = useDepartment.value;
-        [doctorSelect, surgerySelect].forEach((list) => {
-          Array.from(list.options).forEach((option) => {
-            if (!option.value) return;
-            const matches = !department || option.dataset.department === department;
-            option.hidden = !matches;
-            option.disabled = !matches;
-          });
-          if (list.selectedOptions[0]?.disabled) list.value = "";
-        });
+        const currentDoctor = doctorSelect.value;
+        const currentSurgery = surgerySelect.value;
+        const doctors = department
+          ? state.doctors.slice().sort(byName).filter((item) => departmentCode(item.name) === department)
+          : [];
+        doctorSelect.innerHTML = `<option value="">${department ? "원장 코드 선택" : "과를 먼저 선택하세요"}</option>` + doctors
+          .map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`)
+          .join("");
+        if (doctors.some((item) => item.id === currentDoctor)) doctorSelect.value = currentDoctor;
+        const surgeries = department && doctorSelect.value
+          ? state.surgeries.slice().sort((a, b) => alphaFirstCompare(a.name, b.name)).filter((item) => (item.department || inferSurgeryDepartment(item.name)) === department)
+          : [];
+        surgerySelect.innerHTML = `<option value="">${department && doctorSelect.value ? "수술 선택" : "원장 코드를 먼저 선택하세요"}</option>` + surgeries
+          .map((item) => `<option value="${item.id}">${escapeHtml(item.department || inferSurgeryDepartment(item.name))} - ${escapeHtml(item.name)}</option>`)
+          .join("");
+        if (surgeries.some((item) => item.id === currentSurgery)) surgerySelect.value = currentSurgery;
       };
       const renderSearch = () => {
         const query = normalizedName(productSearch.value);
@@ -2593,7 +3223,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           <label class="check-card use-card">
             <input type="checkbox" value="${item.id}" data-edit-search-product="${item.id}" ${app.querySelector(`[data-use-product="${item.id}"]`)?.checked ? "checked" : ""}>
             <span>${escapeHtml(item.name)}<br><span class="muted">${escapeHtml(productCategoryLabel(item.category))}${item.company ? ` · ${escapeHtml(item.company)}` : ""}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ""} · 현재고 ${num(item.stock)}</span></span>
-            <input type="number" min="1" value="${Math.max(1, num(app.querySelector(`[data-use-qty="${item.id}"]`)?.value) || 1)}" data-edit-search-qty="${item.id}" aria-label="${escapeHtml(item.name)} 수정 수량">
+            ${qtyStepper(`data-edit-search-qty="${item.id}" aria-label="${escapeHtml(item.name)} 수정 수량"`, Math.max(1, num(app.querySelector(`[data-use-qty="${item.id}"]`)?.value) || 1), Math.max(1, num(item.stock) || 999))}
           </label>
         `).join("") : `<div class="empty">검색 결과가 없습니다.</div>`;
         productSearchResults.querySelectorAll("[data-edit-search-product]").forEach((input) => {
@@ -2726,6 +3356,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const selectedUseList = document.getElementById("selectedUseList");
       const productSearch = document.getElementById("useProductSearch");
       const productSearchResults = document.getElementById("useProductSearchResults");
+      const openProductSearch = document.getElementById("openUseProductSearch");
+      const closeProductSearch = document.getElementById("closeUseProductSearch");
+      const productSearchModal = document.getElementById("useProductSearchModal");
       let manualRestrictNonpay = false;
       const setRestrictButton = (value) => {
         manualRestrictNonpay = Boolean(value);
@@ -2750,21 +3383,64 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           selectedUseList.innerHTML = `<span>선택된 제품이 없습니다.</span>`;
           return;
         }
-        const categories = ["비급여", "인체조직", "ANCHOR"];
-        selectedUseList.innerHTML = categories.map((category) => {
-          const categoryItems = items
-            .map((item) => ({ ...item, product: productById(item.productId) }))
-            .filter((item) => item.product && productCategory(item.product.category) === category);
-          if (!categoryItems.length) return "";
-          return `
-            <div class="item">
-              <div class="item-title"><span>${escapeHtml(productCategoryLabel(category))}</span><span class="pill">${categoryItems.length}</span></div>
-              <div class="meta">
-                ${categoryItems.map((item) => `<span>${escapeHtml(item.product.name)} · ${item.qty}개</span>`).join("")}
-              </div>
-            </div>
-          `;
-        }).join("");
+        const chipClass = (category) => {
+          const label = productCategoryLabel(category);
+          if (label === "비급여") return "nonpay";
+          if (label === "인체조직") return "tissue";
+          if (label === "ANCHOR") return "anchor";
+          return "";
+        };
+        selectedUseList.innerHTML = `
+          <div class="selected-use-buttons">
+            ${items.map((item) => {
+              const product = productById(item.productId);
+              if (!product) return "";
+              const meta = [productCategoryLabel(product.category), product.company, product.subcategory].filter(Boolean).join(" · ");
+              return `
+                <div class="selected-use-chip ${chipClass(product.category)}">
+                  <div class="selected-use-name" title="${escapeHtml(product.name)}">
+                    ${escapeHtml(product.name)}<span>${escapeHtml(meta)}</span>
+                  </div>
+                  <div class="selected-use-controls">
+                    <button type="button" class="secondary" data-selected-dec="${item.productId}" aria-label="수량 줄이기">−</button>
+                    <input type="number" min="1" max="${Math.max(1, num(product.stock) + item.qty)}" value="${item.qty}" data-selected-qty="${item.productId}" aria-label="${escapeHtml(product.name)} 수량" readonly>
+                    <button type="button" class="secondary" data-selected-inc="${item.productId}" aria-label="수량 늘리기">+</button>
+                    <button type="button" class="remove-selected" data-selected-remove="${item.productId}">삭제</button>
+                  </div>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        `;
+        selectedUseList.querySelectorAll("[data-selected-remove]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const checkbox = app.querySelector(`[data-use-product="${button.dataset.selectedRemove}"]`);
+            if (checkbox) checkbox.checked = false;
+            renderSelectedUseList();
+          });
+        });
+        selectedUseList.querySelectorAll("[data-selected-qty]").forEach((input) => {
+          input.addEventListener("input", () => {
+            const linked = app.querySelector(`[data-use-qty="${input.dataset.selectedQty}"]`);
+            const checkbox = app.querySelector(`[data-use-product="${input.dataset.selectedQty}"]`);
+            const value = Math.max(1, num(input.value));
+            if (linked) linked.value = value;
+            if (checkbox) checkbox.checked = true;
+          });
+          input.addEventListener("change", renderSelectedUseList);
+        });
+        selectedUseList.querySelectorAll("[data-selected-dec], [data-selected-inc]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const productId = button.dataset.selectedDec || button.dataset.selectedInc;
+            const linked = app.querySelector(`[data-use-qty="${productId}"]`);
+            const checkbox = app.querySelector(`[data-use-product="${productId}"]`);
+            const currentQty = Math.max(1, num(linked?.value || 1));
+            const nextQty = button.dataset.selectedDec ? Math.max(1, currentQty - 1) : currentQty + 1;
+            if (linked) linked.value = nextQty;
+            if (checkbox) checkbox.checked = true;
+            renderSelectedUseList();
+          });
+        });
       };
       const selectUseProduct = (productId, qty = 1) => {
         const checkbox = app.querySelector(`[data-use-product="${productId}"]`);
@@ -2787,7 +3463,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           <label class="check-card use-card">
             <input type="checkbox" value="${item.id}" data-search-product="${item.id}" ${app.querySelector(`[data-use-product="${item.id}"]`)?.checked ? "checked" : ""}>
             <span>${escapeHtml(item.name)}<br><span class="muted">${escapeHtml(productCategoryLabel(item.category))}${item.company ? ` · ${escapeHtml(item.company)}` : ""}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ""} · 현재고 ${num(item.stock)}</span></span>
-            <input type="number" min="1" max="${Math.max(1, num(item.stock))}" value="${Math.max(1, num(app.querySelector(`[data-use-qty="${item.id}"]`)?.value) || 1)}" data-search-qty="${item.id}" aria-label="${escapeHtml(item.name)} 검색 사용 수량">
+            ${qtyStepper(`data-search-qty="${item.id}" aria-label="${escapeHtml(item.name)} 검색 사용 수량"`, Math.max(1, num(app.querySelector(`[data-use-qty="${item.id}"]`)?.value) || 1), Math.max(1, num(item.stock)))}
           </label>
         `).join("") : `<div class="empty">검색 결과가 없습니다.</div>`;
         productSearchResults.querySelectorAll("[data-search-product]").forEach((input) => {
@@ -2822,7 +3498,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               <label class="check-card use-card">
                 <input type="checkbox" value="${item.productId}" data-recommend-product="${item.productId}">
                 <span>${escapeHtml(item.product.name)}<br><span class="muted">추천 ${Math.max(1, num(item.qty))}개 · 현재고 ${num(item.product.stock)}</span></span>
-                <input type="number" min="1" max="${Math.max(1, num(item.product.stock))}" value="${Math.max(1, num(item.qty))}" data-recommend-qty="${item.productId}" aria-label="${escapeHtml(item.product.name)} 추천 사용 수량">
+                ${qtyStepper(`data-recommend-qty="${item.productId}" aria-label="${escapeHtml(item.product.name)} 추천 사용 수량"`, Math.max(1, num(item.qty)), Math.max(1, num(item.product.stock)))}
               </label>
             `).join("")}
           </div>
@@ -2861,24 +3537,26 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       };
       const filterUseOptions = () => {
         const department = useDepartment.value;
-        Array.from(departmentSelect.options).forEach((option) => {
-          if (!option.value) return;
-          const matches = !department || option.dataset.department === department;
-          option.hidden = !matches;
-          option.disabled = !matches;
-        });
-        if (departmentSelect.selectedOptions[0]?.disabled) departmentSelect.value = "";
-        Array.from(surgerySelect.options).forEach((option) => {
-          if (!option.value) return;
-          const matches = !department || option.dataset.department === department;
-          option.hidden = !matches;
-          option.disabled = !matches;
-        });
-        if (surgerySelect.selectedOptions[0]?.disabled) surgerySelect.value = "";
+        const currentDoctor = departmentSelect.value;
+        const currentSurgery = surgerySelect.value;
+        const doctors = department
+          ? state.doctors.slice().sort(byName).filter((item) => departmentCode(item.name) === department)
+          : [];
+        departmentSelect.innerHTML = `<option value="">${department ? "원장 코드 선택" : "과를 먼저 선택하세요"}</option>` + doctors
+          .map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`)
+          .join("");
+        if (doctors.some((item) => item.id === currentDoctor)) departmentSelect.value = currentDoctor;
+        const surgeries = department && departmentSelect.value
+          ? state.surgeries.slice().sort((a, b) => alphaFirstCompare(a.name, b.name)).filter((item) => (item.department || inferSurgeryDepartment(item.name)) === department)
+          : [];
+        surgerySelect.innerHTML = `<option value="">${department && departmentSelect.value ? "수술 선택" : "원장 코드를 먼저 선택하세요"}</option>` + surgeries
+          .map((item) => `<option value="${item.id}">${escapeHtml(item.department || inferSurgeryDepartment(item.name))} - ${escapeHtml(item.name)}</option>`)
+          .join("");
+        if (surgeries.some((item) => item.id === currentSurgery)) surgerySelect.value = currentSurgery;
         renderUseRecommendation();
       };
       useDepartment.addEventListener("change", filterUseOptions);
-      departmentSelect.addEventListener("change", renderUseRecommendation);
+      departmentSelect.addEventListener("change", filterUseOptions);
       surgerySelect.addEventListener("change", renderUseRecommendation);
       useRestrictNonpay.addEventListener("click", () => {
         setRestrictButton(!isRestrictOn());
@@ -2888,6 +3566,22 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         input.addEventListener("change", renderSelectedUseList);
         input.addEventListener("input", renderSelectedUseList);
       });
+      const showProductSearchModal = () => {
+        productSearchModal.hidden = false;
+        renderProductSearchResults();
+        setTimeout(() => productSearch?.focus(), 30);
+      };
+      const hideProductSearchModal = () => {
+        productSearchModal.hidden = true;
+      };
+      openProductSearch?.addEventListener("click", showProductSearchModal);
+      closeProductSearch?.addEventListener("click", hideProductSearchModal);
+      productSearchModal?.addEventListener("click", (event) => {
+        if (event.target === productSearchModal) hideProductSearchModal();
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && productSearchModal && !productSearchModal.hidden) hideProductSearchModal();
+      }, { once: false });
       productSearch.addEventListener("input", renderProductSearchResults);
       renderProductSearchResults();
       filterUseOptions();
@@ -3102,7 +3796,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       <section class="grid">
         <div class="card">
           <h2>사용내역 검색</h2>
-          <div class="row three">
+          <div class="row three history-filter-grid">
             <div>
               <label for="historyStart">시작일</label>
               <input id="historyStart" type="date">
