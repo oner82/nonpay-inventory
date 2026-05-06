@@ -22,7 +22,11 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
+      - name: Prepare Firebase service account
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_NONPAY_INVENTORY }}' > "$HOME/firebase-service-account.json"
+
       - name: Deploy to Firebase Hosting
-        run: firebase deploy --only hosting --project nonpay-inventory --token "$FIREBASE_TOKEN"
+        run: firebase deploy --only hosting --project nonpay-inventory
         env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
