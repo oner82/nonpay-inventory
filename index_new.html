@@ -3260,7 +3260,18 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         useDepartment.value = surgery?.department || inferSurgeryDepartment(surgery?.name || "") || departmentCode(departmentById(usage.doctorId)?.name || "");
         filterOptions();
         doctorSelect.value = usage.doctorId || "";
+        filterOptions();
         surgerySelect.value = usage.surgeryId || "";
+        if (usage.surgeryId && !surgerySelect.value) {
+          const surgeryOption = surgeryById(usage.surgeryId);
+          if (surgeryOption) {
+            const fallbackOption = document.createElement("option");
+            fallbackOption.value = surgeryOption.id;
+            fallbackOption.textContent = `${surgeryOption.department || inferSurgeryDepartment(surgeryOption.name || "")} - ${surgeryOption.name}`;
+            surgerySelect.appendChild(fallbackOption);
+            surgerySelect.value = usage.surgeryId;
+          }
+        }
         clearProducts();
         usageProductItems(usage).forEach((item) => selectProduct(item.productId, item.qty));
         renderSearch();
@@ -3336,8 +3347,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         state.usages = state.usages.map((item) => item.id === usage.id ? next : item);
         currentView = "edit";
         pendingEditUsageId = id;
-        render();
         await saveState("수정 완료");
+        render();
       });
       filterOptions();
       renderSearch();
@@ -4013,8 +4024,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               if (product) product.stock = num(product.stock) + 1;
             });
             state.usages = state.usages.filter((item) => item.id !== usage.id);
+            await saveState("사용내역 삭제 완료 · 재고 복구");
             render();
-            await saveState();
           });
         });
       };
