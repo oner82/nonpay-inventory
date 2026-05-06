@@ -4020,13 +4020,14 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             return;
           }
           if (!button.dataset.deleteUsage) return;
-          const usage = state.usages.find((item) => item.id === button.dataset.deleteUsage);
+          const usageId = button.dataset.deleteUsage;
+          const usage = state.usages.find((item) => String(item.id) === usageId);
           if (!usage || !confirm("사용내역을 삭제하고 재고를 복구할까요?")) return;
           usage.productIds.forEach((id) => {
             const product = productById(id);
             if (product) product.stock = num(product.stock) + 1;
           });
-          state.usages = state.usages.filter((item) => item.id !== usage.id);
+          state.usages = state.usages.filter((item) => String(item.id) !== String(usage.id));
           await saveState("사용내역 삭제 완료 · 재고 복구");
           updateHistory();
           render();
