@@ -3345,8 +3345,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           updatedAt: new Date().toISOString()
         };
         state.usages = state.usages.map((item) => item.id === usage.id ? next : item);
-        currentView = "edit";
-        pendingEditUsageId = id;
+        currentView = "dashboard";
+        pendingEditUsageId = "";
         await saveState("수정 완료");
         render();
       });
@@ -4008,25 +4008,28 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         updateHistory();
       });
       const bindHistoryDeleteButtons = () => {
-        app.querySelectorAll("[data-edit-usage]").forEach((button) => {
-          button.addEventListener("click", () => {
+        if (patientList.dataset.boundHistoryActions === "true") return;
+        patientList.dataset.boundHistoryActions = "true";
+        patientList.addEventListener("click", async (event) => {
+          const button = event.target.closest("button");
+          if (!button) return;
+          if (button.dataset.editUsage) {
             pendingEditUsageId = button.dataset.editUsage;
             currentView = "edit";
             render();
+            return;
+          }
+          if (!button.dataset.deleteUsage) return;
+          const usage = state.usages.find((item) => item.id === button.dataset.deleteUsage);
+          if (!usage || !confirm("사용내역을 삭제하고 재고를 복구할까요?")) return;
+          usage.productIds.forEach((id) => {
+            const product = productById(id);
+            if (product) product.stock = num(product.stock) + 1;
           });
-        });
-        app.querySelectorAll("[data-delete-usage]").forEach((button) => {
-          button.addEventListener("click", async () => {
-            const usage = state.usages.find((item) => item.id === button.dataset.deleteUsage);
-            if (!usage || !confirm("사용내역을 삭제하고 재고를 복구할까요?")) return;
-            usage.productIds.forEach((id) => {
-              const product = productById(id);
-              if (product) product.stock = num(product.stock) + 1;
-            });
-            state.usages = state.usages.filter((item) => item.id !== usage.id);
-            await saveState("사용내역 삭제 완료 · 재고 복구");
-            render();
-          });
+          state.usages = state.usages.filter((item) => item.id !== usage.id);
+          await saveState("사용내역 삭제 완료 · 재고 복구");
+          updateHistory();
+          render();
         });
       };
       bindHistoryDeleteButtons();
