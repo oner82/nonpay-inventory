@@ -1707,7 +1707,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       return reconciled;
     };
 
-    const saveState = async (message = "저장 완료") => {
+    const saveState = async (message = "저장 완료", options = {}) => {
       if (!ref) {
         setStatus("Firebase 연결 전입니다", "error");
         return;
@@ -1717,6 +1717,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       try {
         if (runTransaction && db) {
           const merged = await runTransaction(db, async (transaction) => {
+            if (options.authoritative) {
+              const nextState = normalizeState(state);
+              transaction.set(ref, nextState);
+              return nextState;
+            }
             const serverSnap = await transaction.get(ref);
             const remoteData = serverSnap.exists() ? serverSnap.data() : blankState();
             const nextState = mergeStates(remoteData, state);
@@ -4028,7 +4033,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             if (product) product.stock = num(product.stock) + 1;
           });
           state.usages = state.usages.filter((item) => String(item.id) !== String(usage.id));
-          await saveState("사용내역 삭제 완료 · 재고 복구");
+          await saveState("사용내역 삭제 완료 · 재고 복구", { authoritative: true });
           updateHistory();
           render();
         });
