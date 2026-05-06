@@ -1716,10 +1716,15 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       state.updatedAt = new Date().toISOString();
       try {
         if (runTransaction && db) {
+          const localState = normalizeState(state);
           const merged = await runTransaction(db, async (transaction) => {
             const serverSnap = await transaction.get(ref);
             const remoteData = serverSnap.exists() ? serverSnap.data() : blankState();
-            const nextState = mergeStates(remoteData, state);
+            const remoteUpdatedAt = String(remoteData?.updatedAt || "");
+            const localUpdatedAt = String(localState.updatedAt || "");
+            const nextState = remoteUpdatedAt > localUpdatedAt
+              ? mergeStates(remoteData, localState)
+              : localState;
             transaction.set(ref, nextState);
             return nextState;
           });
