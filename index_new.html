@@ -3043,8 +3043,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         </div>
       `;
       const syncProductQty = (productId, nextQty) => {
-        const checkbox = app.querySelector(`[data-use-product="${productId}"]`);
-        const qtyInput = app.querySelector(`[data-use-qty="${productId}"]`);
+        const scope = target.closest("form") || app;
+        const checkbox = scope.querySelector(`[data-use-product="${productId}"]`);
+        const qtyInput = scope.querySelector(`[data-use-qty="${productId}"]`);
         const maxQty = Math.max(1, num(qtyInput?.max || 999));
         const safeQty = Math.min(maxQty, Math.max(0, num(nextQty)));
         if (safeQty <= 0) {
@@ -3054,9 +3055,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           if (checkbox) checkbox.checked = true;
           if (qtyInput) qtyInput.value = safeQty;
         }
-        renderUseItemsList(Array.from(app.querySelectorAll("[data-use-product]:checked")).map((input) => ({
+        renderUseItemsList(Array.from(scope.querySelectorAll("[data-use-product]:checked")).map((input) => ({
           productId: input.value,
-          qty: Math.max(1, num(app.querySelector(`[data-use-qty="${input.value}"]`)?.value))
+          qty: Math.max(1, num(scope.querySelector(`[data-use-qty="${input.value}"]`)?.value))
         })), target);
       };
       target.querySelectorAll("[data-edit-selected-remove]").forEach((button) => {
@@ -3152,24 +3153,24 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const selectedList = document.getElementById("editSelectedUseList");
       const productSearch = document.getElementById("editProductSearch");
       const productSearchResults = document.getElementById("editProductSearchResults");
-      const selectedItems = () => Array.from(app.querySelectorAll("[data-use-product]:checked")).map((input) => ({
+      const selectedItems = () => Array.from(form.querySelectorAll("[data-use-product]:checked")).map((input) => ({
         productId: input.value,
-        qty: Math.max(1, num(app.querySelector(`[data-use-qty="${input.value}"]`)?.value))
+        qty: Math.max(1, num(form.querySelector(`[data-use-qty="${input.value}"]`)?.value))
       }));
       const renderSelected = () => renderUseItemsList(selectedItems(), selectedList);
       const selectProduct = (productId, qty = 1) => {
-        const checkbox = app.querySelector(`[data-use-product="${productId}"]`);
-        const qtyInput = app.querySelector(`[data-use-qty="${productId}"]`);
+        const checkbox = form.querySelector(`[data-use-product="${productId}"]`);
+        const qtyInput = form.querySelector(`[data-use-qty="${productId}"]`);
         if (checkbox) checkbox.checked = true;
         if (qtyInput) qtyInput.value = Math.max(1, num(qty));
         renderSelected();
       };
       const clearProducts = () => {
-        app.querySelectorAll("[data-use-product]").forEach((input) => {
+        form.querySelectorAll("[data-use-product]").forEach((input) => {
           input.checked = false;
           input.disabled = false;
         });
-        app.querySelectorAll("[data-use-qty]").forEach((input) => {
+        form.querySelectorAll("[data-use-qty]").forEach((input) => {
           input.value = 1;
           input.disabled = false;
         });
@@ -3179,10 +3180,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           map.set(item.productId, item.qty);
           return map;
         }, new Map());
-        app.querySelectorAll("[data-use-product]").forEach((input) => {
+        form.querySelectorAll("[data-use-product]").forEach((input) => {
           const product = productById(input.value);
           const available = num(product?.stock) + (originalCounts.get(input.value) || 0);
-          const qtyInput = app.querySelector(`[data-use-qty="${input.value}"]`);
+          const qtyInput = form.querySelector(`[data-use-qty="${input.value}"]`);
           input.disabled = false;
           if (qtyInput) {
             qtyInput.disabled = false;
@@ -3221,15 +3222,15 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           .slice(0, 12);
         productSearchResults.innerHTML = results.length ? results.map((item) => `
           <label class="check-card use-card">
-            <input type="checkbox" value="${item.id}" data-edit-search-product="${item.id}" ${app.querySelector(`[data-use-product="${item.id}"]`)?.checked ? "checked" : ""}>
+            <input type="checkbox" value="${item.id}" data-edit-search-product="${item.id}" ${form.querySelector(`[data-use-product="${item.id}"]`)?.checked ? "checked" : ""}>
             <span>${escapeHtml(item.name)}<br><span class="muted">${escapeHtml(productCategoryLabel(item.category))}${item.company ? ` · ${escapeHtml(item.company)}` : ""}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ""} · 현재고 ${num(item.stock)}</span></span>
-            ${qtyStepper(`data-edit-search-qty="${item.id}" aria-label="${escapeHtml(item.name)} 수정 수량"`, Math.max(1, num(app.querySelector(`[data-use-qty="${item.id}"]`)?.value) || 1), Math.max(1, num(item.stock) || 999))}
+            ${qtyStepper(`data-edit-search-qty="${item.id}" aria-label="${escapeHtml(item.name)} 수정 수량"`, Math.max(1, num(form.querySelector(`[data-use-qty="${item.id}"]`)?.value) || 1), Math.max(1, num(item.stock) || 999))}
           </label>
         `).join("") : `<div class="empty">검색 결과가 없습니다.</div>`;
         productSearchResults.querySelectorAll("[data-edit-search-product]").forEach((input) => {
           input.addEventListener("change", () => {
             const qty = productSearchResults.querySelector(`[data-edit-search-qty="${input.value}"]`)?.value;
-            const linked = app.querySelector(`[data-use-product="${input.value}"]`);
+            const linked = form.querySelector(`[data-use-product="${input.value}"]`);
             if (input.checked) {
               selectProduct(input.value, qty);
             } else if (linked) {
@@ -3268,7 +3269,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       };
       select.addEventListener("change", () => loadUsage(select.value));
       useDepartment.addEventListener("change", filterOptions);
-      app.querySelectorAll("[data-use-product], [data-use-qty]").forEach((input) => {
+      form.querySelectorAll("[data-use-product], [data-use-qty]").forEach((input) => {
         input.addEventListener("change", () => {
           renderSelected();
           renderSearch();
@@ -3356,6 +3357,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const selectedUseList = document.getElementById("selectedUseList");
       const productSearch = document.getElementById("useProductSearch");
       const productSearchResults = document.getElementById("useProductSearchResults");
+      const form = document.getElementById("useForm");
       const openProductSearch = document.getElementById("openUseProductSearch");
       const closeProductSearch = document.getElementById("closeUseProductSearch");
       const productSearchModal = document.getElementById("useProductSearchModal");
@@ -3375,7 +3377,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       );
       const selectedUseItems = () => Array.from(app.querySelectorAll("[data-use-product]:checked")).map((input) => ({
         productId: input.value,
-        qty: Math.max(1, num(app.querySelector(`[data-use-qty="${input.value}"]`)?.value))
+        qty: Math.max(1, num(form.querySelector(`[data-use-qty="${input.value}"]`)?.value))
       }));
       const renderSelectedUseList = () => {
         const items = selectedUseItems();
@@ -3433,7 +3435,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           button.addEventListener("click", () => {
             const productId = button.dataset.selectedDec || button.dataset.selectedInc;
             const linked = app.querySelector(`[data-use-qty="${productId}"]`);
-            const checkbox = app.querySelector(`[data-use-product="${productId}"]`);
+            const checkbox = form.querySelector(`[data-use-product="${productId}"]`);
             const currentQty = Math.max(1, num(linked?.value || 1));
             const nextQty = button.dataset.selectedDec ? Math.max(1, currentQty - 1) : currentQty + 1;
             if (linked) linked.value = nextQty;
@@ -3443,8 +3445,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         });
       };
       const selectUseProduct = (productId, qty = 1) => {
-        const checkbox = app.querySelector(`[data-use-product="${productId}"]`);
-        const qtyInput = app.querySelector(`[data-use-qty="${productId}"]`);
+        const checkbox = form.querySelector(`[data-use-product="${productId}"]`);
+        const qtyInput = form.querySelector(`[data-use-qty="${productId}"]`);
         if (checkbox) checkbox.checked = true;
         if (qtyInput) qtyInput.value = Math.max(1, num(qty));
         renderSelectedUseList();
@@ -3461,9 +3463,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           .slice(0, 12);
         productSearchResults.innerHTML = results.length ? results.map((item) => `
           <label class="check-card use-card">
-            <input type="checkbox" value="${item.id}" data-search-product="${item.id}" ${app.querySelector(`[data-use-product="${item.id}"]`)?.checked ? "checked" : ""}>
+            <input type="checkbox" value="${item.id}" data-search-product="${item.id}" ${form.querySelector(`[data-use-product="${item.id}"]`)?.checked ? "checked" : ""}>
             <span>${escapeHtml(item.name)}<br><span class="muted">${escapeHtml(productCategoryLabel(item.category))}${item.company ? ` · ${escapeHtml(item.company)}` : ""}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ""} · 현재고 ${num(item.stock)}</span></span>
-            ${qtyStepper(`data-search-qty="${item.id}" aria-label="${escapeHtml(item.name)} 검색 사용 수량"`, Math.max(1, num(app.querySelector(`[data-use-qty="${item.id}"]`)?.value) || 1), Math.max(1, num(item.stock)))}
+            ${qtyStepper(`data-search-qty="${item.id}" aria-label="${escapeHtml(item.name)} 검색 사용 수량"`, Math.max(1, num(form.querySelector(`[data-use-qty="${item.id}"]`)?.value) || 1), Math.max(1, num(item.stock)))}
           </label>
         `).join("") : `<div class="empty">검색 결과가 없습니다.</div>`;
         productSearchResults.querySelectorAll("[data-search-product]").forEach((input) => {
@@ -3503,7 +3505,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             `).join("")}
           </div>
         `;
-        app.querySelectorAll("[data-use-product]").forEach((input) => {
+        form.querySelectorAll("[data-use-product]").forEach((input) => {
           const product = productById(input.value);
           const recommendedItem = recommendedItems.find((item) => item.productId === input.value);
           const isRecommended = Boolean(recommendedItem);
@@ -3516,8 +3518,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         });
         app.querySelectorAll("[data-recommend-product]").forEach((input) => {
           input.addEventListener("change", () => {
-            const linked = app.querySelector(`[data-use-product="${input.value}"]`);
-            const qtyInput = app.querySelector(`[data-use-qty="${input.value}"]`);
+            const linked = form.querySelector(`[data-use-product="${input.value}"]`);
+            const qtyInput = form.querySelector(`[data-use-qty="${input.value}"]`);
             const recommendQty = app.querySelector(`[data-recommend-qty="${input.value}"]`);
             if (linked) linked.checked = input.checked;
             if (qtyInput && recommendQty) qtyInput.value = Math.max(1, num(recommendQty.value));
@@ -3562,7 +3564,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         setRestrictButton(!isRestrictOn());
         renderUseRecommendation();
       });
-      app.querySelectorAll("[data-use-product], [data-use-qty]").forEach((input) => {
+      form.querySelectorAll("[data-use-product], [data-use-qty]").forEach((input) => {
         input.addEventListener("change", renderSelectedUseList);
         input.addEventListener("input", renderSelectedUseList);
       });
