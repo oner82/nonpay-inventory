@@ -1814,7 +1814,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           state.receipts = state.receipts.filter((item) => !sameId(item.productId, id));
           state.usages = state.usages.map((usage) => ({ ...usage, productIds: usage.productIds.filter((productId) => !sameId(productId, id)) }));
           render();
-          await saveState();
+          await saveState("제품 삭제 완료", { authoritative: true });
           return;
         }
 
@@ -1840,7 +1840,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           state.doctors = state.doctors.filter((item) => !sameId(item.id, id));
           state.surgeries = state.surgeries.filter((item) => item.department !== doctorToDelete?.name);
           render();
-          await saveState();
+          await saveState("과 삭제 완료", { authoritative: true });
           return;
         }
 
@@ -1862,7 +1862,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           if (!confirm("수술을 삭제할까요?")) return;
           state.surgeries = state.surgeries.filter((item) => !sameId(item.id, id));
           render();
-          await saveState();
+          await saveState("수술 삭제 완료", { authoritative: true });
           return;
         }
 
@@ -1892,7 +1892,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           if (!confirm("수술별 사용관리 규칙을 삭제할까요?")) return;
           state.usageRules = state.usageRules.filter((item) => !sameId(item.id, deleteRuleBtn.dataset.deleteRule));
           render();
-          await saveState();
+          await saveState("수술별 사용관리 삭제 완료", { authoritative: true });
           return;
         }
       });
