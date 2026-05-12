@@ -1786,29 +1786,73 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       if (commonHandlersBound) return;
       commonHandlersBound = true;
       app.addEventListener("click", async (event) => {
+        const editProductBtn = event.target.closest("[data-edit-product]");
+        if (editProductBtn) {
+          const item = productById(editProductBtn.dataset.editProduct);
+          if (!item) return;
+          document.getElementById("productFormTitle").textContent = "제품 수정";
+          document.getElementById("productId").value = item.id;
+          document.getElementById("productCategory").value = item.category;
+          document.getElementById("productName").value = item.name;
+          document.getElementById("productCompany").value = item.company || "";
+          document.getElementById("productSubcategory").value = item.subcategory || "";
+          document.getElementById("productStock").value = num(item.stock);
+          document.getElementById("productWarning").value = num(item.warningStock);
+          document.getElementById("productLanding").value = num(item.landingQty);
+          syncProductFields?.();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+
         const deleteProductBtn = event.target.closest("[data-delete-product]");
         if (deleteProductBtn) {
           const id = deleteProductBtn.dataset.deleteProduct;
-          const used = state.usages.some((usage) => usage.productIds.includes(id));
-          const received = state.receipts.some((receipt) => receipt.productId === id);
-          if ((used || received) && !confirm("내역에 사용된 제품입니다. 그래도 삭제할까요?")) return;
-          state.products = state.products.filter((item) => item.id !== id);
-          state.receipts = state.receipts.filter((item) => item.productId !== id);
-          state.usages = state.usages.map((usage) => ({ ...usage, productIds: usage.productIds.filter((productId) => productId !== id) }));
+          const productUsed = state.usages.some((usage) => usage.productIds.some((productId) => sameId(productId, id)));
+          const productReceived = state.receipts.some((receipt) => sameId(receipt.productId, id));
+          if ((productUsed || productReceived) && !confirm("내역에 사용된 제품입니다. 그래도 삭제할까요?")) return;
+          state.products = state.products.filter((item) => !sameId(item.id, id));
+          state.receipts = state.receipts.filter((item) => !sameId(item.productId, id));
+          state.usages = state.usages.map((usage) => ({ ...usage, productIds: usage.productIds.filter((productId) => !sameId(productId, id)) }));
           render();
           await saveState();
+          return;
+        }
+
+        const editDoctorBtn = event.target.closest("[data-edit-doctor]");
+        if (editDoctorBtn) {
+          const item = state.doctors.find((entry) => sameId(entry.id, editDoctorBtn.dataset.editDoctor));
+          if (!item) return;
+          document.getElementById("doctorFormTitle").textContent = "과 수정";
+          document.getElementById("doctorId").value = item.id;
+          document.getElementById("doctorOldName").value = item.name;
+          document.getElementById("doctorDepartment").value = departmentCode(item.name);
+          document.getElementById("doctorNewDepartment").value = "";
+          document.getElementById("doctorNumber").value = item.name.replace(departmentCode(item.name), "");
+          window.scrollTo({ top: 0, behavior: "smooth" });
           return;
         }
 
         const deleteDoctorBtn = event.target.closest("[data-delete-doctor]");
         if (deleteDoctorBtn) {
           const id = deleteDoctorBtn.dataset.deleteDoctor;
-          const department = state.doctors.find((item) => item.id === id);
+          const doctorToDelete = state.doctors.find((item) => sameId(item.id, id));
           if (!confirm("과를 삭제할까요?")) return;
-          state.doctors = state.doctors.filter((item) => item.id !== id);
-          state.surgeries = state.surgeries.filter((item) => item.department !== department?.name);
+          state.doctors = state.doctors.filter((item) => !sameId(item.id, id));
+          state.surgeries = state.surgeries.filter((item) => item.department !== doctorToDelete?.name);
           render();
           await saveState();
+          return;
+        }
+
+        const editSurgeryBtn = event.target.closest("[data-edit-surgery]");
+        if (editSurgeryBtn) {
+          const item = surgeryById(editSurgeryBtn.dataset.editSurgery);
+          if (!item) return;
+          document.getElementById("surgeryFormTitle").textContent = "수술 수정";
+          document.getElementById("surgeryId").value = item.id;
+          document.getElementById("surgeryDepartment").value = item.department || inferSurgeryDepartment(item.name);
+          document.getElementById("surgeryName").value = item.name;
+          window.scrollTo({ top: 0, behavior: "smooth" });
           return;
         }
 
@@ -1816,9 +1860,40 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         if (deleteSurgeryBtn) {
           const id = deleteSurgeryBtn.dataset.deleteSurgery;
           if (!confirm("수술을 삭제할까요?")) return;
-          state.surgeries = state.surgeries.filter((item) => item.id !== id);
+          state.surgeries = state.surgeries.filter((item) => !sameId(item.id, id));
           render();
           await saveState();
+          return;
+        }
+
+        const editRuleBtn = event.target.closest("[data-edit-rule]");
+        if (editRuleBtn) {
+          const rule = usageRuleById(editRuleBtn.dataset.editRule);
+          if (!rule) return;
+          document.getElementById("usageRuleFormTitle").textContent = "수술별 사용관리 수정";
+          document.getElementById("usageRuleId").value = rule.id;
+          document.getElementById("ruleDepartment").value = rule.department;
+          filterRuleOptions?.();
+          document.getElementById("ruleDoctor").value = rule.doctorId;
+          document.getElementById("ruleSurgery").value = rule.surgeryId;
+          const items = ruleItems(rule);
+          app.querySelectorAll("[data-rule-product]").forEach((input) => {
+            const item = items.find((entry) => sameId(entry.productId, input.value));
+            input.checked = Boolean(item);
+            const qtyInput = app.querySelector(`[data-rule-product-qty="${input.value}"]`);
+            if (qtyInput) qtyInput.value = item ? Math.max(1, num(item.qty)) : 1;
+          });
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+
+        const deleteRuleBtn = event.target.closest("[data-delete-rule]");
+        if (deleteRuleBtn) {
+          if (!confirm("수술별 사용관리 규칙을 삭제할까요?")) return;
+          state.usageRules = state.usageRules.filter((item) => !sameId(item.id, deleteRuleBtn.dataset.deleteRule));
+          render();
+          await saveState();
+          return;
         }
       });
     };
@@ -2261,9 +2336,12 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       </label>
     `;
 
+    let syncProductFields = null;
+    let filterRuleOptions = null;
+
     const bindProducts = () => {
       const form = document.getElementById("productForm");
-      const syncProductFields = () => {
+      syncProductFields = () => {
         const category = document.getElementById("productCategory").value;
         document.getElementById("productCompanyWrap").style.display = category === "비급여" ? "none" : "block";
         document.getElementById("productSubcategoryWrap").style.display = category === "ANCHOR" ? "block" : "none";
@@ -2280,23 +2358,6 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         document.getElementById("productId").value = "";
         document.getElementById("productFormTitle").textContent = "제품 추가";
         syncProductFields();
-      });
-      app.querySelectorAll("[data-edit-product]").forEach((button) => {
-        button.addEventListener("click", () => {
-          const item = productById(button.dataset.editProduct);
-          if (!item) return;
-          document.getElementById("productFormTitle").textContent = "제품 수정";
-          document.getElementById("productId").value = item.id;
-          document.getElementById("productCategory").value = item.category;
-          document.getElementById("productName").value = item.name;
-          document.getElementById("productCompany").value = item.company || "";
-          document.getElementById("productSubcategory").value = item.subcategory || "";
-          document.getElementById("productStock").value = num(item.stock);
-          document.getElementById("productWarning").value = num(item.warningStock);
-          document.getElementById("productLanding").value = num(item.landingQty);
-          syncProductFields();
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        });
       });
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -2585,23 +2646,6 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           }
         });
       }
-      app.querySelectorAll(`[data-edit-${key}]`).forEach((button) => {
-        button.addEventListener("click", () => {
-          const item = state[collection].find((entry) => entry.id === button.dataset[`edit${capitalize(key)}`]);
-          if (!item) return;
-          document.getElementById(`${key}FormTitle`).textContent = `${label} 수정`;
-          document.getElementById(`${key}Id`).value = item.id;
-          document.getElementById(`${key}OldName`).value = item.name;
-          if (key === "doctor") {
-            document.getElementById(`${key}Department`).value = departmentCode(item.name);
-            document.getElementById(`${key}NewDepartment`).value = "";
-            document.getElementById(`${key}Number`).value = item.name.replace(departmentCode(item.name), "");
-          } else {
-            document.getElementById(`${key}Name`).value = item.name;
-          }
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        });
-      });
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         const id = document.getElementById(`${key}Id`).value || uid();
@@ -2630,17 +2674,6 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         form.reset();
         document.getElementById("surgeryId").value = "";
         document.getElementById("surgeryFormTitle").textContent = "수술 추가";
-      });
-      app.querySelectorAll("[data-edit-surgery]").forEach((button) => {
-        button.addEventListener("click", () => {
-          const item = surgeryById(button.dataset.editSurgery);
-          if (!item) return;
-          document.getElementById("surgeryFormTitle").textContent = "수술 수정";
-          document.getElementById("surgeryId").value = item.id;
-          document.getElementById("surgeryDepartment").value = item.department || inferSurgeryDepartment(item.name);
-          document.getElementById("surgeryName").value = item.name;
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        });
       });
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -2743,7 +2776,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
     const bindUsageRules = () => {
       const form = document.getElementById("usageRuleForm");
-      const filterRuleOptions = () => {
+      filterRuleOptions = () => {
         const department = document.getElementById("ruleDepartment").value;
         const doctorSelect = document.getElementById("ruleDoctor");
         const surgerySelect = document.getElementById("ruleSurgery");
@@ -2771,34 +2804,6 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         document.getElementById("usageRuleId").value = "";
         document.getElementById("usageRuleFormTitle").textContent = "수술별 사용관리 추가";
         filterRuleOptions();
-      });
-      app.querySelectorAll("[data-edit-rule]").forEach((button) => {
-        button.addEventListener("click", () => {
-          const rule = usageRuleById(button.dataset.editRule);
-          if (!rule) return;
-          document.getElementById("usageRuleFormTitle").textContent = "수술별 사용관리 수정";
-          document.getElementById("usageRuleId").value = rule.id;
-          document.getElementById("ruleDepartment").value = rule.department;
-          filterRuleOptions();
-          document.getElementById("ruleDoctor").value = rule.doctorId;
-          document.getElementById("ruleSurgery").value = rule.surgeryId;
-          const items = ruleItems(rule);
-          app.querySelectorAll("[data-rule-product]").forEach((input) => {
-            const item = items.find((entry) => entry.productId === input.value);
-            input.checked = Boolean(item);
-            const qtyInput = app.querySelector(`[data-rule-product-qty="${input.value}"]`);
-            if (qtyInput) qtyInput.value = item ? Math.max(1, num(item.qty)) : 1;
-          });
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        });
-      });
-      app.querySelectorAll("[data-delete-rule]").forEach((button) => {
-        button.addEventListener("click", async () => {
-          if (!confirm("수술별 사용관리 규칙을 삭제할까요?")) return;
-          state.usageRules = state.usageRules.filter((item) => !sameId(item.id, button.dataset.deleteRule));
-          render();
-          await saveState();
-        });
       });
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
