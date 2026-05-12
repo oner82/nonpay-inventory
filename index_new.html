@@ -1462,7 +1462,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     const productById = (id) => state.products.find((item) => item.id === id);
     const departmentById = (id) => state.doctors.find((item) => item.id === id);
     const surgeryById = (id) => state.surgeries.find((item) => item.id === id);
-    const usageRuleById = (id) => state.usageRules.find((item) => item.id === id);
+    const sameId = (left, right) => String(left ?? "") === String(right ?? "");
+    const usageRuleById = (id) => state.usageRules.find((item) => sameId(item.id, id));
 
     const setStatus = (message, type = "ok") => {
       status.textContent = message;
@@ -2790,7 +2791,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       app.querySelectorAll("[data-delete-rule]").forEach((button) => {
         button.addEventListener("click", async () => {
           if (!confirm("수술별 사용관리 규칙을 삭제할까요?")) return;
-          state.usageRules = state.usageRules.filter((item) => item.id !== button.dataset.deleteRule);
+          state.usageRules = state.usageRules.filter((item) => !sameId(item.id, button.dataset.deleteRule));
           render();
           await saveState();
         });
@@ -2812,7 +2813,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           nonpayProductIds: items.filter((item) => productCategory(productById(item.productId)?.category) === "비급여").map((item) => item.productId)
         };
         if (!rule.department || !rule.doctorId || !rule.surgeryId) return;
-        state.usageRules = [...state.usageRules.filter((item) => item.id !== id), rule];
+        state.usageRules = [...state.usageRules.filter((item) => !sameId(item.id, id)), rule];
         render();
         await saveState();
       });
