@@ -3154,6 +3154,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           <div class="actions">
             <button type="submit">수정 저장</button>
             <button class="secondary" type="button" id="editUsageCancel">선택 해제</button>
+            <button class="danger" type="button" id="editUsageDelete" style="display:none;">사용내역 삭제</button>
           </div>
         </form>
       </section>
@@ -3168,6 +3169,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const selectedList = document.getElementById("editSelectedUseList");
       const productSearch = document.getElementById("editProductSearch");
       const productSearchResults = document.getElementById("editProductSearchResults");
+      const deleteButton = document.getElementById("editUsageDelete");
       const selectedItems = () => Array.from(form.querySelectorAll("[data-use-product]:checked")).map((input) => ({
         productId: input.value,
         qty: Math.max(1, num(form.querySelector(`[data-use-qty="${input.value}"]`)?.value))
@@ -3262,9 +3264,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const usage = state.usages.find((item) => item.id === id);
         if (!usage) {
           form.style.display = "none";
+          deleteButton.style.display = "none";
           return;
         }
         form.style.display = "";
+        deleteButton.style.display = "";
         form.querySelectorAll("input, select, textarea, button").forEach((element) => {
           element.disabled = false;
         });
@@ -3309,7 +3313,26 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       document.getElementById("editUsageCancel").addEventListener("click", () => {
         select.value = "";
         form.style.display = "none";
+        deleteButton.style.display = "none";
         pendingEditUsageId = "";
+      });
+      deleteButton.addEventListener("click", async () => {
+        const usageId = document.getElementById("editUsageId").value;
+        if (!usageId) return;
+        const deleted = await deleteUsageRecord(usageId, {
+          onSuccess: () => {
+            select.value = "";
+            form.style.display = "none";
+            deleteButton.style.display = "none";
+            pendingEditUsageId = "";
+          }
+        });
+        if (!deleted) return;
+        select.innerHTML = `<option value="">수정할 환자 사용내역을 선택하세요</option>${state.usages.slice().reverse().map((usage) => {
+          const doctor = departmentById(usage.doctorId);
+          const surgery = surgeryById(usage.surgeryId);
+          return `<option value="${usage.id}">${escapeHtml(usage.date)} · ${escapeHtml(usage.patientName)} · ${escapeHtml(doctor?.name || "-")} · ${escapeHtml(surgery?.name || "-")}</option>`;
+        }).join("")}`;
       });
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -3991,6 +4014,20 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       );
     };
 
+    const deleteUsageRecord = async (usageId, { onSuccess } = {}) => {
+      const usage = state.usages.find((item) => String(item.id) === String(usageId));
+      if (!usage || !confirm("사용내역을 삭제하고 재고를 복구할까요?")) return false;
+      usage.productIds.forEach((id) => {
+        const product = productById(id);
+        if (product) product.stock = num(product.stock) + 1;
+      });
+      state.usages = state.usages.filter((item) => String(item.id) !== String(usage.id));
+      await saveState("사용내역 삭제 완료 · 재고 복구", { authoritative: true });
+      if (typeof onSuccess === "function") onSuccess();
+      render();
+      return true;
+    };
+
     const bindHistory = () => {
       const startInput = document.getElementById("historyStart");
       const endInput = document.getElementById("historyEnd");
@@ -4037,17 +4074,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             return;
           }
           if (!button.dataset.deleteUsage) return;
-          const usageId = button.dataset.deleteUsage;
-          const usage = state.usages.find((item) => String(item.id) === usageId);
-          if (!usage || !confirm("사용내역을 삭제하고 재고를 복구할까요?")) return;
-          usage.productIds.forEach((id) => {
-            const product = productById(id);
-            if (product) product.stock = num(product.stock) + 1;
-          });
-          state.usages = state.usages.filter((item) => String(item.id) !== String(usage.id));
-          await saveState("사용내역 삭제 완료 · 재고 복구", { authoritative: true });
-          updateHistory();
-          render();
+          await deleteUsageRecord(button.dataset.deleteUsage, { onSuccess: updateHistory });
         });
       };
       bindHistoryDeleteButtons();
