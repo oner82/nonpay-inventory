@@ -49,6 +49,11 @@ const setAccountStatus = (message, type = "") => {
   $("accountStatus").className = `status ${type}`;
 };
 
+const setRequestStatus = (message, type = "") => {
+  $("requestStatus").textContent = message;
+  $("requestStatus").className = `status ${type}`;
+};
+
 async function sha256(text) {
   const bytes = new TextEncoder().encode(text);
   const hashBuffer = await crypto.subtle.digest("SHA-256", bytes);
@@ -76,6 +81,17 @@ async function saveAccounts(message = "계정 저장 완료") {
     updatedBy: safeUser()
   });
   setAccountStatus(message, "ok");
+}
+
+function accountStatusLabel(user) {
+  if (user.pendingApproval && user.active === false) return "승인대기";
+  return user.active === false ? "사용중지" : "사용";
+}
+
+function canDeleteAccount(user) {
+  if (!user || user.id === currentUser?.id) return false;
+  const adminCount = accounts.filter((item) => item.role === "admin").length;
+  return user.role !== "admin" || adminCount > 1;
 }
 
 function showApp() {
@@ -139,6 +155,55 @@ async function handleLogin(loginId, pin) {
   showApp();
 }
 
+function resetRequestForm() {
+  $("requestForm").reset();
+  setRequestStatus("");
+}
+
+function openRequestDialog() {
+  resetRequestForm();
+  $("requestDialog").showModal();
+}
+
+async function submitAccountRequest(name, loginId, pin) {
+  if (!name || !loginId || !pin) return;
+  const salt = uid();
+  const pinHash = await hashPin(loginId, pin, salt);
+  const requestedAt = nowIso();
+  const requestedAccount = {
+    id: uid(),
+    name,
+    loginId,
+    pinHash,
+    salt,
+    role: "staff",
+    active: false,
+    pendingApproval: true,
+    createdAt: requestedAt,
+    updatedAt: requestedAt,
+    requestedAt
+  };
+
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(usersRef);
+    const currentAccounts = snap.exists() && Array.isArray(snap.data().accounts) ? snap.data().accounts : [];
+    if (currentAccounts.length === 0) {
+      throw new Error("먼저 최초 관리자 계정을 생성해 주세요.");
+    }
+    const duplicate = currentAccounts.find((item) => String(item.loginId || "").trim() === loginId);
+    if (duplicate) {
+      throw new Error("이미 사용 중인 아이디입니다.");
+    }
+    const nextAccounts = [...currentAccounts, requestedAccount];
+    transaction.set(usersRef, {
+      accounts: nextAccounts,
+      updatedAt: requestedAt,
+      updatedBy: null
+    });
+    accounts = nextAccounts;
+  });
+}
+
 function logout() {
   currentUser = null;
   sessionStorage.removeItem("orInventoryUser");
@@ -150,12 +215,13 @@ function renderAccounts() {
   $("accountList").innerHTML = accounts.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), "ko")).map((user) => `
     <div class="account-row">
       <div>
-        <strong>${escapeHtml(user.name)} <span class="pill">${escapeHtml(roleLabels[user.role] || user.role)}</span></strong>
-        <span>ID: ${escapeHtml(user.loginId)} · 상태: ${user.active === false ? "사용중지" : "사용"}</span>
+        <strong>${escapeHtml(user.name)} <span class="pill">${escapeHtml(roleLabels[user.role] || user.role)}</span>${user.pendingApproval && user.active === false ? ` <span class="pill pending">승인대기</span>` : ""}</strong>
+        <span>ID: ${escapeHtml(user.loginId)} · 상태: ${accountStatusLabel(user)}</span>
       </div>
       <div class="actions">
         <button type="button" class="secondary" data-edit-account="${escapeHtml(user.id)}">수정</button>
         ${user.id === "admin" ? "" : `<button type="button" class="danger" data-toggle-account="${escapeHtml(user.id)}">${user.active === false ? "사용" : "중지"}</button>`}
+        ${canDeleteAccount(user) ? `<button type="action" class="danger" data-delete-account="${escapeHtml(user.id)}">삭제</button>` : ""}
       </div>
     </div>
   `).join("");
@@ -179,10 +245,26 @@ function renderAccounts() {
       const user = accounts.find((item) => item.id === button.dataset.toggleAccount);
       if (!user) return;
       user.active = user.active === false;
+      if (user.active) user.pendingApproval = false;
       user.updatedAt = nowIso();
       user.updatedBy = safeUser();
       await saveAccounts(user.active ? "계정을 사용으로 변경했습니다." : "계정을 사용중지했습니다.");
       renderAccounts();
+    });
+  });
+
+  $("accountList").querySelectorAll("[data-delete-account]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const user = accounts.find((item) => item.id === button.dataset.deleteAccount);
+      if (!canDeleteAccount(user)) {
+        setAccountStatus("현재 로그인 계정이나 마지막 관리자 계정은 삭제할 수 없습니다.", "error");
+        return;
+      }
+      if (!confirm(`${user.name} (${user.loginId}) 계정을 삭제할까요?`)) return;
+      accounts = accounts.filter((item) => item.id !== user.id);
+      await saveAccounts("계정을 삭제했습니다.");
+      renderAccounts();
+      if ($("accountEditId").value === user.id) resetAccountForm();
     });
   });
 }
@@ -202,6 +284,96 @@ function openAccountDialog() {
   $("accountDialog").showModal();
 }
 
+function renderFrameAccountControls(frameDoc) {
+  if (!currentUser || !frameDoc) return;
+  const topbar = frameDoc.querySelector(".topbar");
+  if (!topbar) return;
+
+  if (!frameDoc.getElementById("authShellControlsStyle")) {
+    const style = frameDoc.createElement("style");
+    style.id = "authShellControlsStyle";
+    style.textContent = `
+      .topbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: end;
+        column-gap: 10px;
+      }
+      .topbar .brand,
+      .topbar #nav {
+        grid-column: 1 / -1;
+      }
+      .topbar #status {
+        grid-column: 1;
+        align-self: center;
+      }
+      .auth-shell-controls {
+        grid-column: 2;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+        min-width: 0;
+        margin: 0 0 2px;
+        white-space: nowrap;
+      }
+      .auth-shell-user {
+        display: inline-flex;
+        align-items: center;
+        min-height: 32px;
+        max-width: 220px;
+        padding: 0 10px;
+        border: 1px solid #d7e2ef;
+        border-radius: 10px;
+        background: rgba(255,255,255,.72);
+        color: #2e405c;
+        font-size: 12px;
+        font-weight: 900;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .auth-shell-controls button {
+        min-height: 32px;
+        padding: 0 10px;
+        border-radius: 10px;
+        font-size: 12px;
+        box-shadow: none;
+      }
+      @media (max-width: 720px) {
+        .topbar { grid-template-columns: 1fr; }
+        .topbar #status,
+        .auth-shell-controls {
+          grid-column: 1;
+        }
+        .auth-shell-controls {
+          justify-content: flex-start;
+          overflow-x: auto;
+          padding-bottom: 2px;
+        }
+        .auth-shell-user { max-width: 170px; }
+      }
+    `;
+    frameDoc.head.appendChild(style);
+  }
+
+  let controls = frameDoc.getElementById("authShellControls");
+  if (!controls) {
+    controls = frameDoc.createElement("div");
+    controls.id = "authShellControls";
+    controls.className = "auth-shell-controls";
+    const status = frameDoc.getElementById("status");
+    topbar.insertBefore(controls, status?.nextSibling || topbar.querySelector("#nav"));
+  }
+
+  controls.innerHTML = `
+    <span class="auth-shell-user" title="${escapeHtml(roleLabels[currentUser.role] || currentUser.role)}">${escapeHtml(currentUser.name)} · ${escapeHtml(currentUser.loginId)}</span>
+    ${currentUser.role === "admin" ? `<button type="button" class="secondary" data-auth-account>계정관리</button>` : ""}
+    <button type="button" class="danger" data-auth-logout>로그아웃</button>
+  `;
+  controls.querySelector("[data-auth-account]")?.addEventListener("click", openAccountDialog);
+  controls.querySelector("[data-auth-logout]")?.addEventListener("click", logout);
+}
+
 function applyRoleToFrame() {
   const frame = $("inventoryFrame");
   const allowed = new Set(roleAllowedViews[currentUser?.role] || []);
@@ -209,6 +381,7 @@ function applyRoleToFrame() {
     try {
       const frameDoc = frame.contentDocument;
       if (!frameDoc) return;
+      renderFrameAccountControls(frameDoc);
       frameDoc.querySelectorAll("button.tab[data-view]").forEach((button) => {
         const ok = allowed.has(button.dataset.view);
         button.style.display = ok ? "" : "none";
@@ -285,9 +458,23 @@ $("loginForm").addEventListener("submit", async (event) => {
 });
 
 $("logoutBtn").addEventListener("click", logout);
+$("requestAccountBtn").addEventListener("click", openRequestDialog);
+$("requestCloseBtn").addEventListener("click", () => $("requestDialog").close());
 $("accountManageBtn").addEventListener("click", openAccountDialog);
 $("accountCloseBtn").addEventListener("click", () => $("accountDialog").close());
 $("accountResetBtn").addEventListener("click", resetAccountForm);
+
+$("requestForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  setRequestStatus("신청을 저장하는 중입니다.", "");
+  try {
+    await submitAccountRequest($("requestName").value.trim(), $("requestLoginId").value.trim(), $("requestPin").value.trim());
+    setRequestStatus("신청이 저장되었습니다. 관리자 승인 후 로그인할 수 있습니다.", "ok");
+    $("requestForm").reset();
+  } catch (error) {
+    setRequestStatus(error.message || "신청 저장에 실패했습니다.", "error");
+  }
+});
 
 $("accountForm").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -307,6 +494,7 @@ $("accountForm").addEventListener("submit", async (event) => {
   }
   const salt = pin ? uid() : existing?.salt;
   const pinHash = pin ? await hashPin(loginId, pin, salt) : existing?.pinHash;
+  const active = $("accountActive").value === "true";
   const next = {
     id,
     name: $("accountName").value.trim(),
@@ -314,7 +502,8 @@ $("accountForm").addEventListener("submit", async (event) => {
     pinHash,
     salt,
     role: $("accountRole").value,
-    active: $("accountActive").value === "true",
+    active,
+    pendingApproval: active ? false : existing?.pendingApproval === true,
     createdAt: existing?.createdAt || nowIso(),
     updatedAt: nowIso(),
     updatedBy: safeUser()

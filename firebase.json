@@ -5,7 +5,10 @@
       "firebase.json",
       ".firebaserc",
       "**/.*",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "*firebase-adminsdk*.json",
+      "start_local_site.bat",
+      "*.log"
     ],
     "cleanUrls": true,
     "trailingSlash": false
