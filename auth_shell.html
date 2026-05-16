@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>수술실 재고관리 로그인</title>
+  <style>
+    :root{--bg:#f5f7fb;--panel:#fff;--ink:#122033;--muted:#667085;--line:#dbe7f5;--brand:#2f6fd6;--danger:#ef4444;--ok:#16a34a;--shadow:0 16px 44px rgba(15,23,42,.16)}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.screen{min-height:100vh;display:grid;place-items:center;padding:18px}.card{width:min(460px,100%);background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:24px;box-shadow:var(--shadow)}h1{margin:0 0 6px;font-size:24px;letter-spacing:-.04em}p{margin:0 0 18px;color:var(--muted);font-weight:750;line-height:1.45}label{display:block;margin:12px 0 6px;color:var(--muted);font-size:14px;font-weight:850}input,select{width:100%;min-height:46px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;font:inherit;outline:none;background:#fff}button{min-height:44px;padding:0 14px;border:0;border-radius:12px;background:linear-gradient(135deg,#2f8df4,#176bd2);color:#fff;font-weight:900;cursor:pointer}button.secondary{background:#fff;color:var(--ink);border:1px solid var(--line)}button.danger{background:var(--danger)}.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.status{min-height:22px;margin-top:12px;color:var(--muted);font-size:13px;font-weight:800}.error{color:#c2410c}.ok{color:var(--ok)}.app-shell{display:none;min-height:100vh}.userbar{position:sticky;top:0;z-index:50;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,.96);border-bottom:1px solid var(--line);box-shadow:0 8px 22px rgba(15,23,42,.08)}.user-info{min-width:0;font-size:13px;font-weight:900}.user-info span{display:block;color:var(--muted);font-size:12px;font-weight:800}iframe{display:block;width:100%;height:calc(100vh - 65px);border:0;background:#fff}dialog{width:min(760px,96vw);max-height:86vh;border:1px solid var(--line);border-radius:18px;padding:0;box-shadow:var(--shadow)}dialog::backdrop{background:rgba(15,23,42,.38)}.modal{padding:18px;display:grid;gap:14px}.grid{display:grid;grid-template-columns:1fr;gap:10px}.account-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:14px;background:#fff}.account-row strong{display:block}.account-row span{display:block;color:var(--muted);font-size:12px;font-weight:800}.pill{display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border-radius:999px;background:#edf4ff;color:#1f4f99;font-size:12px;font-weight:900}@media(max-width:640px){.userbar{align-items:flex-start;flex-direction:column}iframe{height:calc(100vh - 116px)}.actions button{flex:1 1 auto}.account-row{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <section id="loginScreen" class="screen">
+    <form id="loginForm" class="card">
+      <h1>수술실 재고관리 로그인</h1>
+      <p id="loginGuide">사용자별 입력·수정·입고 기록을 남기기 위한 화면입니다.</p>
+      <label for="loginId">아이디</label><input id="loginId" required autocomplete="username">
+      <label for="loginPin">PIN</label><input id="loginPin" required type="password" inputmode="numeric" autocomplete="current-password">
+      <div class="actions"><button type="submit">로그인</button></div>
+      <div id="loginStatus" class="status"></div>
+    </form>
+  </section>
+  <section id="appShell" class="app-shell">
+    <div class="userbar"><div class="user-info"><strong id="currentUserText">-</strong><span id="roleText">-</span></div><div class="actions"><button id="accountManageBtn" type="button" class="secondary">계정관리</button><button id="logoutBtn" type="button" class="danger">로그아웃</button></div></div>
+    <iframe id="inventoryFrame" src="./index_new.html" title="수술실 재고관리"></iframe>
+  </section>
+  <dialog id="accountDialog"><div class="modal"><div><h1>계정관리</h1><p>관리자만 계정 추가, 권한 변경, 사용중지 처리를 할 수 있습니다.</p></div><form id="accountForm" class="grid"><input type="hidden" id="accountEditId"><label for="accountName">이름</label><input id="accountName" required><label for="accountLoginId">아이디</label><input id="accountLoginId" required><label for="accountPin">PIN</label><input id="accountPin" required type="password" inputmode="numeric"><label for="accountRole">권한</label><select id="accountRole" required><option value="staff">일반 사용자 - 사용입력/조회</option><option value="manager">책임/입고 담당 - 사용/입고/수정</option><option value="admin">관리자 - 전체 설정/계정관리</option></select><label for="accountActive">사용 여부</label><select id="accountActive"><option value="true">사용</option><option value="false">사용중지</option></select><div class="actions"><button type="submit">계정 저장</button><button id="accountResetBtn" type="button" class="secondary">새로 입력</button><button id="accountCloseBtn" type="button" class="secondary">닫기</button></div></form><div id="accountList" class="grid"></div><div id="accountStatus" class="status"></div></div></dialog>
+  <script type="module" src="./auth_shell.js"></script>
+</body>
+</html>
