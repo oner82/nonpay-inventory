@@ -1512,6 +1512,12 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     const patientDisplayName = (usage) => patientIdText(usage)
       ? `${usage.patientName || ""} (${patientIdText(usage)})`
       : (usage.patientName || "");
+    const auditUserText = (item) => item?.createdByName || item?.createdBy?.name || item?.createdBy?.loginId || "";
+    const auditTimeText = (item) => formatDateTime(item?.createdAt || item?.updatedAt || item?.date || "");
+    const auditMetaHtml = (item, label = "입력") => `
+      <span>${label}자: ${escapeHtml(auditUserText(item) || "-")}</span>
+      <span>${label}시각: ${escapeHtml(auditTimeText(item))}</span>
+    `;
     const warningQtyFromBase = (value) => {
       const qty = num(value);
       if (qty <= 1) return 0;
@@ -2582,7 +2588,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       <div class="item landing-line ${receipt ? "received" : "pending"}">
         <div class="compact-line">
           <div class="compact-main">${escapeHtml(product?.name || "삭제된 제품")} · ${escapeHtml(usage.patientName)} · 사용 ${escapeHtml(usage.date)} · ${Math.max(1, num(qty))}개</div>
-          <div class="compact-meta">${receipt ? `입고 ${escapeHtml(receipt.date)} · ${num(receipt.qty)}개` : "입고 대기"}</div>
+          <div class="compact-meta">${receipt ? `입고 ${escapeHtml(receipt.date)} · ${num(receipt.qty)}개 · 입고자: ${escapeHtml(auditUserText(receipt) || "-")} · 입고시각: ${escapeHtml(auditTimeText(receipt))}` : "입고 대기"}</div>
           <span class="pill ${receipt ? "" : "low"}">${receipt ? "확인" : "대기"}</span>
           ${receipt ? "" : `<div class="compact-actions"><button type="button" data-receive-landing="${usage.id}::${product.id}">입고 확인</button></div>`}
         </div>
@@ -2610,7 +2616,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
                 <div class="item landing-line received">
                   <div class="compact-line">
                     <div class="compact-main">${escapeHtml(product?.name || "삭제된 제품")} · ${item.type === "landing" ? `사용 ${escapeHtml(item.usageDate || "-")} · ${escapeHtml(item.patientName || "-")}` : "비급여 입고"} · ${num(item.qty)}개</div>
-                    <div class="compact-meta">입고 ${escapeHtml(item.date)}</div>
+                    <div class="compact-meta">입고 ${escapeHtml(item.date)} · 입고자: ${escapeHtml(auditUserText(item) || "-")} · 입고시각: ${escapeHtml(auditTimeText(item))}</div>
                     <span class="pill">${item.type === "landing" ? "랜딩" : "비급여"}</span>
                   </div>
                 </div>
@@ -2882,6 +2888,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         ${currentReceiptView === "history" ? `
           <div class="card receipt-wide">
             <h2>입고내역</h2>
+            <div class="actions"><button class="secondary" type="button" id="exportReceiptHistory">엑셀 저장</button></div>
             ${renderReceiptHistory()}
           </div>
         ` : ""}
@@ -2965,6 +2972,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           await saveState();
         });
       });
+      document.getElementById("exportReceiptHistory")?.addEventListener("click", exportReceiptHistory);
     };
 
     const renderUse = () => `
@@ -3855,6 +3863,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
                     <div class="item-title"><span>${escapeHtml(patientDisplayName(usage))}</span><span class="pill">${qty}개</span></div>
                     <div class="meta">
                       <span>사용일: ${escapeHtml(usage.date)}</span>
+                      ${auditMetaHtml(usage, "입력")}
                       <span>과/원장 코드: ${escapeHtml(doctor?.name || "-")} · 수술: ${escapeHtml(surgery?.department || inferSurgeryDepartment(surgery?.name || ""))} - ${escapeHtml(surgery?.name || "-")}</span>
                     </div>
                   </div>
@@ -3953,6 +3962,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             <span class="pill">${usage.date}</span>
           </div>
           <div class="meta">
+            ${auditMetaHtml(usage, "입력")}
             <span>과/원장 코드: ${escapeHtml(doctor?.name || "-")} · 수술: ${escapeHtml(surgeryDepartment)} - ${escapeHtml(surgery?.name || "-")}</span>
             <div class="usage-products">
               ${groupedProducts.map((group) => `
@@ -4040,6 +4050,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           usage.date,
           usage.patientName,
           patientIdText(usage),
+          auditUserText(usage),
+          auditTimeText(usage),
           doctor?.name || "",
           surgery?.department || inferSurgeryDepartment(surgery?.name || ""),
           surgery?.name || "",
@@ -4048,7 +4060,35 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       });
       downloadExcel(
         `환자별_사용내역_${start || "all"}_${end || "all"}.xls`,
-        ["조회기간", "사용일", "환자명", "환자ID", "원장코드", "과", "수술", "사용제품"],
+        ["조회기간", "사용일", "환자명", "환자ID", "입력자", "입력시각", "원장코드", "과", "수술", "사용제품"],
+        rows
+      );
+    };
+
+    const exportReceiptHistory = () => {
+      const rows = state.receipts.slice()
+        .sort((a, b) => alphaFirstCompare(b.createdAt || b.date, a.createdAt || a.date))
+        .map((receipt) => {
+          const product = productById(receipt.productId);
+          const usage = receipt.usageId ? state.usages.find((item) => item.id === receipt.usageId) : null;
+          return [
+            receipt.date || "",
+            auditTimeText(receipt),
+            auditUserText(receipt),
+            receipt.type === "landing" ? "랜딩" : "비급여",
+            productCategoryLabel(product?.category || ""),
+            product?.name || "삭제된 제품",
+            product?.company || receipt.company || "",
+            product?.subcategory || receipt.subcategory || "",
+            receipt.patientName || usage?.patientName || "",
+            patientIdText(usage),
+            receipt.usageDate || usage?.date || "",
+            num(receipt.qty)
+          ];
+        });
+      downloadExcel(
+        "입고내역.xls",
+        ["입고일", "입고시각", "입고자", "구분", "제품군", "제품명", "업체명", "세부분류", "환자명", "환자ID", "사용일", "입고수량"],
         rows
       );
     };
