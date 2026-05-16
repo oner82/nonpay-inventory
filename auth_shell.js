@@ -221,7 +221,7 @@ function renderAccounts() {
       <div class="actions">
         <button type="button" class="secondary" data-edit-account="${escapeHtml(user.id)}">수정</button>
         ${user.id === "admin" ? "" : `<button type="button" class="danger" data-toggle-account="${escapeHtml(user.id)}">${user.active === false ? "사용" : "중지"}</button>`}
-        ${canDeleteAccount(user) ? `<button type="action" class="danger" data-delete-account="${escapeHtml(user.id)}">삭제</button>` : ""}
+        ${canDeleteAccount(user) ? `<button type="button" class="danger" data-delete-account="${escapeHtml(user.id)}">삭제</button>` : ""}
       </div>
     </div>
   `).join("");
