@@ -1471,6 +1471,26 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       status.className = type;
     };
 
+    const currentAuditUser = () => {
+      try {
+        const user = JSON.parse(sessionStorage.getItem("orInventoryUser") || "null");
+        if (!user?.id) return null;
+        return {
+          id: user.id,
+          loginId: user.loginId || "",
+          name: user.name || user.loginId || "",
+          role: user.role || "staff"
+        };
+      } catch (error) {
+        return null;
+      }
+    };
+
+    const auditCreateFields = () => {
+      const user = currentAuditUser();
+      return user ? { createdBy: user, createdByName: user.name } : {};
+    };
+
     const normalizeState = (data) => ({
       ...blankState(),
       ...data,
@@ -2878,7 +2898,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const product = productById(productId);
         if (!product) return;
         product.stock = num(product.stock) + qty;
-        state.receipts.push({ id: uid(), type: "nonpay", productId, qty, date: today(), createdAt: new Date().toISOString() });
+        state.receipts.push({ id: uid(), type: "nonpay", productId, qty, date: today(), createdAt: new Date().toISOString(), ...auditCreateFields() });
         render();
         await saveState();
       });
@@ -2902,7 +2922,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           patientName: usage.patientName,
           company: product.company || "",
           subcategory: product.subcategory || "",
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          ...auditCreateFields()
         });
       };
       app.querySelectorAll("[data-receive-landing]").forEach((button) => {
@@ -2932,7 +2953,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               patientName: line.usage.patientName,
               company: product.company || "",
               subcategory: product.subcategory || "",
-              createdAt: new Date().toISOString()
+              createdAt: new Date().toISOString(),
+              ...auditCreateFields()
             });
           });
           render();
@@ -3693,7 +3715,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           surgeryId: document.getElementById("useSurgery").value,
           productIds,
           date: today(),
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          ...auditCreateFields()
         });
         currentView = "edit";
         pendingEditUsageId = state.usages[state.usages.length - 1]?.id || "";
