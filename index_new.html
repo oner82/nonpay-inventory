@@ -4230,7 +4230,15 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
 
     const usageDateValue = (usage) => usage?.date || String(usage?.createdAt || usage?.updatedAt || "").slice(0, 10) || "";
-    const reportDateFromFilters = (start = "", end = "") => end || start || today();
+    const reportPeriodFromFilters = (start = "", end = "") => {
+      const fallback = today();
+      const periodStart = start || end || fallback;
+      const periodEnd = end || start || fallback;
+      return periodStart <= periodEnd
+        ? { start: periodStart, end: periodEnd }
+        : { start: periodEnd, end: periodStart };
+    };
+    const reportPeriodLabel = (period) => `${period.start}~${period.end}`;
     const productSeedFor = (product) => {
       const seeds = parseSeedProducts();
       const seedByKey = new Map(seeds.map((item) => [productKey(item), item]));
@@ -4260,7 +4268,13 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       if (!normalizedQuery) return true;
       return normalizedName(`${product.name} ${product.company || ""} ${product.subcategory || ""} ${productCategoryLabel(product.category)}`).includes(normalizedQuery);
     };
-    const productDailyReportRows = (category, reportDate, query = "") => state.products
+    const latestReceiptDateForProduct = (productId) => state.receipts.reduce((latest, receipt) => {
+      if (!sameId(receipt.productId, productId)) return latest;
+      const date = receiptDateValue(receipt);
+      if (!date) return latest;
+      return !latest || date > latest ? date : latest;
+    }, "");
+    const productStockFlowRows = (category, period, query = "") => state.products
       .filter((product) => productCategory(product.category) === category)
       .filter((product) => productMatchesReportQuery(product, query))
       .sort(productUsageSort(category))
@@ -4268,23 +4282,19 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const totalReceived = productMovementTotal(product.id, "receipt");
         const totalUsed = productMovementTotal(product.id, "usage");
         const initialStock = productInitialStock(product, totalReceived, totalUsed);
-        const previousReceived = productMovementTotal(product.id, "receipt", (date) => Boolean(date) && date < reportDate);
-        const previousUsed = productMovementTotal(product.id, "usage", (date) => Boolean(date) && date < reportDate);
-        const todayReceived = productMovementTotal(product.id, "receipt", (date) => date === reportDate);
-        const todayUsed = productMovementTotal(product.id, "usage", (date) => date === reportDate);
-        const previousCloseStock = initialStock + previousReceived - previousUsed;
-        const todayCurrentStock = previousCloseStock + todayReceived - todayUsed;
-        const systemCurrentStock = Math.max(0, initialStock + totalReceived - totalUsed);
+        const basisReceived = productMovementTotal(product.id, "receipt", (date) => Boolean(date) && date < period.start);
+        const basisUsed = productMovementTotal(product.id, "usage", (date) => Boolean(date) && date < period.start);
+        const periodReceived = productMovementTotal(product.id, "receipt", (date) => Boolean(date) && date >= period.start && date <= period.end);
+        const periodUsed = productMovementTotal(product.id, "usage", (date) => Boolean(date) && date >= period.start && date <= period.end);
+        const basisStock = initialStock + basisReceived - basisUsed;
+        const currentStock = basisStock + periodReceived - periodUsed;
         return {
           product,
-          initialStock,
-          totalReceived,
-          totalUsed,
-          previousCloseStock,
-          todayReceived,
-          todayUsed,
-          todayCurrentStock,
-          systemCurrentStock
+          basisStock,
+          periodReceived,
+          periodUsed,
+          currentStock,
+          latestReceiptDate: latestReceiptDateForProduct(product.id)
         };
       });
 
@@ -4379,8 +4389,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             <summary><span>${escapeHtml(productCategoryLabel(category))} 제품 사용내역</span><span class="pill">${productRows.length}</span></summary>
             <div class="details-body">
               <div class="actions">
-                <button class="secondary" type="button" data-export-history-category="${escapeHtml(category)}">당일 보고 엑셀</button>
-                <button class="secondary" type="button" data-export-history-category-cumulative="${escapeHtml(category)}">누적 관리 엑셀</button>
+                <button class="secondary" type="button" data-export-history-category="${escapeHtml(category)}">엑셀 저장</button>
               </div>
               <div class="summary-table">${rows || `<div class="empty">해당 제품 사용내역이 없습니다.</div>`}</div>
             </div>
@@ -4532,42 +4541,22 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
     const exportHistoryCategory = (category) => {
       const { start, end, query } = historyFilterValues();
-      const reportDate = reportDateFromFilters(start, end);
-      const rows = productDailyReportRows(category, reportDate, query).map((item) => [
+      const period = reportPeriodFromFilters(start, end);
+      const periodText = reportPeriodLabel(period);
+      const rows = productStockFlowRows(category, period, query).map((item) => [
         item.product.name,
         productCategoryLabel(item.product.category),
         item.product.company || "",
-        item.previousCloseStock,
-        item.todayReceived,
-        item.todayUsed,
-        item.todayCurrentStock,
-        item.initialStock,
-        item.totalReceived,
-        item.totalUsed,
-        item.systemCurrentStock
+        item.basisStock,
+        periodText,
+        item.periodReceived,
+        item.periodUsed,
+        item.currentStock,
+        item.latestReceiptDate
       ]);
       downloadExcel(
-        `제품별_당일보고_${productCategoryLabel(category)}_${reportDate}.xls`,
-        ["제품명", "분류", "업체명", "전일마감재고", "당일입고", "당일사용", "당일현재고", "초기재고", "누적입고", "누적사용", "시스템현재고"],
-        rows
-      );
-    };
-
-    const exportHistoryCategoryCumulative = (category) => {
-      const { start, end, query } = historyFilterValues();
-      const rows = productUsageSummaryRows(category, start, end, query).map(({ product, received, used }) => [
-        historyPeriodText(start, end),
-        productCategoryLabel(product.category),
-        product.name,
-        product.company || "",
-        product.subcategory || "",
-        productCategory(product.category) === "비급여" ? received : received,
-        used,
-        num(product.stock)
-      ]);
-      downloadExcel(
-        `제품군별_${productCategoryLabel(category)}_${start || "all"}_${end || "all"}.xls`,
-        ["조회기간", "제품군", "제품명", "업체명", "세부분류", productCategory(category) === "비급여" ? "입고량" : "랜딩입고", "사용량", "현재고"],
+        `제품별_재고흐름_${productCategoryLabel(category)}_${periodText}.xls`,
+        ["제품명", "분류", "업체명", "기준재고", "조회기간", "기간입고", "기간사용", "현재고", "최근입고일"],
         rows
       );
     };
@@ -4655,9 +4644,6 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const bindHistoryExports = () => {
         app.querySelectorAll("[data-export-history-category]").forEach((button) => {
           button.addEventListener("click", () => exportHistoryCategory(button.dataset.exportHistoryCategory));
-        });
-        app.querySelectorAll("[data-export-history-category-cumulative]").forEach((button) => {
-          button.addEventListener("click", () => exportHistoryCategoryCumulative(button.dataset.exportHistoryCategoryCumulative));
         });
         document.getElementById("exportHistoryPatients")?.addEventListener("click", exportHistoryPatients);
       };
