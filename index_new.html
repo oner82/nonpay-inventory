@@ -4238,7 +4238,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         ? { start: periodStart, end: periodEnd }
         : { start: periodEnd, end: periodStart };
     };
-    const reportPeriodLabel = (period) => `${period.start}~${period.end}`;
+    const reportPeriodLabel = (period) => period.start === period.end ? period.start : `${period.start} ~ ${period.end}`;
     const productSeedFor = (product) => {
       const seeds = parseSeedProducts();
       const seedByKey = new Map(seeds.map((item) => [productKey(item), item]));
@@ -4288,12 +4288,17 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const periodUsed = productMovementTotal(product.id, "usage", (date) => Boolean(date) && date >= period.start && date <= period.end);
         const basisStock = initialStock + basisReceived - basisUsed;
         const currentStock = basisStock + periodReceived - periodUsed;
+        const systemCurrentStock = Math.max(0, initialStock + totalReceived - totalUsed);
         return {
           product,
+          initialStock,
+          totalReceived,
+          totalUsed,
           basisStock,
           periodReceived,
           periodUsed,
           currentStock,
+          systemCurrentStock,
           latestReceiptDate: latestReceiptDateForProduct(product.id)
         };
       });
@@ -4364,8 +4369,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
                   ${product.company || product.subcategory ? `<span class="summary-sub">${product.company ? `${escapeHtml(product.company)}` : ""}${product.subcategory ? `${product.company ? " · " : ""}${escapeHtml(product.subcategory)}` : ""}</span>` : ""}
                 </div>
                 <div class="summary-metrics">
-                  <div class="metric"><strong>${received}</strong><span>${isNonpay ? "입고" : "랜딩"}</span></div>
-                  <div class="metric"><strong>${used}</strong><span>사용</span></div>
+                  <div class="metric"><span>기간입고</span> <strong>${received}</strong></div>
+                  <div class="metric"><span>기간사용</span> <strong>${used}</strong></div>
                   <div class="metric ${stockStatusClass(product)}"><strong>${num(product.stock)}</strong><span>재고</span></div>
                 </div>
               </summary>
@@ -4389,7 +4394,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             <summary><span>${escapeHtml(productCategoryLabel(category))} 제품 사용내역</span><span class="pill">${productRows.length}</span></summary>
             <div class="details-body">
               <div class="actions">
-                <button class="secondary" type="button" data-export-history-category="${escapeHtml(category)}">엑셀 저장</button>
+                <button class="secondary" type="button" data-export-history-category="${escapeHtml(category)}">보고용 엑셀</button>
+                <button class="secondary" type="button" data-export-history-category-detail="${escapeHtml(category)}">상세 엑셀</button>
               </div>
               <div class="summary-table">${rows || `<div class="empty">해당 제품 사용내역이 없습니다.</div>`}</div>
             </div>
@@ -4546,17 +4552,41 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const rows = productStockFlowRows(category, period, query).map((item) => [
         item.product.name,
         productCategoryLabel(item.product.category),
-        item.product.company || "",
+        item.basisStock,
+        periodText,
+        item.periodReceived,
+        item.periodUsed,
+        item.currentStock
+      ]);
+      downloadExcel(
+        `보고용_재고흐름_${productCategoryLabel(category)}_${periodText}.xls`,
+        ["제품명", "분류", "기준재고", "조회기간", "기간입고", "기간사용", "현재고"],
+        rows
+      );
+    };
+
+    const exportHistoryCategoryDetail = (category) => {
+      const { start, end, query } = historyFilterValues();
+      const period = reportPeriodFromFilters(start, end);
+      const periodText = reportPeriodLabel(period);
+      const rows = productStockFlowRows(category, period, query).map((item) => [
+        item.product.name,
+        productCategoryLabel(item.product.category),
         item.basisStock,
         periodText,
         item.periodReceived,
         item.periodUsed,
         item.currentStock,
-        item.latestReceiptDate
+        item.product.company || "",
+        item.latestReceiptDate,
+        item.initialStock,
+        item.totalReceived,
+        item.totalUsed,
+        item.systemCurrentStock
       ]);
       downloadExcel(
-        `제품별_재고흐름_${productCategoryLabel(category)}_${periodText}.xls`,
-        ["제품명", "분류", "업체명", "기준재고", "조회기간", "기간입고", "기간사용", "현재고", "최근입고일"],
+        `상세_재고흐름_${productCategoryLabel(category)}_${periodText}.xls`,
+        ["제품명", "분류", "기준재고", "조회기간", "기간입고", "기간사용", "현재고", "업체명", "최근입고일", "초기재고", "누적입고", "누적사용", "시스템현재고"],
         rows
       );
     };
@@ -4644,6 +4674,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const bindHistoryExports = () => {
         app.querySelectorAll("[data-export-history-category]").forEach((button) => {
           button.addEventListener("click", () => exportHistoryCategory(button.dataset.exportHistoryCategory));
+        });
+        app.querySelectorAll("[data-export-history-category-detail]").forEach((button) => {
+          button.addEventListener("click", () => exportHistoryCategoryDetail(button.dataset.exportHistoryCategoryDetail));
         });
         document.getElementById("exportHistoryPatients")?.addEventListener("click", exportHistoryPatients);
       };
