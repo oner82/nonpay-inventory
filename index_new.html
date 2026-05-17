@@ -254,6 +254,50 @@
     .receipt-tab { flex: 0 0 auto; min-height: 42px; border: 1px solid var(--line); background: #fff; color: var(--ink); box-shadow: none; }
     .receipt-tab.active { border-color: var(--brand); background: var(--brand); color: #fff; }
     .receipt-wide { width: 100%; }
+    .receipt-history-filter { margin-bottom: 12px; }
+    .receipt-search-cell { position: relative; z-index: 30; }
+    .receipt-search-menu {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 6px);
+      z-index: 40;
+      max-height: 260px;
+      overflow-y: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: 0 16px 36px rgba(16,35,63,.18);
+      padding: 6px;
+    }
+    .receipt-search-menu[hidden] { display: none; }
+    .receipt-search-option {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      min-height: 38px;
+      justify-content: flex-start;
+      padding: 7px 10px;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      box-shadow: none;
+      text-align: left;
+      font-size: 13px;
+    }
+    .receipt-search-option:hover { background: #f8fbff; }
+    .receipt-history-tools { align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .receipt-history-list { display: grid; gap: 10px; }
+    .receipt-history-card { display: grid; gap: 10px; }
+    .receipt-history-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .receipt-history-name { min-width: 0; font-weight: 950; color: var(--ink); }
+    .receipt-history-name span { display: block; color: var(--muted); font-size: 12px; font-weight: 800; margin-top: 3px; }
+    .receipt-history-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .receipt-history-meta span { min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: #f8fbff; color: #53647a; font-size: 12px; font-weight: 850; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .receipt-memo { color: var(--muted); font-size: 13px; font-weight: 800; }
+    .receipt-edit-form { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #f8fafc; }
+    .receipt-edit-form[hidden] { display: none; }
+    .memo-input { min-height: 86px; font-family: inherit; }
     .compact-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: nowrap; }
     .compact-main { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 900; }
     .compact-meta { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 800; white-space: nowrap; }
@@ -326,6 +370,9 @@
       main { padding: 12px 8px 36px; }
       .page-head { margin-bottom: 10px; padding: 10px; min-height: 52px; }
       .page-head h2 { font-size: 18px; }
+      .receipt-history-meta { grid-template-columns: 1fr 1fr; }
+      .receipt-history-head { align-items: stretch; flex-direction: column; }
+      .receipt-history-head .pill { width: fit-content; }
       details.summary-row > summary { grid-template-columns: 1fr; gap: 6px; }
       .summary-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .summary-headline { white-space: normal; }
@@ -1491,6 +1538,14 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       return user ? { createdBy: user, createdByName: user.name } : {};
     };
 
+    const auditUpdateFields = () => {
+      const user = currentAuditUser();
+      return user ? { updatedBy: user, updatedByName: user.name } : {};
+    };
+
+    const currentUserRole = () => currentAuditUser()?.role || "";
+    const canManageReceipts = () => ["admin", "manager"].includes(currentUserRole());
+
     const normalizeState = (data) => ({
       ...blankState(),
       ...data,
@@ -1518,6 +1573,35 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       <span>${label}자: ${escapeHtml(auditUserText(item) || "-")}</span>
       <span>${label}시각: ${escapeHtml(auditTimeText(item))}</span>
     `;
+    const receiptDateValue = (receipt) => receipt?.date || String(receipt?.createdAt || receipt?.updatedAt || "").slice(0, 10) || "";
+    const receiptProduct = (receipt) => productById(receipt?.productId);
+    const receiptProductName = (receipt) => receiptProduct(receipt)?.name || receipt?.productName || "삭제된 제품";
+    const receiptProductMeta = (receipt) => {
+      const product = receiptProduct(receipt);
+      return [
+        productCategoryLabel(product?.category || receipt?.category || ""),
+        product?.company || receipt?.company || "",
+        product?.subcategory || receipt?.subcategory || ""
+      ].filter(Boolean).join(" · ");
+    };
+    const receiptTypeLabel = (receipt) => receipt?.type === "landing" ? "랜딩" : "비급여";
+    const receiptSortValue = (receipt) => {
+      const value = receipt?.createdAt || receipt?.updatedAt || receipt?.date || "";
+      const time = new Date(value).getTime();
+      return Number.isNaN(time) ? 0 : time;
+    };
+    const filteredReceipts = (start = "", end = "", query = "") => {
+      const normalizedQuery = normalizedName(query || "");
+      return state.receipts
+        .filter((receipt) => {
+          const date = receiptDateValue(receipt);
+          if ((start || end) && !inDateRange(date, start, end)) return false;
+          if (!normalizedQuery) return true;
+          return normalizedName(receiptProductName(receipt)).includes(normalizedQuery);
+        })
+        .slice()
+        .sort((a, b) => receiptSortValue(b) - receiptSortValue(a) || alphaFirstCompare(b.date, a.date));
+    };
     const warningQtyFromBase = (value) => {
       const qty = num(value);
       if (qty <= 1) return 0;
@@ -2595,37 +2679,99 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       </div>
     `;
 
-    const renderReceiptHistory = () => {
-      if (!state.receipts.length) return `<div class="empty">입고내역이 없습니다.</div>`;
-      const productIds = [...new Set(state.receipts.map((item) => item.productId))]
-        .sort((a, b) => alphaFirstCompare(productById(a)?.name || "", productById(b)?.name || ""));
-      return productIds.map((productId) => {
-        const product = productById(productId);
-        const receipts = state.receipts
-          .filter((item) => item.productId === productId)
-          .slice()
-          .sort((a, b) => alphaFirstCompare(b.date, a.date) || alphaFirstCompare(a.patientName || "", b.patientName || ""));
-        return `
-          <details class="item">
-            <summary><span>${escapeHtml(product?.name || "삭제된 제품")}</span><span class="pill">${receipts.reduce((sum, item) => sum + num(item.qty), 0)}개</span></summary>
-            <div class="details-body">
-              <div class="meta">
-                <span>${escapeHtml(productCategoryLabel(product?.category))}${product?.company ? ` · ${escapeHtml(product.company)}` : ""}${product?.subcategory ? ` · ${escapeHtml(product.subcategory)}` : ""}</span>
-              </div>
-              ${receipts.map((item) => `
-                <div class="item landing-line received">
-                  <div class="compact-line">
-                    <div class="compact-main">${escapeHtml(product?.name || "삭제된 제품")} · ${item.type === "landing" ? `사용 ${escapeHtml(item.usageDate || "-")} · ${escapeHtml(item.patientName || "-")}` : "비급여 입고"} · ${num(item.qty)}개</div>
-                    <div class="compact-meta">입고 ${escapeHtml(item.date)} · 입고자: ${escapeHtml(auditUserText(item) || "-")} · 입고시각: ${escapeHtml(auditTimeText(item))}</div>
-                    <span class="pill">${item.type === "landing" ? "랜딩" : "비급여"}</span>
+    const receiptHistoryFiltersHtml = (prefix) => `
+      <div class="row three receipt-history-filter">
+        <div class="receipt-search-cell">
+          <label for="${prefix}Search">제품명 검색</label>
+          <input id="${prefix}Search" autocomplete="off" placeholder="제품명 입력">
+          <div class="receipt-search-menu" id="${prefix}ProductMenu" hidden></div>
+        </div>
+        <div>
+          <label for="${prefix}Start">시작일</label>
+          <input id="${prefix}Start" type="date">
+        </div>
+        <div>
+          <label for="${prefix}End">종료일</label>
+          <input id="${prefix}End" type="date">
+        </div>
+      </div>
+      <div class="actions receipt-history-tools">
+        <div class="actions">
+          <button class="secondary" type="button" data-receipt-quick="7" data-receipt-prefix="${prefix}">최근 7일</button>
+          <button class="secondary" type="button" data-receipt-quick="30" data-receipt-prefix="${prefix}">최근 30일</button>
+          <button class="secondary" type="button" data-receipt-reset data-receipt-prefix="${prefix}">초기화</button>
+        </div>
+        <div class="actions">
+          <button class="secondary" type="button" data-export-receipt-history>엑셀 저장</button>
+        </div>
+      </div>
+    `;
+
+    const renderReceiptHistoryList = (start = "", end = "", query = "") => {
+      const receipts = filteredReceipts(start, end, query);
+      const manager = canManageReceipts();
+      if (!receipts.length) return `<div class="empty">조회된 입고이력이 없습니다.</div>`;
+      return `
+        <div class="receipt-history-list">
+          ${receipts.map((receipt) => {
+            const product = receiptProduct(receipt);
+            const name = receiptProductName(receipt);
+            const meta = receiptProductMeta(receipt);
+            const date = receiptDateValue(receipt);
+            const updatedText = receipt.updatedAt ? ` · 수정 ${escapeHtml(formatDateTime(receipt.updatedAt))}${receipt.updatedByName || receipt.updatedBy?.name ? ` / ${escapeHtml(receipt.updatedByName || receipt.updatedBy?.name)}` : ""}` : "";
+            return `
+              <div class="item receipt-history-card" data-receipt-row="${escapeHtml(receipt.id)}">
+                <div class="receipt-history-head">
+                  <div class="receipt-history-name">
+                    ${escapeHtml(name)}
+                    <span>${escapeHtml(meta || "-")}</span>
                   </div>
+                  <span class="pill">${num(receipt.qty).toLocaleString()}개</span>
                 </div>
-              `).join("")}
-            </div>
-          </details>
-        `;
-      }).join("");
+                <div class="receipt-history-meta">
+                  <span>입고일: ${escapeHtml(date || "-")}</span>
+                  <span>구분: ${escapeHtml(receiptTypeLabel(receipt))}</span>
+                  <span>입력자: ${escapeHtml(auditUserText(receipt) || "-")}</span>
+                  <span>입고시각: ${escapeHtml(auditTimeText(receipt))}${updatedText}</span>
+                </div>
+                ${receipt.memo ? `<div class="receipt-memo">메모: ${escapeHtml(receipt.memo)}</div>` : ""}
+                ${receipt.type === "landing" ? `<div class="receipt-memo">사용일: ${escapeHtml(receipt.usageDate || "-")} · 환자명: ${escapeHtml(receipt.patientName || "-")}</div>` : ""}
+                ${manager ? `
+                  <div class="actions">
+                    <button class="secondary" type="button" data-edit-receipt="${escapeHtml(receipt.id)}">수정</button>
+                    <button class="danger" type="button" data-delete-receipt="${escapeHtml(receipt.id)}">삭제</button>
+                  </div>
+                  <form class="receipt-edit-form" data-edit-receipt-form="${escapeHtml(receipt.id)}" hidden>
+                    <div class="row three">
+                      <div>
+                        <label for="receiptEditDate-${escapeHtml(receipt.id)}">입고일</label>
+                        <input id="receiptEditDate-${escapeHtml(receipt.id)}" type="date" value="${escapeHtml(date)}" data-receipt-edit-date required>
+                      </div>
+                      <div>
+                        <label for="receiptEditQty-${escapeHtml(receipt.id)}">입고수량</label>
+                        <input id="receiptEditQty-${escapeHtml(receipt.id)}" type="number" min="1" value="${num(receipt.qty) || 1}" data-receipt-edit-qty required>
+                      </div>
+                      <div>
+                        <label for="receiptEditProduct-${escapeHtml(receipt.id)}">제품명</label>
+                        <input id="receiptEditProduct-${escapeHtml(receipt.id)}" value="${escapeHtml(product?.name || receipt.productName || name)}" readonly>
+                      </div>
+                    </div>
+                    <label for="receiptEditMemo-${escapeHtml(receipt.id)}">메모</label>
+                    <textarea id="receiptEditMemo-${escapeHtml(receipt.id)}" class="memo-input" data-receipt-edit-memo placeholder="메모">${escapeHtml(receipt.memo || "")}</textarea>
+                    <div class="actions">
+                      <button type="submit">수정 저장</button>
+                      <button class="secondary" type="button" data-cancel-edit-receipt="${escapeHtml(receipt.id)}">취소</button>
+                    </div>
+                  </form>
+                ` : ""}
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
     };
+
+    const renderReceiptHistory = () => renderReceiptHistoryList();
 
     const renderGroupedSurgeries = () => {
       const departments = departmentNames();
@@ -2859,14 +3005,19 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       filterRuleOptions();
     };
 
-    const renderReceipts = () => `
+    const renderReceipts = () => {
+      const canEnterReceipts = canManageReceipts();
+      const receiptView = canEnterReceipts ? currentReceiptView : "history";
+      return `
       <section class="grid">
         <div class="receipt-tabs">
-          <button class="receipt-tab ${currentReceiptView === "nonpay" ? "active" : ""}" data-receipt-view="nonpay" type="button">비급여 입고관리</button>
-          <button class="receipt-tab ${currentReceiptView === "landing" ? "active" : ""}" data-receipt-view="landing" type="button">랜딩 입고관리</button>
-          <button class="receipt-tab ${currentReceiptView === "history" ? "active" : ""}" data-receipt-view="history" type="button">입고내역</button>
+          ${canEnterReceipts ? `
+            <button class="receipt-tab ${receiptView === "nonpay" ? "active" : ""}" data-receipt-view="nonpay" type="button">비급여 입고관리</button>
+            <button class="receipt-tab ${receiptView === "landing" ? "active" : ""}" data-receipt-view="landing" type="button">랜딩 입고관리</button>
+          ` : ""}
+          <button class="receipt-tab ${receiptView === "history" ? "active" : ""}" data-receipt-view="history" type="button">입고내역</button>
         </div>
-        ${currentReceiptView === "nonpay" ? `
+        ${receiptView === "nonpay" ? `
           <form class="card receipt-wide" id="nonpayReceiptForm">
             <h2>비급여 입고 등록</h2>
             <label for="nonpayReceiptProduct">제품 선택</label>
@@ -2876,24 +3027,164 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             </select>
             <label for="nonpayReceiptQty">입고 수량</label>
             <input id="nonpayReceiptQty" type="number" min="1" value="1" required>
+            <label for="nonpayReceiptMemo">메모</label>
+            <textarea id="nonpayReceiptMemo" class="memo-input" placeholder="메모 입력(선택)"></textarea>
             <div class="actions"><button type="submit">비급여 입고 저장</button></div>
           </form>
         ` : ""}
-        ${currentReceiptView === "landing" ? `
+        ${receiptView === "landing" ? `
           <div class="card receipt-wide">
             <h2>랜딩 입고 확인</h2>
             ${renderLandingBoard()}
           </div>
         ` : ""}
-        ${currentReceiptView === "history" ? `
+        ${receiptView === "history" ? `
           <div class="card receipt-wide">
             <h2>입고내역</h2>
-            <div class="actions"><button class="secondary" type="button" id="exportReceiptHistory">엑셀 저장</button></div>
-            ${renderReceiptHistory()}
+            ${receiptHistoryFiltersHtml("receiptTabHistory")}
+            <div id="receiptTabHistoryList">${renderReceiptHistory()}</div>
           </div>
         ` : ""}
       </section>
     `;
+    };
+
+    const setReceiptQuickRange = (prefix, days) => {
+      const end = new Date();
+      const start = new Date();
+      start.setDate(end.getDate() - (Number(days) - 1));
+      const toInputDate = (date) => {
+        const next = new Date(date);
+        next.setMinutes(next.getMinutes() - next.getTimezoneOffset());
+        return next.toISOString().slice(0, 10);
+      };
+      document.getElementById(`${prefix}Start`).value = toInputDate(start);
+      document.getElementById(`${prefix}End`).value = toInputDate(end);
+    };
+
+    const updateReceiptRecord = async (receiptId, values) => {
+      if (!canManageReceipts()) {
+        alert("입고이력 수정은 관리자와 manager만 가능합니다.");
+        return false;
+      }
+      const receipt = state.receipts.find((item) => sameId(item.id, receiptId));
+      if (!receipt) return false;
+      const product = receiptProduct(receipt);
+      Object.assign(receipt, {
+        qty: Math.max(1, num(values.qty)),
+        date: values.date || receiptDateValue(receipt) || today(),
+        productName: product?.name || receipt.productName || "",
+        memo: values.memo || "",
+        updatedAt: new Date().toISOString(),
+        ...auditUpdateFields()
+      });
+      reconcileProductStocks();
+      render();
+      await saveState("입고이력 수정 완료", { authoritative: true });
+      return true;
+    };
+
+    const deleteReceiptRecord = async (receiptId) => {
+      if (!canManageReceipts()) {
+        alert("입고이력 삭제는 관리자와 manager만 가능합니다.");
+        return false;
+      }
+      const receipt = state.receipts.find((item) => sameId(item.id, receiptId));
+      if (!receipt || !confirm("입고이력을 삭제하고 현재고를 다시 계산할까요?")) return false;
+      state.receipts = state.receipts.filter((item) => !sameId(item.id, receiptId));
+      reconcileProductStocks();
+      render();
+      await saveState("입고이력 삭제 완료", { authoritative: true });
+      return true;
+    };
+
+    const bindReceiptHistoryControls = (prefix, listId) => {
+      const startInput = document.getElementById(`${prefix}Start`);
+      const endInput = document.getElementById(`${prefix}End`);
+      const searchInput = document.getElementById(`${prefix}Search`);
+      const productMenu = document.getElementById(`${prefix}ProductMenu`);
+      const list = document.getElementById(listId);
+      if (!startInput || !endInput || !searchInput || !list) return;
+      const updateList = () => {
+        list.innerHTML = renderReceiptHistoryList(startInput.value, endInput.value, searchInput.value);
+      };
+      const closeProductMenu = () => {
+        if (productMenu) productMenu.hidden = true;
+      };
+      const renderProductMenu = () => {
+        if (!productMenu) return;
+        const query = normalizedName(searchInput.value);
+        const products = state.products
+          .slice()
+          .sort(byName)
+          .filter((product) => !query || normalizedName(product.name).includes(query))
+          .slice(0, 20);
+        if (!products.length) {
+          closeProductMenu();
+          return;
+        }
+        productMenu.innerHTML = products.map((product) => `
+          <button class="receipt-search-option" type="button" data-receipt-product-suggestion="${escapeHtml(product.name)}">
+            ${escapeHtml(product.name)}
+          </button>
+        `).join("");
+        productMenu.hidden = false;
+      };
+      [startInput, endInput, searchInput].forEach((input) => {
+        input.addEventListener("input", updateList);
+        input.addEventListener("change", updateList);
+      });
+      searchInput.addEventListener("focus", renderProductMenu);
+      searchInput.addEventListener("input", renderProductMenu);
+      searchInput.addEventListener("blur", () => setTimeout(closeProductMenu, 120));
+      productMenu?.addEventListener("mousedown", (event) => event.preventDefault());
+      productMenu?.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-receipt-product-suggestion]");
+        if (!button) return;
+        searchInput.value = button.dataset.receiptProductSuggestion || "";
+        closeProductMenu();
+        updateList();
+      });
+      app.querySelectorAll(`[data-receipt-prefix="${prefix}"][data-receipt-quick]`).forEach((button) => {
+        button.addEventListener("click", () => {
+          setReceiptQuickRange(prefix, button.dataset.receiptQuick);
+          updateList();
+        });
+      });
+      app.querySelector(`[data-receipt-prefix="${prefix}"][data-receipt-reset]`)?.addEventListener("click", () => {
+        startInput.value = "";
+        endInput.value = "";
+        searchInput.value = "";
+        updateList();
+      });
+      app.querySelectorAll("[data-export-receipt-history]").forEach((button) => {
+        button.addEventListener("click", () => exportReceiptHistory(startInput.value, endInput.value, searchInput.value));
+      });
+      list.addEventListener("click", async (event) => {
+        const editButton = event.target.closest("[data-edit-receipt]");
+        if (editButton) {
+          list.querySelector(`[data-edit-receipt-form="${CSS.escape(editButton.dataset.editReceipt)}"]`)?.toggleAttribute("hidden");
+          return;
+        }
+        const cancelButton = event.target.closest("[data-cancel-edit-receipt]");
+        if (cancelButton) {
+          list.querySelector(`[data-edit-receipt-form="${CSS.escape(cancelButton.dataset.cancelEditReceipt)}"]`)?.setAttribute("hidden", "");
+          return;
+        }
+        const deleteButton = event.target.closest("[data-delete-receipt]");
+        if (deleteButton) await deleteReceiptRecord(deleteButton.dataset.deleteReceipt);
+      });
+      list.addEventListener("submit", async (event) => {
+        const form = event.target.closest("[data-edit-receipt-form]");
+        if (!form) return;
+        event.preventDefault();
+        await updateReceiptRecord(form.dataset.editReceiptForm, {
+          date: form.querySelector("[data-receipt-edit-date]")?.value || "",
+          qty: form.querySelector("[data-receipt-edit-qty]")?.value || "1",
+          memo: form.querySelector("[data-receipt-edit-memo]")?.value.trim() || ""
+        });
+      });
+    };
 
     const bindReceipts = () => {
       app.querySelectorAll("[data-receipt-view]").forEach((button) => {
@@ -2906,10 +3197,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         event.preventDefault();
         const productId = document.getElementById("nonpayReceiptProduct").value;
         const qty = Math.max(1, num(document.getElementById("nonpayReceiptQty").value));
+        const memo = document.getElementById("nonpayReceiptMemo")?.value.trim() || "";
         const product = productById(productId);
         if (!product) return;
         product.stock = num(product.stock) + qty;
-        state.receipts.push({ id: uid(), type: "nonpay", productId, qty, date: today(), createdAt: new Date().toISOString(), ...auditCreateFields() });
+        state.receipts.push({ id: uid(), type: "nonpay", productId, productName: product.name, qty, date: today(), memo, createdAt: new Date().toISOString(), ...auditCreateFields() });
         render();
         await saveState();
       });
@@ -2927,6 +3219,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           type: "landing",
           usageId,
           productId,
+          productName: product.name,
           qty,
           date: today(),
           usageDate: usage.date,
@@ -2958,6 +3251,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               type: "landing",
               usageId: line.usage.id,
               productId: product.id,
+              productName: product.name,
               qty,
               date: today(),
               usageDate: line.usage.date,
@@ -2972,7 +3266,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           await saveState();
         });
       });
-      document.getElementById("exportReceiptHistory")?.addEventListener("click", exportReceiptHistory);
+      bindReceiptHistoryControls("receiptTabHistory", "receiptTabHistoryList");
     };
 
     const renderUse = () => `
@@ -3781,7 +4075,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       });
       const receiptCounts = new Map();
       state.receipts
-        .filter((receipt) => inDateRange(receipt.date, start, end))
+        .filter((receipt) => inDateRange(receiptDateValue(receipt), start, end))
         .forEach((receipt) => receiptCounts.set(receipt.productId, (receiptCounts.get(receipt.productId) || 0) + num(receipt.qty)));
       return { usageCounts, receiptCounts };
     };
@@ -4065,30 +4359,32 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       );
     };
 
-    const exportReceiptHistory = () => {
-      const rows = state.receipts.slice()
-        .sort((a, b) => alphaFirstCompare(b.createdAt || b.date, a.createdAt || a.date))
+    const exportReceiptHistory = (start = "", end = "", query = "") => {
+      const rows = filteredReceipts(start, end, query)
         .map((receipt) => {
           const product = productById(receipt.productId);
           const usage = receipt.usageId ? state.usages.find((item) => item.id === receipt.usageId) : null;
           return [
-            receipt.date || "",
+            receiptDateValue(receipt),
             auditTimeText(receipt),
             auditUserText(receipt),
-            receipt.type === "landing" ? "랜딩" : "비급여",
-            productCategoryLabel(product?.category || ""),
-            product?.name || "삭제된 제품",
+            receiptTypeLabel(receipt),
+            productCategoryLabel(product?.category || receipt.category || ""),
+            receiptProductName(receipt),
             product?.company || receipt.company || "",
             product?.subcategory || receipt.subcategory || "",
             receipt.patientName || usage?.patientName || "",
             patientIdText(usage),
             receipt.usageDate || usage?.date || "",
-            num(receipt.qty)
+            num(receipt.qty),
+            receipt.memo || "",
+            receipt.updatedByName || receipt.updatedBy?.name || "",
+            receipt.updatedAt ? formatDateTime(receipt.updatedAt) : ""
           ];
         });
       downloadExcel(
         "입고내역.xls",
-        ["입고일", "입고시각", "입고자", "구분", "제품군", "제품명", "업체명", "세부분류", "환자명", "환자ID", "사용일", "입고수량"],
+        ["입고일", "입고시각", "입고자", "구분", "제품군", "제품명", "업체명", "세부분류", "환자명", "환자ID", "사용일", "입고수량", "메모", "수정자", "수정시각"],
         rows
       );
     };

@@ -16,7 +16,7 @@ const roleLabels = {
 const roleAllowedViews = {
   admin: ["dashboard", "use", "edit", "history", "receipts", "settings"],
   manager: ["dashboard", "use", "edit", "history", "receipts"],
-  staff: ["dashboard", "use", "history"]
+  staff: ["dashboard", "use", "history", "receipts"]
 };
 
 let accounts = [];
@@ -391,7 +391,7 @@ function applyRoleToFrame() {
         if (button.dataset.goView && !allowed.has(button.dataset.goView)) button.style.display = "none";
       });
       if (currentUser.role === "staff") {
-        frameDoc.querySelectorAll("button[data-delete-usage],button[data-edit-usage],button[data-delete-product],button[data-delete-doctor],button[data-delete-surgery],button[data-delete-rule]").forEach((button) => {
+        frameDoc.querySelectorAll("button[data-delete-usage],button[data-edit-usage],button[data-delete-product],button[data-delete-doctor],button[data-delete-surgery],button[data-delete-rule],button[data-edit-receipt],button[data-delete-receipt]").forEach((button) => {
           button.style.display = "none";
         });
       }
