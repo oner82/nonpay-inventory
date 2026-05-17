@@ -5,7 +5,6 @@ const firebaseConfig = { projectId: "nonpay-inventory" };
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 const usersRef = doc(db, "app", "users");
-const mainRef = doc(db, "app", "main");
 
 const roleLabels = {
   admin: "관리자",
@@ -21,7 +20,6 @@ const roleAllowedViews = {
 
 let accounts = [];
 let setupMode = false;
-let auditTimer = null;
 let unsubscribeUsers = null;
 let roleInterval = null;
 const userStorageKey = "orInventoryUser";
@@ -138,14 +136,12 @@ function showApp() {
   $("currentUserText").textContent = `${currentUser.name} (${currentUser.loginId})`;
   $("roleText").textContent = roleLabels[currentUser.role] || currentUser.role;
   $("accountManageBtn").style.display = currentUser.role === "admin" ? "inline-flex" : "none";
-  startAuditLoop();
   applyRoleToFrame();
 }
 
 function showLogin() {
   $("loginScreen").style.display = "grid";
   $("appShell").style.display = "none";
-  stopAuditLoop();
   if (roleInterval) clearInterval(roleInterval);
   roleInterval = null;
 }
@@ -452,43 +448,6 @@ function applyRoleToFrame() {
   }, 2000);
 }
 
-async function patchAuditFields() {
-  if (!currentUser) return;
-  try {
-    await runTransaction(db, async (transaction) => {
-      const snap = await transaction.get(mainRef);
-      if (!snap.exists()) return;
-      const data = snap.data();
-      const user = safeUser();
-      let changed = false;
-      const stampList = (listName) => {
-        if (!Array.isArray(data[listName])) return;
-        data[listName] = data[listName].map((item) => {
-          if (!item || item.createdBy) return item;
-          changed = true;
-          return { ...item, createdBy: user, createdByName: user.name };
-        });
-      };
-      stampList("usages");
-      stampList("receipts");
-      if (changed) transaction.set(mainRef, { ...data, auditUpdatedAt: nowIso(), auditUpdatedBy: user });
-    });
-  } catch (error) {
-    console.info("기록자 보정 실패", error);
-  }
-}
-
-function startAuditLoop() {
-  stopAuditLoop();
-  auditTimer = setInterval(patchAuditFields, 2500);
-  setTimeout(patchAuditFields, 2500);
-}
-
-function stopAuditLoop() {
-  if (auditTimer) clearInterval(auditTimer);
-  auditTimer = null;
-}
-
 $("loginForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   await handleLogin($("loginId").value.trim(), $("loginPin").value.trim());
@@ -580,6 +539,5 @@ if (activeAccount) {
 
 window.addEventListener("beforeunload", () => {
   if (unsubscribeUsers) unsubscribeUsers();
-  stopAuditLoop();
   if (roleInterval) clearInterval(roleInterval);
 });
