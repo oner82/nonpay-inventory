@@ -4515,8 +4515,13 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const link = document.createElement("a");
       link.href = url;
       link.download = filename;
+      link.style.display = "none";
+      document.body.appendChild(link);
       link.click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+        link.remove();
+      }, 0);
     };
 
     const historyFilterValues = () => ({
