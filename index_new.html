@@ -4512,24 +4512,18 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       `;
     };
 
-    const excelCell = (value) => `<td>${escapeHtml(value ?? "")}</td>`;
+    const csvCell = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
     const downloadExcel = (filename, headers, rows) => {
-      const table = `
-        <html>
-          <head><meta charset="utf-8"></head>
-          <body>
-            <table border="1">
-              <thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
-              <tbody>${rows.map((row) => `<tr>${row.map(excelCell).join("")}</tr>`).join("")}</tbody>
-            </table>
-          </body>
-        </html>
-      `;
-      const blob = new Blob(["\ufeff", table], { type: "application/vnd.ms-excel;charset=utf-8" });
+      const csv = [
+        "sep=,",
+        headers.map(csvCell).join(","),
+        ...rows.map((row) => row.map(csvCell).join(","))
+      ].join("\r\n");
+      const blob = new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = filename;
+      link.download = filename.replace(/\.xls$/i, ".csv");
       link.style.display = "none";
       document.body.appendChild(link);
       link.click();
@@ -4559,7 +4553,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         item.currentStock
       ]);
       downloadExcel(
-        `보고용_재고흐름_${productCategoryLabel(category)}_${periodText}.xls`,
+        `보고용_재고흐름_${productCategoryLabel(category)}_${periodText}.csv`,
         ["제품명", "분류", "기준재고", "조회기간", "기간입고", "기간사용", "현재고"],
         rows
       );
@@ -4585,7 +4579,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         item.systemCurrentStock
       ]);
       downloadExcel(
-        `상세_재고흐름_${productCategoryLabel(category)}_${periodText}.xls`,
+        `상세_재고흐름_${productCategoryLabel(category)}_${periodText}.csv`,
         ["제품명", "분류", "기준재고", "조회기간", "기간입고", "기간사용", "현재고", "업체명", "최근입고일", "초기재고", "누적입고", "누적사용", "시스템현재고"],
         rows
       );
@@ -4611,7 +4605,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         ];
       });
       downloadExcel(
-        `환자별_사용내역_${start || "all"}_${end || "all"}.xls`,
+        `환자별_사용내역_${start || "all"}_${end || "all"}.csv`,
         ["조회기간", "사용일", "환자명", "환자ID", "입력자", "입력시각", "원장코드", "과", "수술", "사용제품"],
         rows
       );
@@ -4641,7 +4635,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           ];
         });
       downloadExcel(
-        "입고내역.xls",
+        "입고내역.csv",
         ["입고일", "입고시각", "입고자", "구분", "제품군", "제품명", "업체명", "세부분류", "환자명", "환자ID", "사용일", "입고수량", "메모", "수정자", "수정시각"],
         rows
       );
