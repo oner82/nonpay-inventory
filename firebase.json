@@ -4,9 +4,14 @@
     "ignore": [
       "firebase.json",
       ".firebaserc",
+      ".git/**",
+      ".github/**",
+      ".firebase/**",
+      ".firebase-live-download/**",
       "**/.*",
       "**/node_modules/**",
       "*firebase-adminsdk*.json",
+      "tore index_new.html",
       "start_local_site.bat",
       "*.log"
     ],
