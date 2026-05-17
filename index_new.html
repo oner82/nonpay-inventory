@@ -1524,9 +1524,45 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       status.className = type;
     };
 
+    const userStorageKey = "orInventoryUser";
+
+    const readStoredUser = () => {
+      for (const storageName of ["sessionStorage", "localStorage"]) {
+        try {
+          const raw = window[storageName]?.getItem(userStorageKey);
+          if (!raw) continue;
+          const user = JSON.parse(raw);
+          if (user?.id) return user;
+        } catch (error) {
+          console.info(`${storageName} user read failed`, error);
+        }
+      }
+      return null;
+    };
+
+    const writeStoredUser = (user) => {
+      for (const storageName of ["sessionStorage", "localStorage"]) {
+        try {
+          window[storageName]?.setItem(userStorageKey, JSON.stringify(user));
+        } catch (error) {
+          console.info(`${storageName} user write failed`, error);
+        }
+      }
+    };
+
+    const clearStoredUser = () => {
+      for (const storageName of ["sessionStorage", "localStorage"]) {
+        try {
+          window[storageName]?.removeItem(userStorageKey);
+        } catch (error) {
+          console.info(`${storageName} user clear failed`, error);
+        }
+      }
+    };
+
     const currentAuditUser = () => {
       try {
-        const user = JSON.parse(sessionStorage.getItem("orInventoryUser") || "null");
+        const user = readStoredUser();
         if (!user?.id) return null;
         return {
           id: user.id,
@@ -1569,7 +1605,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
 
     const redirectToLogin = (message) => {
-      sessionStorage.removeItem("orInventoryUser");
+      clearStoredUser();
       try {
         if (window.self === window.top) {
           window.location.replace(authShellUrl);
@@ -1597,7 +1633,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         name: account.name || account.loginId || "",
         role: roleAllowedViews[account.role] ? account.role : "staff"
       };
-      sessionStorage.setItem("orInventoryUser", JSON.stringify(verified));
+      writeStoredUser(verified);
       return verified;
     };
 

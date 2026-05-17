@@ -21,10 +21,46 @@ const roleAllowedViews = {
 
 let accounts = [];
 let setupMode = false;
-let currentUser = JSON.parse(sessionStorage.getItem("orInventoryUser") || "null");
 let auditTimer = null;
 let unsubscribeUsers = null;
 let roleInterval = null;
+const userStorageKey = "orInventoryUser";
+
+const readStoredUser = () => {
+  for (const storageName of ["sessionStorage", "localStorage"]) {
+    try {
+      const raw = window[storageName]?.getItem(userStorageKey);
+      if (!raw) continue;
+      const user = JSON.parse(raw);
+      if (user?.id) return user;
+    } catch (error) {
+      console.info(`${storageName} user read failed`, error);
+    }
+  }
+  return null;
+};
+
+const writeStoredUser = (user) => {
+  for (const storageName of ["sessionStorage", "localStorage"]) {
+    try {
+      window[storageName]?.setItem(userStorageKey, JSON.stringify(user));
+    } catch (error) {
+      console.info(`${storageName} user write failed`, error);
+    }
+  }
+};
+
+const clearStoredUser = () => {
+  for (const storageName of ["sessionStorage", "localStorage"]) {
+    try {
+      window[storageName]?.removeItem(userStorageKey);
+    } catch (error) {
+      console.info(`${storageName} user clear failed`, error);
+    }
+  }
+};
+
+let currentUser = readStoredUser();
 
 const $ = (id) => document.getElementById(id);
 const nowIso = () => new Date().toISOString();
@@ -131,7 +167,7 @@ async function createFirstAdmin(loginId, pin) {
   accounts = [user];
   currentUser = { id: user.id, loginId: user.loginId, name: user.name, role: user.role };
   await setDoc(usersRef, { accounts, updatedAt: nowIso(), updatedBy: currentUser });
-  sessionStorage.setItem("orInventoryUser", JSON.stringify(currentUser));
+  writeStoredUser(currentUser);
   showApp();
 }
 
@@ -152,7 +188,7 @@ async function handleLogin(loginId, pin) {
     return;
   }
   currentUser = { id: user.id, loginId: user.loginId, name: user.name, role: user.role };
-  sessionStorage.setItem("orInventoryUser", JSON.stringify(currentUser));
+  writeStoredUser(currentUser);
   showApp();
 }
 
@@ -207,7 +243,7 @@ async function submitAccountRequest(name, loginId, pin) {
 
 function logout() {
   currentUser = null;
-  sessionStorage.removeItem("orInventoryUser");
+  clearStoredUser();
   $("inventoryFrame").src = "about:blank";
   showLogin();
 }
@@ -523,11 +559,22 @@ unsubscribeUsers = onSnapshot(usersRef, (snap) => {
   if ($("accountDialog").open) renderAccounts();
 });
 
-if (currentUser && accounts.some((item) => item.id === currentUser.id && item.active !== false)) {
+const activeAccount = currentUser
+  ? accounts.find((item) => String(item.id) === String(currentUser.id) && item.active !== false)
+  : null;
+
+if (activeAccount) {
+  currentUser = {
+    id: activeAccount.id,
+    loginId: activeAccount.loginId || "",
+    name: activeAccount.name || activeAccount.loginId || "",
+    role: roleAllowedViews[activeAccount.role] ? activeAccount.role : "staff"
+  };
+  writeStoredUser(currentUser);
   showApp();
 } else {
   currentUser = null;
-  sessionStorage.removeItem("orInventoryUser");
+  clearStoredUser();
   showLogin();
 }
 
