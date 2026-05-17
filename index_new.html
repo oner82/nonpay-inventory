@@ -1310,6 +1310,12 @@
       ["settings", "설정"]
     ];
 
+    const roleAllowedViews = {
+      admin: ["dashboard", "use", "edit", "history", "receipts", "settings"],
+      manager: ["dashboard", "use", "edit", "history", "receipts"],
+      staff: ["dashboard", "use", "history", "receipts"]
+    };
+
     const settingsMenus = [
       ["products", "제품관리"],
       ["doctors", "과관리"],
@@ -1544,7 +1550,65 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
 
     const currentUserRole = () => currentAuditUser()?.role || "";
+    const allowedViews = () => new Set(roleAllowedViews[currentUserRole()] || []);
+    const canOpenView = (view) => allowedViews().has(view);
+    const canEditUsage = () => ["admin", "manager"].includes(currentUserRole());
     const canManageReceipts = () => ["admin", "manager"].includes(currentUserRole());
+    const canManageSettings = () => currentUserRole() === "admin";
+    const authShellUrl = "./auth_shell.html";
+
+    const showFramedAuthBlock = (message = "로그인이 필요합니다.") => {
+      document.body.innerHTML = `
+        <main style="min-height:100vh;display:grid;place-items:center;padding:18px;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f7fb;color:#122033;">
+          <section style="width:min(420px,100%);padding:22px;border:1px solid #dbe7f5;border-radius:14px;background:#fff;box-shadow:0 12px 32px rgba(22,39,74,.08);">
+            <h1 style="margin:0 0 8px;font-size:20px;">${escapeHtml(message)}</h1>
+            <p style="margin:0;color:#667085;font-weight:800;line-height:1.45;">로그인 화면에서 다시 접속해 주세요.</p>
+          </section>
+        </main>
+      `;
+    };
+
+    const redirectToLogin = (message) => {
+      sessionStorage.removeItem("orInventoryUser");
+      try {
+        if (window.self === window.top) {
+          window.location.replace(authShellUrl);
+        } else {
+          showFramedAuthBlock(message);
+        }
+      } catch (error) {
+        showFramedAuthBlock(message);
+      }
+      return false;
+    };
+
+    const ensureLocalSession = () => currentAuditUser() || redirectToLogin("로그인이 필요합니다.");
+
+    const verifySessionUser = async () => {
+      const sessionUser = currentAuditUser();
+      if (!sessionUser) return redirectToLogin("로그인이 필요합니다.");
+      const usersSnap = await getDoc(doc(db, "app", "users"));
+      const accounts = usersSnap.exists() && Array.isArray(usersSnap.data().accounts) ? usersSnap.data().accounts : [];
+      const account = accounts.find((item) => String(item.id) === String(sessionUser.id) && item.active !== false);
+      if (!account) return redirectToLogin("세션이 만료되었습니다.");
+      const verified = {
+        id: account.id,
+        loginId: account.loginId || "",
+        name: account.name || account.loginId || "",
+        role: roleAllowedViews[account.role] ? account.role : "staff"
+      };
+      sessionStorage.setItem("orInventoryUser", JSON.stringify(verified));
+      return verified;
+    };
+
+    const ensureCurrentViewAllowed = () => {
+      const visibleMenus = menus.filter(([key]) => canOpenView(key));
+      if (!visibleMenus.length) return redirectToLogin("권한이 없습니다.");
+      if (!canOpenView(currentView)) currentView = visibleMenus[0][0];
+      if (currentView === "settings" && !canManageSettings()) currentView = visibleMenus[0][0];
+      if (currentView === "edit" && !canEditUsage()) currentView = visibleMenus[0][0];
+      return true;
+    };
 
     const normalizeState = (data) => ({
       ...blankState(),
@@ -1859,11 +1923,13 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
 
     const renderNav = () => {
-      nav.innerHTML = menus.map(([key, label]) => `
+      ensureCurrentViewAllowed();
+      nav.innerHTML = menus.filter(([key]) => canOpenView(key)).map(([key, label]) => `
         <button class="tab ${currentView === key ? "active" : ""}" data-view="${key}" type="button">${label}</button>
       `).join("");
       nav.querySelectorAll("button").forEach((button) => {
         button.addEventListener("click", () => {
+          if (!canOpenView(button.dataset.view)) return;
           currentView = button.dataset.view;
           render();
         });
@@ -1871,6 +1937,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
 
     const render = () => {
+      if (!ensureLocalSession() || !ensureCurrentViewAllowed()) return;
       renderedDate = today();
       renderNav();
       const views = {
@@ -1890,7 +1957,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             <span>${escapeHtml(today())}</span>
           </div>
         </div>
-        ${views[currentView]()}
+        ${views[currentView]?.() || renderDashboard()}
       `;
       bindCommon();
       bindView();
@@ -1902,6 +1969,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       app.addEventListener("click", async (event) => {
         const editProductBtn = event.target.closest("[data-edit-product]");
         if (editProductBtn) {
+          if (!canManageSettings()) {
+            alert("관리자만 수정할 수 있습니다.");
+            return;
+          }
           const item = productById(editProductBtn.dataset.editProduct);
           if (!item) return;
           document.getElementById("productFormTitle").textContent = "제품 수정";
@@ -1920,6 +1991,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
         const deleteProductBtn = event.target.closest("[data-delete-product]");
         if (deleteProductBtn) {
+          if (!canManageSettings()) {
+            alert("관리자만 삭제할 수 있습니다.");
+            return;
+          }
           const id = deleteProductBtn.dataset.deleteProduct;
           const productUsed = state.usages.some((usage) => usage.productIds.some((productId) => sameId(productId, id)));
           const productReceived = state.receipts.some((receipt) => sameId(receipt.productId, id));
@@ -1934,6 +2009,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
         const editDoctorBtn = event.target.closest("[data-edit-doctor]");
         if (editDoctorBtn) {
+          if (!canManageSettings()) {
+            alert("관리자만 수정할 수 있습니다.");
+            return;
+          }
           const item = state.doctors.find((entry) => sameId(entry.id, editDoctorBtn.dataset.editDoctor));
           if (!item) return;
           document.getElementById("doctorFormTitle").textContent = "과 수정";
@@ -1948,6 +2027,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
         const deleteDoctorBtn = event.target.closest("[data-delete-doctor]");
         if (deleteDoctorBtn) {
+          if (!canManageSettings()) {
+            alert("관리자만 삭제할 수 있습니다.");
+            return;
+          }
           const id = deleteDoctorBtn.dataset.deleteDoctor;
           const doctorToDelete = state.doctors.find((item) => sameId(item.id, id));
           if (!confirm("과를 삭제할까요?")) return;
@@ -1960,6 +2043,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
         const editSurgeryBtn = event.target.closest("[data-edit-surgery]");
         if (editSurgeryBtn) {
+          if (!canManageSettings()) {
+            alert("관리자만 수정할 수 있습니다.");
+            return;
+          }
           const item = surgeryById(editSurgeryBtn.dataset.editSurgery);
           if (!item) return;
           document.getElementById("surgeryFormTitle").textContent = "수술 수정";
@@ -1972,6 +2059,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
         const deleteSurgeryBtn = event.target.closest("[data-delete-surgery]");
         if (deleteSurgeryBtn) {
+          if (!canManageSettings()) {
+            alert("관리자만 삭제할 수 있습니다.");
+            return;
+          }
           const id = deleteSurgeryBtn.dataset.deleteSurgery;
           if (!confirm("수술을 삭제할까요?")) return;
           state.surgeries = state.surgeries.filter((item) => !sameId(item.id, id));
@@ -1982,6 +2073,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
         const editRuleBtn = event.target.closest("[data-edit-rule]");
         if (editRuleBtn) {
+          if (!canManageSettings()) {
+            alert("관리자만 수정할 수 있습니다.");
+            return;
+          }
           const rule = usageRuleById(editRuleBtn.dataset.editRule);
           if (!rule) return;
           document.getElementById("usageRuleFormTitle").textContent = "수술별 사용관리 수정";
@@ -2003,6 +2098,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
         const deleteRuleBtn = event.target.closest("[data-delete-rule]");
         if (deleteRuleBtn) {
+          if (!canManageSettings()) {
+            alert("관리자만 삭제할 수 있습니다.");
+            return;
+          }
           if (!confirm("수술별 사용관리 규칙을 삭제할까요?")) return;
           state.usageRules = state.usageRules.filter((item) => !sameId(item.id, deleteRuleBtn.dataset.deleteRule));
           render();
@@ -2025,6 +2124,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
 
     const renderSettings = () => {
+      if (!canManageSettings()) return `<div class="empty">관리자만 설정을 사용할 수 있습니다.</div>`;
       const views = {
         products: renderProducts,
         doctors: renderDoctors,
@@ -2043,6 +2143,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
 
     const bindSettings = () => {
+      if (!canManageSettings()) return;
       app.querySelectorAll("[data-settings-view]").forEach((button) => {
         button.addEventListener("click", () => {
           currentSettingsView = button.dataset.settingsView;
@@ -2260,6 +2361,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     `;
 
     const renderProducts = () => `
+      ${canManageSettings() ? "" : `<div class="empty">관리자만 제품관리를 사용할 수 있습니다.</div>`}
+      ${canManageSettings() ? `
       <section class="grid two">
         <form class="card" id="productForm">
           <h2 id="productFormTitle">제품 추가</h2>
@@ -2310,6 +2413,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           ${renderGroupedProducts(true)}
         </div>
       </section>
+    ` : ""}
     `;
 
     const productItem = (item) => {
@@ -2329,10 +2433,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             <span>${detail}</span>
             <span>현재고: ${num(item.stock)} · 경고수량: ${num(item.warningStock)}${item.category === "비급여" ? "" : ` · 랜딩수량: ${num(item.landingQty)}`}</span>
           </div>
-          <div class="actions">
+          ${canManageSettings() ? `<div class="actions">
             <button class="secondary" type="button" data-edit-product="${item.id}">수정</button>
             <button class="danger" type="button" data-delete-product="${item.id}">삭제</button>
-          </div>
+          </div>` : ""}
         </div>
       `;
     };
@@ -3195,6 +3299,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       });
       document.getElementById("nonpayReceiptForm")?.addEventListener("submit", async (event) => {
         event.preventDefault();
+        if (!canManageReceipts()) {
+          alert("입고 등록은 관리자와 책임/입고 담당만 가능합니다.");
+          return;
+        }
         const productId = document.getElementById("nonpayReceiptProduct").value;
         const qty = Math.max(1, num(document.getElementById("nonpayReceiptQty").value));
         const memo = document.getElementById("nonpayReceiptMemo")?.value.trim() || "";
@@ -3206,6 +3314,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         await saveState();
       });
       const receiveLandingLine = async (usageId, productId) => {
+        if (!canManageReceipts()) {
+          alert("랜딩 입고 확인은 관리자와 책임/입고 담당만 가능합니다.");
+          return;
+        }
         const usage = state.usages.find((item) => item.id === usageId);
         const product = productById(productId);
         if (!usage || !product) return;
@@ -3421,7 +3533,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       });
     };
 
-    const renderEditUsage = () => `
+    const renderEditUsage = () => canEditUsage() ? `
       <section class="grid">
         <div class="card">
           <h2>환자 사용내역 선택</h2>
@@ -3494,9 +3606,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           </div>
         </form>
       </section>
-    `;
+    ` : `<div class="empty">관리자와 책임/입고 담당만 사용내역을 수정할 수 있습니다.</div>`;
 
     const bindEditUsage = () => {
+      if (!canEditUsage()) return;
       const select = document.getElementById("editUsageSelect");
       const form = document.getElementById("editUsageForm");
       const useDepartment = document.getElementById("editDepartment");
@@ -4229,7 +4342,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     `;
 
     const usageItem = (usage, options = {}) => {
-      const showDelete = options.showDelete !== false;
+      const showDelete = options.showDelete !== false && canEditUsage();
       const showEdit = options.showEdit !== false && showDelete;
       const doctor = departmentById(usage.doctorId);
       const surgery = surgeryById(usage.surgeryId);
@@ -4390,6 +4503,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
 
     const deleteUsageRecord = async (usageId, { onSuccess } = {}) => {
+      if (!canEditUsage()) {
+        alert("관리자와 책임/입고 담당만 사용내역을 삭제할 수 있습니다.");
+        return false;
+      }
       const usage = state.usages.find((item) => String(item.id) === String(usageId));
       if (!usage || !confirm("사용내역을 삭제하고 재고를 복구할까요?")) return false;
       usage.productIds.forEach((id) => {
@@ -4595,10 +4712,13 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     const capitalize = (value) => value.charAt(0).toUpperCase() + value.slice(1);
 
     const boot = async () => {
+      if (!ensureLocalSession()) return;
       render();
       try {
         const firebaseApp = initializeApp(firebaseConfig);
         db = getFirestore(firebaseApp);
+        const verifiedUser = await verifySessionUser();
+        if (!verifiedUser) return;
         ref = doc(db, "app", "main");
         try {
           await enableIndexedDbPersistence(db);
@@ -4639,6 +4759,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     });
 
     const loadFirebaseAndBoot = async () => {
+      if (!ensureLocalSession()) return;
       render();
       try {
         setStatus("Firebase 모듈 불러오는 중", "ok");

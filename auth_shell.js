@@ -98,6 +98,7 @@ function showApp() {
   setupMode = false;
   $("loginScreen").style.display = "none";
   $("appShell").style.display = "block";
+  $("inventoryFrame").src = "./index_new.html";
   $("currentUserText").textContent = `${currentUser.name} (${currentUser.loginId})`;
   $("roleText").textContent = roleLabels[currentUser.role] || currentUser.role;
   $("accountManageBtn").style.display = currentUser.role === "admin" ? "inline-flex" : "none";
@@ -207,7 +208,7 @@ async function submitAccountRequest(name, loginId, pin) {
 function logout() {
   currentUser = null;
   sessionStorage.removeItem("orInventoryUser");
-  $("inventoryFrame").src = "./index_new.html";
+  $("inventoryFrame").src = "about:blank";
   showLogin();
 }
 
