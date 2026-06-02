@@ -292,6 +292,8 @@
     .receipt-history-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
     .receipt-history-name { min-width: 0; font-weight: 950; color: var(--ink); }
     .receipt-history-name span { display: block; color: var(--muted); font-size: 12px; font-weight: 800; margin-top: 3px; }
+    .receipt-role-badge { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border-radius: 999px; background: #fff7ed; color: #c2410c; font-size: 12px; font-weight: 950; white-space: nowrap; }
+    .receipt-safety-note { margin: 0 0 12px; padding: 10px 12px; border: 1px solid #fed7aa; border-radius: 12px; background: #fff7ed; color: #9a3412; font-size: 13px; font-weight: 850; line-height: 1.45; }
     .receipt-history-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
     .receipt-history-meta span { min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: #f8fbff; color: #53647a; font-size: 12px; font-weight: 850; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .receipt-memo { color: var(--muted); font-size: 13px; font-weight: 800; }
@@ -1312,8 +1314,9 @@
 
     const roleAllowedViews = {
       admin: ["dashboard", "use", "edit", "history", "receipts", "settings"],
-      manager: ["dashboard", "use", "edit", "history", "receipts"],
-      staff: ["dashboard", "use", "history", "receipts"]
+      manager: ["dashboard", "use", "edit", "history", "receipts", "settings"],
+      receiver: ["receipts"],
+      staff: ["dashboard", "use", "edit", "history"]
     };
 
     const settingsMenus = [
@@ -1588,9 +1591,12 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     const currentUserRole = () => currentAuditUser()?.role || "";
     const allowedViews = () => new Set(roleAllowedViews[currentUserRole()] || []);
     const canOpenView = (view) => allowedViews().has(view);
-    const canEditUsage = () => ["admin", "manager"].includes(currentUserRole());
+    const canEditUsage = () => ["admin", "manager", "staff"].includes(currentUserRole());
+    const canDeleteUsage = () => ["admin", "manager"].includes(currentUserRole());
     const canManageReceipts = () => ["admin", "manager"].includes(currentUserRole());
-    const canManageSettings = () => currentUserRole() === "admin";
+    const canRegisterNonpayReceipts = () => ["admin", "manager", "receiver"].includes(currentUserRole());
+    const canManageLandingReceipts = () => ["admin", "manager"].includes(currentUserRole());
+    const canManageSettings = () => ["admin", "manager"].includes(currentUserRole());
     const authShellUrl = "./auth_shell.html";
 
     const showFramedAuthBlock = (message = "로그인이 필요합니다.") => {
@@ -1668,7 +1674,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       ? `${usage.patientName || ""} (${patientIdText(usage)})`
       : (usage.patientName || "");
     const auditUserText = (item) => {
-      const roleTokens = new Set(["staff", "manager", "admin", "일반 사용자", "책임/입고 담당", "관리자"]);
+      const roleTokens = new Set(["staff", "receiver", "manager", "admin", "일반사용자", "일반 사용자", "입고담당자", "책임사용자", "책임/입고 담당", "관리자"]);
       const candidates = [
         item?.createdByName,
         item?.createdBy?.name,
@@ -1682,6 +1688,12 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       }
       return "";
     };
+    const auditRoleLabel = (item) => ({
+      admin: "관리자",
+      manager: "책임사용자",
+      receiver: "입고담당자",
+      staff: "일반사용자"
+    }[item?.createdBy?.role] || item?.createdBy?.role || "");
     const auditTimeText = (item) => formatDateTime(item?.createdAt || item?.updatedAt || item?.date || "");
     const auditMetaHtml = (item, label = "입력") => `
       <span>${label}자: ${escapeHtml(auditUserText(item) || "-")}</span>
@@ -2020,7 +2032,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const editProductBtn = event.target.closest("[data-edit-product]");
         if (editProductBtn) {
           if (!canManageSettings()) {
-            alert("관리자만 수정할 수 있습니다.");
+            alert("관리자와 책임사용자만 수정할 수 있습니다.");
             return;
           }
           const item = productById(editProductBtn.dataset.editProduct);
@@ -2042,7 +2054,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const deleteProductBtn = event.target.closest("[data-delete-product]");
         if (deleteProductBtn) {
           if (!canManageSettings()) {
-            alert("관리자만 삭제할 수 있습니다.");
+            alert("관리자와 책임사용자만 삭제할 수 있습니다.");
             return;
           }
           const id = deleteProductBtn.dataset.deleteProduct;
@@ -2060,7 +2072,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const editDoctorBtn = event.target.closest("[data-edit-doctor]");
         if (editDoctorBtn) {
           if (!canManageSettings()) {
-            alert("관리자만 수정할 수 있습니다.");
+            alert("관리자와 책임사용자만 수정할 수 있습니다.");
             return;
           }
           const item = state.doctors.find((entry) => sameId(entry.id, editDoctorBtn.dataset.editDoctor));
@@ -2078,7 +2090,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const deleteDoctorBtn = event.target.closest("[data-delete-doctor]");
         if (deleteDoctorBtn) {
           if (!canManageSettings()) {
-            alert("관리자만 삭제할 수 있습니다.");
+            alert("관리자와 책임사용자만 삭제할 수 있습니다.");
             return;
           }
           const id = deleteDoctorBtn.dataset.deleteDoctor;
@@ -2094,7 +2106,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const editSurgeryBtn = event.target.closest("[data-edit-surgery]");
         if (editSurgeryBtn) {
           if (!canManageSettings()) {
-            alert("관리자만 수정할 수 있습니다.");
+            alert("관리자와 책임사용자만 수정할 수 있습니다.");
             return;
           }
           const item = surgeryById(editSurgeryBtn.dataset.editSurgery);
@@ -2110,7 +2122,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const deleteSurgeryBtn = event.target.closest("[data-delete-surgery]");
         if (deleteSurgeryBtn) {
           if (!canManageSettings()) {
-            alert("관리자만 삭제할 수 있습니다.");
+            alert("관리자와 책임사용자만 삭제할 수 있습니다.");
             return;
           }
           const id = deleteSurgeryBtn.dataset.deleteSurgery;
@@ -2124,7 +2136,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const editRuleBtn = event.target.closest("[data-edit-rule]");
         if (editRuleBtn) {
           if (!canManageSettings()) {
-            alert("관리자만 수정할 수 있습니다.");
+            alert("관리자와 책임사용자만 수정할 수 있습니다.");
             return;
           }
           const rule = usageRuleById(editRuleBtn.dataset.editRule);
@@ -2149,7 +2161,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const deleteRuleBtn = event.target.closest("[data-delete-rule]");
         if (deleteRuleBtn) {
           if (!canManageSettings()) {
-            alert("관리자만 삭제할 수 있습니다.");
+            alert("관리자와 책임사용자만 삭제할 수 있습니다.");
             return;
           }
           if (!confirm("수술별 사용관리 규칙을 삭제할까요?")) return;
@@ -2174,7 +2186,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
 
     const renderSettings = () => {
-      if (!canManageSettings()) return `<div class="empty">관리자만 설정을 사용할 수 있습니다.</div>`;
+      if (!canManageSettings()) return `<div class="empty">관리자와 책임사용자만 설정을 사용할 수 있습니다.</div>`;
       const views = {
         products: renderProducts,
         doctors: renderDoctors,
@@ -2411,7 +2423,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     `;
 
     const renderProducts = () => `
-      ${canManageSettings() ? "" : `<div class="empty">관리자만 제품관리를 사용할 수 있습니다.</div>`}
+      ${canManageSettings() ? "" : `<div class="empty">관리자와 책임사용자만 제품관리를 사용할 수 있습니다.</div>`}
       ${canManageSettings() ? `
       <section class="grid two">
         <form class="card" id="productForm">
@@ -2873,6 +2885,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             const meta = receiptProductMeta(receipt);
             const date = receiptDateValue(receipt);
             const updatedText = receipt.updatedAt ? ` · 수정 ${escapeHtml(formatDateTime(receipt.updatedAt))}${receipt.updatedByName || receipt.updatedBy?.name ? ` / ${escapeHtml(receipt.updatedByName || receipt.updatedBy?.name)}` : ""}` : "";
+            const receiverBadge = receipt.type === "nonpay" && auditRoleLabel(receipt) === "입고담당자"
+              ? `<span class="receipt-role-badge" title="입고담당자가 비급여 입고관리에서 입력한 기록입니다.">입고담당자 입력</span>`
+              : "";
             return `
               <div class="item receipt-history-card" data-receipt-row="${escapeHtml(receipt.id)}">
                 <div class="receipt-history-head">
@@ -2881,6 +2896,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
                     <span>${escapeHtml(meta || "-")}</span>
                   </div>
                   <span class="pill">${num(receipt.qty).toLocaleString()}개</span>
+                  ${receiverBadge}
                 </div>
                 <div class="receipt-history-meta">
                   <span>입고일: ${escapeHtml(date || "-")}</span>
@@ -3160,20 +3176,26 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
 
     const renderReceipts = () => {
-      const canEnterReceipts = canManageReceipts();
-      const receiptView = canEnterReceipts ? currentReceiptView : "history";
+      const canEnterReceipts = canRegisterNonpayReceipts();
+      const canEnterLanding = canManageLandingReceipts();
+      const canViewReceiptHistory = canManageReceipts();
+      const allowedReceiptViews = [
+        ...(canEnterReceipts ? ["nonpay"] : []),
+        ...(canEnterLanding ? ["landing"] : []),
+        ...(canViewReceiptHistory ? ["history"] : [])
+      ];
+      const receiptView = allowedReceiptViews.includes(currentReceiptView) ? currentReceiptView : allowedReceiptViews[0];
       return `
       <section class="grid">
         <div class="receipt-tabs">
-          ${canEnterReceipts ? `
-            <button class="receipt-tab ${receiptView === "nonpay" ? "active" : ""}" data-receipt-view="nonpay" type="button">비급여 입고관리</button>
-            <button class="receipt-tab ${receiptView === "landing" ? "active" : ""}" data-receipt-view="landing" type="button">랜딩 입고관리</button>
-          ` : ""}
-          <button class="receipt-tab ${receiptView === "history" ? "active" : ""}" data-receipt-view="history" type="button">입고내역</button>
+          ${canEnterReceipts ? `<button class="receipt-tab ${receiptView === "nonpay" ? "active" : ""}" data-receipt-view="nonpay" type="button">비급여 입고관리</button>` : ""}
+          ${canEnterLanding ? `<button class="receipt-tab ${receiptView === "landing" ? "active" : ""}" data-receipt-view="landing" type="button">랜딩 입고관리</button>` : ""}
+          ${canViewReceiptHistory ? `<button class="receipt-tab ${receiptView === "history" ? "active" : ""}" data-receipt-view="history" type="button">입고내역</button>` : ""}
         </div>
         ${receiptView === "nonpay" ? `
           <form class="card receipt-wide" id="nonpayReceiptForm">
             <h2>비급여 입고 등록</h2>
+            ${currentUserRole() === "receiver" ? `<p class="receipt-safety-note">입고담당자 권한입니다. 비급여 입고 수량만 저장할 수 있고, 랜딩 입고·입고내역 수정·삭제는 책임사용자 이상에게 요청해 주세요.</p>` : ""}
             <label for="nonpayReceiptProduct">제품 선택</label>
             <select id="nonpayReceiptProduct" required>
               <option value="">비급여 제품을 선택하세요</option>
@@ -3218,7 +3240,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
     const updateReceiptRecord = async (receiptId, values) => {
       if (!canManageReceipts()) {
-        alert("입고이력 수정은 관리자와 manager만 가능합니다.");
+        alert("입고이력 수정은 관리자와 책임사용자만 가능합니다.");
         return false;
       }
       const receipt = state.receipts.find((item) => sameId(item.id, receiptId));
@@ -3240,7 +3262,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
     const deleteReceiptRecord = async (receiptId) => {
       if (!canManageReceipts()) {
-        alert("입고이력 삭제는 관리자와 manager만 가능합니다.");
+        alert("입고이력 삭제는 관리자와 책임사용자만 가능합니다.");
         return false;
       }
       const receipt = state.receipts.find((item) => sameId(item.id, receiptId));
@@ -3349,8 +3371,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       });
       document.getElementById("nonpayReceiptForm")?.addEventListener("submit", async (event) => {
         event.preventDefault();
-        if (!canManageReceipts()) {
-          alert("입고 등록은 관리자와 책임/입고 담당만 가능합니다.");
+        if (!canRegisterNonpayReceipts()) {
+          alert("비급여 입고 등록은 관리자, 책임사용자, 입고담당자만 가능합니다.");
           return;
         }
         const productId = document.getElementById("nonpayReceiptProduct").value;
@@ -3364,8 +3386,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         await saveState();
       });
       const receiveLandingLine = async (usageId, productId) => {
-        if (!canManageReceipts()) {
-          alert("랜딩 입고 확인은 관리자와 책임/입고 담당만 가능합니다.");
+        if (!canManageLandingReceipts()) {
+          alert("랜딩 입고 확인은 관리자와 책임사용자만 가능합니다.");
           return;
         }
         const usage = state.usages.find((item) => item.id === usageId);
@@ -3656,7 +3678,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           </div>
         </form>
       </section>
-    ` : `<div class="empty">관리자와 책임/입고 담당만 사용내역을 수정할 수 있습니다.</div>`;
+    ` : `<div class="empty">사용내역 수정은 관리자, 책임사용자, 일반사용자만 가능합니다.</div>`;
 
     const bindEditUsage = () => {
       if (!canEditUsage()) return;
@@ -3767,7 +3789,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           return;
         }
         form.style.display = "";
-        deleteButton.style.display = "";
+        deleteButton.style.display = canDeleteUsage() ? "" : "none";
         form.querySelectorAll("input, select, textarea, button").forEach((element) => {
           element.disabled = false;
         });
@@ -4469,8 +4491,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     `;
 
     const usageItem = (usage, options = {}) => {
-      const showDelete = options.showDelete !== false && canEditUsage();
-      const showEdit = options.showEdit !== false && showDelete;
+      const showDelete = options.showDelete !== false && canDeleteUsage();
+      const showEdit = options.showEdit !== false && canEditUsage();
       const doctor = departmentById(usage.doctorId);
       const surgery = surgeryById(usage.surgeryId);
       const surgeryDepartment = surgery ? (surgery.department || inferSurgeryDepartment(surgery.name)) : "-";
@@ -4731,8 +4753,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
 
     const deleteUsageRecord = async (usageId, { onSuccess } = {}) => {
-      if (!canEditUsage()) {
-        alert("관리자와 책임/입고 담당만 사용내역을 삭제할 수 있습니다.");
+      if (!canDeleteUsage()) {
+        alert("사용내역 삭제는 관리자와 책임사용자만 가능합니다.");
         return false;
       }
       const usage = state.usages.find((item) => String(item.id) === String(usageId));

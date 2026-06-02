@@ -8,16 +8,17 @@ const usersRef = doc(db, "app", "users");
 
 const roleLabels = {
   admin: "관리자",
-  manager: "책임/입고 담당",
-  staff: "일반 사용자"
+  manager: "책임사용자",
+  receiver: "입고담당자",
+  staff: "일반사용자"
 };
 
 const roleAllowedViews = {
   admin: ["dashboard", "use", "edit", "history", "receipts", "settings"],
-  manager: ["dashboard", "use", "edit", "history", "receipts"],
-  staff: ["dashboard", "use", "history", "receipts"]
+  manager: ["dashboard", "use", "edit", "history", "receipts", "settings"],
+  receiver: ["receipts"],
+  staff: ["dashboard", "use", "edit", "history"]
 };
-
 let accounts = [];
 let setupMode = false;
 let unsubscribeUsers = null;
@@ -424,11 +425,11 @@ function applyRoleToFrame() {
         if (button.dataset.goView && !allowed.has(button.dataset.goView)) button.style.display = "none";
       });
       if (currentUser.role === "staff") {
-        frameDoc.querySelectorAll("button[data-delete-usage],button[data-edit-usage],button[data-delete-product],button[data-delete-doctor],button[data-delete-surgery],button[data-delete-rule],button[data-edit-receipt],button[data-delete-receipt]").forEach((button) => {
+        frameDoc.querySelectorAll("button[data-delete-usage],button[data-edit-receipt],button[data-delete-receipt]").forEach((button) => {
           button.style.display = "none";
         });
       }
-      if (currentUser.role !== "admin") {
+      if (!["admin", "manager"].includes(currentUser.role)) {
         frameDoc.querySelectorAll("button[data-delete-product],button[data-delete-doctor],button[data-delete-surgery],button[data-delete-rule]").forEach((button) => {
           button.style.display = "none";
         });
