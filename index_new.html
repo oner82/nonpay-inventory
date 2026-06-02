@@ -330,6 +330,11 @@
     .usage-product-heading { display: flex; justify-content: space-between; gap: 8px; align-items: center; color: var(--ink); font-size: 14px; font-weight: 900; }
     .usage-product-chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .usage-chip { display: inline-flex; align-items: center; min-height: 30px; padding: 5px 8px; border: 1px solid rgba(15,23,42,.08); border-radius: 10px; background: rgba(255,255,255,.78); color: var(--ink); font-size: 13px; font-weight: 800; }
+    .edit-usage-list { display: grid; gap: 8px; margin-top: 10px; }
+    button.edit-usage-card { width: 100%; min-height: auto; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink); text-align: left; box-shadow: 0 6px 15px rgba(16,35,63,.04); display: grid; gap: 6px; }
+    button.edit-usage-card[aria-pressed="true"] { border-color: var(--brand); background: var(--soft); box-shadow: 0 8px 20px rgba(47,141,244,.14); }
+    button.edit-usage-card .item-title { margin-bottom: 0; }
+    button.edit-usage-card .meta { font-size: 13px; }
     .summary-table { display: grid; gap: 6px; }
     .summary-row { display: grid; grid-template-columns: 1fr; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
     details.summary-row { padding: 0; overflow: hidden; }
@@ -3605,19 +3610,51 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       });
     };
 
-    const renderEditUsage = () => canEditUsage() ? `
+    const editUsageCardHtml = (usage, selectedId = "") => {
+      const doctor = departmentById(usage.doctorId);
+      const surgery = surgeryById(usage.surgeryId);
+      const productCount = Array.isArray(usage.productIds) ? usage.productIds.length : 0;
+      const isSelected = String(usage.id) === String(selectedId);
+      return `
+        <button class="edit-usage-card" type="button" data-edit-usage-select="${escapeHtml(usage.id)}" aria-pressed="${isSelected ? "true" : "false"}">
+          <div class="item-title">
+            <span>${escapeHtml(patientDisplayName(usage))}</span>
+            <span class="pill">${escapeHtml(usage.date || "-")}</span>
+          </div>
+          <div class="meta">
+            <span>환자ID: ${escapeHtml(patientIdText(usage) || "-")}</span>
+            <span>과/원장 코드: ${escapeHtml(doctor?.name || "-")} · 수술: ${escapeHtml(surgery?.name || "-")}</span>
+            <span>사용 제품: ${productCount}개</span>
+          </div>
+        </button>
+      `;
+    };
+
+    const editUsageListForDate = (date, selectedId = "") => {
+      const usages = state.usages
+        .filter((usage) => (usage.date || "") === date)
+        .slice()
+        .reverse();
+      return usages.length
+        ? usages.map((usage) => editUsageCardHtml(usage, selectedId)).join("")
+        : `<div class="empty">선택한 날짜에 사용내역이 없습니다.</div>`;
+    };
+
+    const renderEditUsage = () => {
+      if (!canEditUsage()) return `<div class="empty">사용내역 수정은 관리자, 책임사용자, 일반사용자만 가능합니다.</div>`;
+      const pendingUsage = pendingEditUsageId ? state.usages.find((usage) => usage.id === pendingEditUsageId) : null;
+      const editSelectDate = pendingUsage?.date || today();
+      const initialUsageList = editUsageListForDate(editSelectDate, pendingEditUsageId);
+      return `
       <section class="grid">
         <div class="card">
           <h2>환자 사용내역 선택</h2>
-          <label for="editUsageSelect">환자 선택</label>
-          <select id="editUsageSelect">
-            <option value="">수정할 환자 사용내역을 선택하세요</option>
-            ${state.usages.slice().reverse().map((usage) => {
-              const doctor = departmentById(usage.doctorId);
-              const surgery = surgeryById(usage.surgeryId);
-              return `<option value="${usage.id}">${escapeHtml(usage.date)} · ${escapeHtml(patientDisplayName(usage))} · ${escapeHtml(doctor?.name || "-")} · ${escapeHtml(surgery?.name || "-")}</option>`;
-            }).join("")}
-          </select>
+          <label for="editUsageSelectDate">사용일 선택</label>
+          <input id="editUsageSelectDate" type="date" value="${escapeHtml(editSelectDate)}">
+          <p class="helper">기본값은 오늘 날짜입니다. 날짜를 바꾸면 해당 날짜의 환자 사용내역이 아래 목록으로 표시됩니다.</p>
+          <div id="editUsageList" class="edit-usage-list" aria-label="선택한 날짜의 환자 사용내역 목록">
+            ${initialUsageList}
+          </div>
         </div>
         <form class="card" id="editUsageForm" style="display:none;">
           <h2>사용내용 수정</h2>
@@ -3678,11 +3715,13 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           </div>
         </form>
       </section>
-    ` : `<div class="empty">사용내역 수정은 관리자, 책임사용자, 일반사용자만 가능합니다.</div>`;
+    `;
+    };
 
     const bindEditUsage = () => {
       if (!canEditUsage()) return;
-      const select = document.getElementById("editUsageSelect");
+      const dateInput = document.getElementById("editUsageSelectDate");
+      const usageList = document.getElementById("editUsageList");
       const form = document.getElementById("editUsageForm");
       const useDepartment = document.getElementById("editDepartment");
       const doctorSelect = document.getElementById("editDoctor");
@@ -3691,6 +3730,15 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const productSearch = document.getElementById("editProductSearch");
       const productSearchResults = document.getElementById("editProductSearchResults");
       const deleteButton = document.getElementById("editUsageDelete");
+      const renderUsageList = (date, selectedId = "") => {
+        usageList.innerHTML = editUsageListForDate(date, selectedId);
+      };
+      const resetLoadedUsage = () => {
+        form.style.display = "none";
+        deleteButton.style.display = "none";
+        pendingEditUsageId = "";
+        renderUsageList(dateInput.value || today());
+      };
       const selectedItems = () => Array.from(form.querySelectorAll("[data-use-product]:checked")).map((input) => ({
         productId: input.value,
         qty: Math.max(1, num(form.querySelector(`[data-use-qty="${input.value}"]`)?.value))
@@ -3788,6 +3836,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           deleteButton.style.display = "none";
           return;
         }
+        if (dateInput.value !== (usage.date || today())) {
+          dateInput.value = usage.date || today();
+          renderUsageList(dateInput.value, usage.id);
+        }
         form.style.display = "";
         deleteButton.style.display = canDeleteUsage() ? "" : "none";
         form.querySelectorAll("input, select, textarea, button").forEach((element) => {
@@ -3819,7 +3871,17 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         renderSearch();
         renderSelected();
       };
-      select.addEventListener("change", () => loadUsage(select.value));
+      dateInput.addEventListener("change", () => {
+        dateInput.value = dateInput.value || today();
+        resetLoadedUsage();
+      });
+      usageList.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-edit-usage-select]");
+        if (!button) return;
+        pendingEditUsageId = button.dataset.editUsageSelect;
+        renderUsageList(dateInput.value || today(), pendingEditUsageId);
+        loadUsage(pendingEditUsageId);
+      });
       useDepartment.addEventListener("change", filterOptions);
       form.querySelectorAll("[data-use-product], [data-use-qty]").forEach((input) => {
         input.addEventListener("change", () => {
@@ -3832,29 +3894,15 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         });
       });
       productSearch.addEventListener("input", renderSearch);
-      document.getElementById("editUsageCancel").addEventListener("click", () => {
-        select.value = "";
-        form.style.display = "none";
-        deleteButton.style.display = "none";
-        pendingEditUsageId = "";
-      });
+      document.getElementById("editUsageCancel").addEventListener("click", resetLoadedUsage);
       deleteButton.addEventListener("click", async () => {
         const usageId = document.getElementById("editUsageId").value;
         if (!usageId) return;
         const deleted = await deleteUsageRecord(usageId, {
-          onSuccess: () => {
-            select.value = "";
-            form.style.display = "none";
-            deleteButton.style.display = "none";
-            pendingEditUsageId = "";
-          }
+          onSuccess: resetLoadedUsage
         });
         if (!deleted) return;
-        select.innerHTML = `<option value="">수정할 환자 사용내역을 선택하세요</option>${state.usages.slice().reverse().map((usage) => {
-          const doctor = departmentById(usage.doctorId);
-          const surgery = surgeryById(usage.surgeryId);
-          return `<option value="${usage.id}">${escapeHtml(usage.date)} · ${escapeHtml(patientDisplayName(usage))} · ${escapeHtml(doctor?.name || "-")} · ${escapeHtml(surgery?.name || "-")}</option>`;
-        }).join("")}`;
+        renderUsageList(dateInput.value || today());
       });
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -3915,8 +3963,12 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       filterOptions();
       renderSearch();
       if (pendingEditUsageId) {
-        select.value = pendingEditUsageId;
-        loadUsage(pendingEditUsageId);
+        const pendingUsage = state.usages.find((usage) => usage.id === pendingEditUsageId);
+        if (pendingUsage) {
+          dateInput.value = pendingUsage.date || today();
+          renderUsageList(dateInput.value, pendingEditUsageId);
+          loadUsage(pendingEditUsageId);
+        }
       }
     };
 
