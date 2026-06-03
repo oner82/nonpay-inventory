@@ -1316,6 +1316,85 @@
 
   
 
+
+    /* 2026-06-03 수술별 사용관리 목록 검색/분류 */
+    .usage-rule-tools {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #f8fbff;
+    }
+    .usage-rule-summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .usage-rule-summary span {
+      display: grid;
+      gap: 2px;
+      min-height: 58px;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+      align-content: center;
+    }
+    .usage-rule-summary strong {
+      display: block;
+      color: var(--ink);
+      font-size: 19px;
+      line-height: 1;
+      font-weight: 950;
+    }
+    .usage-rule-filter-row {
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) minmax(140px, 180px) auto;
+      gap: 8px;
+      align-items: center;
+    }
+    .usage-rule-filter-row input,
+    .usage-rule-filter-row select { min-height: 42px; }
+    .usage-rule-filter-row button { min-height: 42px; box-shadow: none; }
+    .usage-rule-help {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 850;
+      line-height: 1.45;
+    }
+    .usage-rule-list { display: grid; gap: 10px; }
+    details.usage-rule-group { background: #f8fbff; }
+    details.usage-rule-group > summary { background: #fff; }
+    .usage-rule-group-body { display: grid; gap: 10px; padding: 0 12px 12px; }
+    .usage-rule-card { margin-top: 0 !important; border-left: 5px solid #93c5fd; }
+    .usage-rule-card[hidden],
+    .usage-rule-group[hidden] { display: none; }
+    .usage-rule-card .item-title span:first-child { min-width: 0; }
+    .usage-rule-products { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .usage-rule-product-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 8px;
+      border: 1px solid rgba(15,23,42,.08);
+      border-radius: 999px;
+      background: #fff;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 850;
+    }
+    @media (max-width: 720px) {
+      .usage-rule-summary { grid-template-columns: 1fr; }
+      .usage-rule-filter-row { grid-template-columns: 1fr; }
+      .usage-rule-filter-row button { width: 100%; }
+    }
+
     /* 수술별 사용관리 수량 버튼/과-원장-수술 단계 선택 보정 */
     .rule-card .qty-stepper { justify-self: end; }
     select option[disabled] { color: #9ca3af; }
@@ -2110,7 +2189,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           document.getElementById("productWarning").value = num(item.warningStock);
           document.getElementById("productLanding").value = num(item.landingQty);
           syncProductFields?.();
-          window.scrollTo({ top: 0, behavior: "smooth" });
+          document.getElementById("productForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
           return;
         }
 
@@ -2146,7 +2225,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           document.getElementById("doctorDepartment").value = departmentCode(item.name);
           document.getElementById("doctorNewDepartment").value = "";
           document.getElementById("doctorNumber").value = item.name.replace(departmentCode(item.name), "");
-          window.scrollTo({ top: 0, behavior: "smooth" });
+          document.getElementById("doctorForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
           return;
         }
 
@@ -2178,7 +2257,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           document.getElementById("surgeryId").value = item.id;
           document.getElementById("surgeryDepartment").value = item.department || inferSurgeryDepartment(item.name);
           document.getElementById("surgeryName").value = item.name;
-          window.scrollTo({ top: 0, behavior: "smooth" });
+          document.getElementById("surgeryForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
           return;
         }
 
@@ -2209,6 +2288,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           document.getElementById("ruleDepartment").value = rule.department;
           filterRuleOptions?.();
           document.getElementById("ruleDoctor").value = rule.doctorId;
+          filterRuleOptions?.();
           document.getElementById("ruleSurgery").value = rule.surgeryId;
           const items = ruleItems(rule);
           app.querySelectorAll("[data-rule-product]").forEach((input) => {
@@ -2217,7 +2297,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             const qtyInput = app.querySelector(`[data-rule-product-qty="${input.value}"]`);
             if (qtyInput) qtyInput.value = item ? Math.max(1, num(item.qty)) : 1;
           });
-          window.scrollTo({ top: 0, behavior: "smooth" });
+          document.getElementById("usageRuleForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
           return;
         }
 
@@ -3096,7 +3176,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       });
     };
 
-    const renderUsageRules = () => `
+    const renderUsageRules = () => {
+      const rules = sortedUsageRules();
+      const departmentCount = new Set(rules.map((rule) => rule.department || "미분류")).size;
+      const productCount = rules.reduce((sum, rule) => sum + ruleItems(rule).reduce((innerSum, item) => innerSum + Math.max(1, num(item.qty)), 0), 0);
+      return `
       <section class="grid two">
         <form class="card" id="usageRuleForm">
           <h2 id="usageRuleFormTitle">수술별 사용관리 추가</h2>
@@ -3127,10 +3211,30 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         </form>
         <div class="card">
           <h2>수술별 사용관리 목록</h2>
-          ${state.usageRules.slice().sort((a, b) => alphaFirstCompare(a.department, b.department) || alphaFirstCompare(departmentById(a.doctorId)?.name, departmentById(b.doctorId)?.name) || alphaFirstCompare(surgeryById(a.surgeryId)?.name, surgeryById(b.surgeryId)?.name)).map(ruleItem).join("") || `<div class="empty">등록된 규칙이 없습니다.</div>`}
+          <div class="usage-rule-tools" aria-label="수술별 사용관리 목록 찾기">
+            <div class="usage-rule-summary">
+              <span><strong>${rules.length}</strong>등록 규칙</span>
+              <span><strong>${departmentCount}</strong>과 분류</span>
+              <span><strong>${productCount}</strong>추천 수량 합계</span>
+            </div>
+            <div class="usage-rule-filter-row">
+              <input id="usageRuleSearch" type="search" autocomplete="off" placeholder="과·원장코드·수술명·제품명으로 검색">
+              <select id="usageRuleDepartmentFilter">
+                <option value="">전체 과</option>
+                ${[...new Set(rules.map((rule) => rule.department || "미분류"))].sort(departmentCompare).map((department) => `<option value="${escapeHtml(department)}">${escapeHtml(department)}</option>`).join("")}
+              </select>
+              <button class="secondary" type="button" id="usageRuleClearFilter">초기화</button>
+            </div>
+          </div>
+          <p class="usage-rule-help">목록은 과별로 접어서 정리했고, 검색어를 입력하면 해당 과·원장코드·수술·제품이 들어간 규칙만 바로 남습니다. 수정 버튼을 누르면 왼쪽 입력 폼으로 이동합니다.</p>
+          <div id="usageRuleFilterEmpty" class="empty" hidden>검색 조건에 맞는 규칙이 없습니다.</div>
+          <div id="usageRuleList" class="usage-rule-list">
+            ${renderUsageRuleGroups(rules)}
+          </div>
         </div>
       </section>
     `;
+    };
 
     const ruleItems = (rule) => Array.isArray(rule.items)
       ? rule.items
@@ -3163,24 +3267,104 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       </label>
     `;
 
+    const sortedUsageRules = () => state.usageRules.slice().sort((a, b) =>
+      departmentCompare(a.department || "", b.department || "") ||
+      alphaFirstCompare(departmentById(a.doctorId)?.name, departmentById(b.doctorId)?.name) ||
+      alphaFirstCompare(surgeryById(a.surgeryId)?.name, surgeryById(b.surgeryId)?.name)
+    );
+
+    const usageRuleSearchText = (rule) => {
+      const doctor = departmentById(rule.doctorId);
+      const surgery = surgeryById(rule.surgeryId);
+      const itemText = ruleItems(rule).map((item) => {
+        const product = productById(item.productId);
+        return [product?.name, productCategoryLabel(product?.category), product?.company, product?.subcategory, item.qty].filter(Boolean).join(" ");
+      }).join(" ");
+      return normalizedName([rule.department, doctor?.name, surgery?.department, surgery?.name, itemText].filter(Boolean).join(" "));
+    };
+
+    const renderUsageRuleGroups = (rules) => {
+      if (!rules.length) return `<div class="empty">등록된 규칙이 없습니다.</div>`;
+      const grouped = rules.reduce((map, rule) => {
+        const department = rule.department || "미분류";
+        if (!map.has(department)) map.set(department, []);
+        map.get(department).push(rule);
+        return map;
+      }, new Map());
+      return [...grouped.entries()].map(([department, items]) => `
+        <details class="item usage-rule-group" data-rule-group="${escapeHtml(department)}" open>
+          <summary><span>${escapeHtml(department)} 수술별 사용관리</span><span class="pill" data-rule-group-count>${items.length}</span></summary>
+          <div class="usage-rule-group-body">
+            ${items.map(ruleItem).join("")}
+          </div>
+        </details>
+      `).join("");
+    };
+
     const ruleItem = (rule) => {
       const doctor = departmentById(rule.doctorId);
       const surgery = surgeryById(rule.surgeryId);
       const items = ruleItems(rule);
-      const names = items.map((item) => `${productById(item.productId)?.name || "삭제된 제품"} ${num(item.qty) || 1}개`).join(", ");
+      const productChips = items.map((item) => {
+        const product = productById(item.productId);
+        return `<span class="usage-rule-product-chip">${escapeHtml(product?.name || "삭제된 제품")} · ${Math.max(1, num(item.qty))}개</span>`;
+      }).join("");
+      const totalQty = items.reduce((sum, item) => sum + Math.max(1, num(item.qty)), 0);
       return `
-        <div class="item">
+        <div class="item usage-rule-card" data-rule-card data-rule-department="${escapeHtml(rule.department || "미분류")}" data-rule-search="${escapeHtml(usageRuleSearchText(rule))}">
           <div class="item-title">
-            <span>${escapeHtml(rule.department)} · ${escapeHtml(doctor?.name || "-")} · ${escapeHtml(surgery?.name || "-")}</span>
-            <span class="pill">추천</span>
+            <span>${escapeHtml(rule.department || "-")} · ${escapeHtml(doctor?.name || "-")} · ${escapeHtml(surgery?.name || "-")}</span>
+            <span class="pill">${items.length}종 / ${totalQty}개</span>
           </div>
-          <div class="meta"><span>추천 항목: ${escapeHtml(names || "-")}</span></div>
+          <div class="meta">
+            <span>수술: ${escapeHtml(surgery?.department || rule.department || "-")} - ${escapeHtml(surgery?.name || "-")}</span>
+            <span>원장코드: ${escapeHtml(doctor?.name || "-")}</span>
+          </div>
+          <div class="usage-rule-products">${productChips || `<span class="usage-rule-product-chip">추천 항목 없음</span>`}</div>
           <div class="actions">
             <button class="secondary" type="button" data-edit-rule="${rule.id}">수정</button>
             <button class="danger" type="button" data-delete-rule="${rule.id}">삭제</button>
           </div>
         </div>
       `;
+    };
+
+    const bindUsageRuleListFilters = () => {
+      const search = document.getElementById("usageRuleSearch");
+      const departmentFilter = document.getElementById("usageRuleDepartmentFilter");
+      const clear = document.getElementById("usageRuleClearFilter");
+      const empty = document.getElementById("usageRuleFilterEmpty");
+      if (!search || !departmentFilter) return;
+      const apply = () => {
+        const query = normalizedName(search.value);
+        const department = departmentFilter.value;
+        let visibleTotal = 0;
+        app.querySelectorAll("[data-rule-group]").forEach((group) => {
+          let groupVisible = 0;
+          group.querySelectorAll("[data-rule-card]").forEach((card) => {
+            const matchesDepartment = !department || card.dataset.ruleDepartment === department;
+            const matchesQuery = !query || (card.dataset.ruleSearch || "").includes(query);
+            const visible = matchesDepartment && matchesQuery;
+            card.hidden = !visible;
+            if (visible) groupVisible += 1;
+          });
+          group.hidden = groupVisible === 0;
+          const count = group.querySelector("[data-rule-group-count]");
+          if (count) count.textContent = groupVisible;
+          if (groupVisible > 0 && (query || department)) group.open = true;
+          visibleTotal += groupVisible;
+        });
+        if (empty) empty.hidden = visibleTotal > 0 || !state.usageRules.length;
+      };
+      search.addEventListener("input", apply);
+      departmentFilter.addEventListener("change", apply);
+      clear?.addEventListener("click", () => {
+        search.value = "";
+        departmentFilter.value = "";
+        apply();
+        search.focus();
+      });
+      apply();
     };
 
     const bindUsageRules = () => {
@@ -3206,6 +3390,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           .join("");
         if (surgeries.some((item) => item.id === currentSurgery)) surgerySelect.value = currentSurgery;
       };
+      bindUsageRuleListFilters();
       document.getElementById("ruleDepartment").addEventListener("change", filterRuleOptions);
       document.getElementById("ruleDoctor").addEventListener("change", filterRuleOptions);
       document.getElementById("usageRuleReset").addEventListener("click", () => {
