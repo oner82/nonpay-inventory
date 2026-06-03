@@ -3219,7 +3219,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               <span><strong>${productCount}</strong>추천 수량 합계</span>
             </div>
             <div class="usage-rule-filter-row">
-              <input id="usageRuleSearch" type="search" autocomplete="off" placeholder="원장코드·수술명·제품명으로 검색">
+              <select id="usageRuleSearchSelect" aria-label="원장코드·수술명·제품명 선택 검색">
+                <option value="">전체 원장·수술·제품</option>
+                ${usageRuleSearchOptions(rules)}
+              </select>
               <select id="usageRuleDepartmentFilter">
                 <option value="">전체 과</option>
                 ${[...new Set(rules.map((rule) => rule.department || "미분류"))].sort(departmentCompare).map((department) => `<option value="${escapeHtml(department)}">${escapeHtml(department)}</option>`).join("")}
@@ -3227,7 +3230,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               <button class="secondary" type="button" id="usageRuleClearFilter">초기화</button>
             </div>
           </div>
-          <p class="usage-rule-help">목록은 과별로 접어서 정리했고, 검색어를 입력하면 해당 원장코드·수술·제품이 들어간 규칙만 바로 남습니다. 수정 버튼을 누르면 왼쪽 입력 폼으로 이동합니다.</p>
+          <p class="usage-rule-help">목록은 과별로 접어서 정리했고, 원장코드·수술·제품을 선택하면 해당 항목이 들어간 규칙만 바로 남습니다. 수정 버튼을 누르면 왼쪽 입력 폼으로 이동합니다.</p>
           <div id="usageRuleFilterEmpty" class="empty" hidden>검색 조건에 맞는 규칙이 없습니다.</div>
           <div id="usageRuleList" class="usage-rule-list">
             ${renderUsageRuleGroups(rules)}
@@ -3284,6 +3287,42 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       return normalizedName([rule.department, doctor?.name, surgery?.department, surgery?.name, itemText].filter(Boolean).join(" "));
     };
 
+    const usageRuleSearchOptions = (rules) => {
+      const groups = {
+        rule: new Map(),
+        doctor: new Map(),
+        surgery: new Map(),
+        product: new Map()
+      };
+      const addOption = (group, label, searchText = label) => {
+        const normalized = normalizedName(searchText);
+        if (!normalized || groups[group].has(normalized)) return;
+        groups[group].set(normalized, label);
+      };
+      rules.forEach((rule) => {
+        const doctor = departmentById(rule.doctorId);
+        const surgery = surgeryById(rule.surgeryId);
+        if (doctor?.name && surgery?.name) addOption("rule", `${doctor.name} · ${surgery.name}`, `${doctor.name} ${surgery.name}`);
+        if (doctor?.name) addOption("doctor", doctor.name);
+        if (surgery?.name) addOption("surgery", surgery.name);
+        ruleItems(rule).forEach((item) => {
+          const product = productById(item.productId);
+          if (product?.name) addOption("product", product.name);
+        });
+      });
+      const renderGroup = (label, options) => {
+        const sortedOptions = [...options.entries()].sort((a, b) => alphaFirstCompare(a[1], b[1]));
+        if (!sortedOptions.length) return "";
+        return `<optgroup label="${escapeHtml(label)}">${sortedOptions.map(([value, labelText]) => `<option value="${escapeHtml(value)}">${escapeHtml(labelText)}</option>`).join("")}</optgroup>`;
+      };
+      return [
+        renderGroup("규칙", groups.rule),
+        renderGroup("원장코드", groups.doctor),
+        renderGroup("수술", groups.surgery),
+        renderGroup("제품", groups.product)
+      ].join("");
+    };
+
     const renderUsageRuleGroups = (rules) => {
       if (!rules.length) return `<div class="empty">등록된 규칙이 없습니다.</div>`;
       const grouped = rules.reduce((map, rule) => {
@@ -3331,13 +3370,13 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
 
     const bindUsageRuleListFilters = () => {
-      const search = document.getElementById("usageRuleSearch");
+      const searchSelect = document.getElementById("usageRuleSearchSelect");
       const departmentFilter = document.getElementById("usageRuleDepartmentFilter");
       const clear = document.getElementById("usageRuleClearFilter");
       const empty = document.getElementById("usageRuleFilterEmpty");
-      if (!search || !departmentFilter) return;
+      if (!searchSelect || !departmentFilter) return;
       const apply = () => {
-        const query = normalizedName(search.value);
+        const query = searchSelect.value;
         const department = departmentFilter.value;
         let visibleTotal = 0;
         app.querySelectorAll("[data-rule-group]").forEach((group) => {
@@ -3357,13 +3396,13 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         });
         if (empty) empty.hidden = visibleTotal > 0 || !state.usageRules.length;
       };
-      search.addEventListener("input", apply);
+      searchSelect.addEventListener("change", apply);
       departmentFilter.addEventListener("change", apply);
       clear?.addEventListener("click", () => {
-        search.value = "";
+        searchSelect.value = "";
         departmentFilter.value = "";
         apply();
-        search.focus();
+        searchSelect.focus();
       });
       apply();
     };
