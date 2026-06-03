@@ -2285,9 +2285,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           if (!rule) return;
           document.getElementById("usageRuleFormTitle").textContent = "수술별 사용관리 수정";
           document.getElementById("usageRuleId").value = rule.id;
-          document.getElementById("ruleDepartment").value = rule.department;
-          filterRuleOptions?.();
           document.getElementById("ruleDoctor").value = rule.doctorId;
+          filterRuleOptions?.("doctor");
+          document.getElementById("ruleDepartment").value = rule.department || document.getElementById("ruleDepartment").value;
           filterRuleOptions?.();
           document.getElementById("ruleSurgery").value = rule.surgeryId;
           const items = ruleItems(rule);
@@ -3185,16 +3185,17 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         <form class="card" id="usageRuleForm">
           <h2 id="usageRuleFormTitle">수술별 사용관리 추가</h2>
           <input type="hidden" id="usageRuleId">
-          <label for="ruleDepartment">과</label>
-          <select id="ruleDepartment" required>
-            <option value="">과 선택</option>
-            ${departmentNames().map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}
-          </select>
           <label for="ruleDoctor">원장코드</label>
           <select id="ruleDoctor" required>
             <option value="">원장코드 선택</option>
             ${state.doctors.slice().sort(byName).map((item) => `<option value="${item.id}" data-department="${escapeHtml(departmentCode(item.name))}">${escapeHtml(item.name)}</option>`).join("")}
           </select>
+          <label for="ruleDepartment">과</label>
+          <select id="ruleDepartment" required>
+            <option value="">원장코드를 선택하면 과가 자동 선택됩니다</option>
+            ${departmentNames().map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}
+          </select>
+          <div class="muted">원장코드 앞 글자로 과를 먼저 맞춘 뒤 필요하면 과를 직접 바꿀 수 있습니다.</div>
           <label for="ruleSurgery">수술</label>
           <select id="ruleSurgery" required>
             <option value="">수술 선택</option>
@@ -3218,7 +3219,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               <span><strong>${productCount}</strong>추천 수량 합계</span>
             </div>
             <div class="usage-rule-filter-row">
-              <input id="usageRuleSearch" type="search" autocomplete="off" placeholder="과·원장코드·수술명·제품명으로 검색">
+              <input id="usageRuleSearch" type="search" autocomplete="off" placeholder="원장코드·수술명·제품명으로 검색">
               <select id="usageRuleDepartmentFilter">
                 <option value="">전체 과</option>
                 ${[...new Set(rules.map((rule) => rule.department || "미분류"))].sort(departmentCompare).map((department) => `<option value="${escapeHtml(department)}">${escapeHtml(department)}</option>`).join("")}
@@ -3226,7 +3227,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               <button class="secondary" type="button" id="usageRuleClearFilter">초기화</button>
             </div>
           </div>
-          <p class="usage-rule-help">목록은 과별로 접어서 정리했고, 검색어를 입력하면 해당 과·원장코드·수술·제품이 들어간 규칙만 바로 남습니다. 수정 버튼을 누르면 왼쪽 입력 폼으로 이동합니다.</p>
+          <p class="usage-rule-help">목록은 과별로 접어서 정리했고, 검색어를 입력하면 해당 원장코드·수술·제품이 들어간 규칙만 바로 남습니다. 수정 버튼을 누르면 왼쪽 입력 폼으로 이동합니다.</p>
           <div id="usageRuleFilterEmpty" class="empty" hidden>검색 조건에 맞는 규칙이 없습니다.</div>
           <div id="usageRuleList" class="usage-rule-list">
             ${renderUsageRuleGroups(rules)}
@@ -3313,11 +3314,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       return `
         <div class="item usage-rule-card" data-rule-card data-rule-department="${escapeHtml(rule.department || "미분류")}" data-rule-search="${escapeHtml(usageRuleSearchText(rule))}">
           <div class="item-title">
-            <span>${escapeHtml(rule.department || "-")} · ${escapeHtml(doctor?.name || "-")} · ${escapeHtml(surgery?.name || "-")}</span>
+            <span>${escapeHtml(doctor?.name || "-")} · ${escapeHtml(surgery?.name || "-")}</span>
             <span class="pill">${items.length}종 / ${totalQty}개</span>
           </div>
           <div class="meta">
-            <span>수술: ${escapeHtml(surgery?.department || rule.department || "-")} - ${escapeHtml(surgery?.name || "-")}</span>
+            <span>수술: ${escapeHtml(surgery?.name || "-")}</span>
             <span>원장코드: ${escapeHtml(doctor?.name || "-")}</span>
           </div>
           <div class="usage-rule-products">${productChips || `<span class="usage-rule-product-chip">추천 항목 없음</span>`}</div>
@@ -3369,30 +3370,42 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
     const bindUsageRules = () => {
       const form = document.getElementById("usageRuleForm");
-      filterRuleOptions = () => {
-        const department = document.getElementById("ruleDepartment").value;
+      filterRuleOptions = (source = "") => {
+        const departmentSelect = document.getElementById("ruleDepartment");
         const doctorSelect = document.getElementById("ruleDoctor");
         const surgerySelect = document.getElementById("ruleSurgery");
-        const currentDoctor = doctorSelect.value;
+        let department = departmentSelect.value;
+        let currentDoctor = doctorSelect.value;
         const currentSurgery = surgerySelect.value;
-        const doctors = department
-          ? state.doctors.slice().sort(byName).filter((item) => departmentCode(item.name) === department)
-          : [];
-        doctorSelect.innerHTML = `<option value="">${department ? "원장코드 선택" : "과를 먼저 선택하세요"}</option>` + doctors
-          .map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`)
+        const selectedDoctor = state.doctors.find((item) => item.id === currentDoctor);
+        const inferredDepartment = selectedDoctor ? departmentCode(selectedDoctor.name) : "";
+        if (source === "doctor" && inferredDepartment) {
+          department = inferredDepartment;
+          departmentSelect.value = inferredDepartment;
+        }
+        if (source === "department" && currentDoctor && inferredDepartment !== department) {
+          currentDoctor = "";
+        }
+        const doctors = state.doctors.slice().sort(byName).filter((item) => !department || departmentCode(item.name) === department);
+        doctorSelect.innerHTML = `<option value="">원장코드 선택</option>` + doctors
+          .map((item) => `<option value="${item.id}" data-department="${escapeHtml(departmentCode(item.name))}">${escapeHtml(item.name)}</option>`)
           .join("");
-        if (doctors.some((item) => item.id === currentDoctor)) doctorSelect.value = currentDoctor;
-        const surgeries = department && doctorSelect.value
+        if (doctors.some((item) => item.id === currentDoctor)) {
+          doctorSelect.value = currentDoctor;
+        } else {
+          currentDoctor = "";
+        }
+        const surgeries = department
           ? state.surgeries.slice().sort((a, b) => alphaFirstCompare(a.name, b.name)).filter((item) => (item.department || inferSurgeryDepartment(item.name)) === department)
           : [];
-        surgerySelect.innerHTML = `<option value="">${department && doctorSelect.value ? "수술 선택" : "원장코드를 먼저 선택하세요"}</option>` + surgeries
-          .map((item) => `<option value="${item.id}">${escapeHtml(item.department || inferSurgeryDepartment(item.name))} - ${escapeHtml(item.name)}</option>`)
+        surgerySelect.innerHTML = `<option value="">${department ? "수술 선택" : "원장코드를 먼저 선택하세요"}</option>` + surgeries
+          .map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`)
           .join("");
         if (surgeries.some((item) => item.id === currentSurgery)) surgerySelect.value = currentSurgery;
       };
       bindUsageRuleListFilters();
-      document.getElementById("ruleDepartment").addEventListener("change", filterRuleOptions);
-      document.getElementById("ruleDoctor").addEventListener("change", filterRuleOptions);
+      document.getElementById("ruleDepartment").addEventListener("change", () => filterRuleOptions("department"));
+      document.getElementById("ruleDoctor").addEventListener("change", () => filterRuleOptions("doctor"));
       document.getElementById("usageRuleReset").addEventListener("click", () => {
         form.reset();
         document.getElementById("usageRuleId").value = "";
