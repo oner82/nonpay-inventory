@@ -2302,10 +2302,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           if (!rule) return;
           document.getElementById("usageRuleFormTitle").textContent = "수술별 사용관리 수정";
           document.getElementById("usageRuleId").value = rule.id;
+          document.getElementById("ruleDepartment").value = rule.department || departmentCode(departmentById(rule.doctorId)?.name || "") || document.getElementById("ruleDepartment").value;
+          filterRuleOptions?.("department");
           document.getElementById("ruleDoctor").value = rule.doctorId;
           filterRuleOptions?.("doctor");
-          document.getElementById("ruleDepartment").value = rule.department || document.getElementById("ruleDepartment").value;
-          filterRuleOptions?.();
           document.getElementById("ruleSurgery").value = rule.surgeryId;
           const items = ruleItems(rule);
           app.querySelectorAll("[data-rule-product]").forEach((input) => {
@@ -3251,17 +3251,16 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         <form class="card" id="usageRuleForm">
           <h2 id="usageRuleFormTitle">수술별 사용관리 추가</h2>
           <input type="hidden" id="usageRuleId">
-          <label for="ruleDoctor">원장코드</label>
-          <select id="ruleDoctor" required>
-            <option value="">원장코드 선택</option>
-            ${state.doctors.slice().sort(byName).map((item) => `<option value="${item.id}" data-department="${escapeHtml(departmentCode(item.name))}">${escapeHtml(item.name)}</option>`).join("")}
-          </select>
           <label for="ruleDepartment">과</label>
           <select id="ruleDepartment" required>
-            <option value="">원장코드를 선택하면 과가 자동 선택됩니다</option>
+            <option value="">과 선택</option>
             ${departmentNames().map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}
           </select>
-          <div class="muted">원장코드 앞 글자로 과를 먼저 맞춘 뒤 필요하면 과를 직접 바꿀 수 있습니다.</div>
+          <label for="ruleDoctor">원장코드</label>
+          <select id="ruleDoctor" required>
+            <option value="">과를 먼저 선택하세요</option>
+          </select>
+          <div class="muted">과를 먼저 선택하면 해당 과 원장코드만 표시되고, 원장코드 선택 후 등록 가능한 수술이 표시됩니다.</div>
           <label for="ruleSurgery">수술</label>
           <select id="ruleSurgery" required>
             <option value="">수술 선택</option>
@@ -3285,21 +3284,20 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               <span><strong>${productCount}</strong>추천 수량 합계</span>
             </div>
             <div class="usage-rule-filter-row">
-              <select id="usageRuleDoctorFilter" aria-label="원장코드별 목록 검색">
-                <option value="">전체 원장코드</option>
-                ${usageRuleDoctorOptions()}
-              </select>
-              <select id="usageRuleSurgeryFilter" aria-label="선택 원장코드의 수술별 목록 검색">
-                <option value="">원장코드를 선택하면 수술이 표시됩니다</option>
-              </select>
               <select id="usageRuleDepartmentFilter" aria-label="과별 목록 검색">
                 <option value="">전체 과</option>
                 ${[...new Set(rules.map((rule) => rule.department || "미분류"))].sort(departmentCompare).map((department) => `<option value="${escapeHtml(department)}">${escapeHtml(department)}</option>`).join("")}
               </select>
+              <select id="usageRuleDoctorFilter" aria-label="선택 과의 원장코드별 목록 검색">
+                <option value="">과를 먼저 선택하세요</option>
+              </select>
+              <select id="usageRuleSurgeryFilter" aria-label="선택 원장코드의 수술별 목록 검색">
+                <option value="">원장코드를 선택하면 수술이 표시됩니다</option>
+              </select>
               <button class="secondary" type="button" id="usageRuleClearFilter">초기화</button>
             </div>
           </div>
-          <p class="usage-rule-help">목록은 과별로 접어서 정리했고, 원장코드를 먼저 고른 뒤 해당 원장에게 등록된 수술만 두 번째 드롭박스에 표시됩니다. 왼쪽 추가 폼에서 원장코드를 선택해도 오른쪽 관련 카드가 즉시 필터링됩니다.</p>
+          <p class="usage-rule-help">목록은 과별로 접어서 정리했고, 과를 먼저 고른 뒤 해당 과 원장코드와 원장에게 등록된 수술만 순서대로 표시됩니다. 왼쪽 추가 폼에서 과/원장코드를 선택해도 오른쪽 관련 카드가 즉시 필터링됩니다.</p>
           <div id="usageRuleFilterEmpty" class="empty" hidden>검색 조건에 맞는 규칙이 없습니다.</div>
           <div id="usageRuleList" class="usage-rule-list">
             ${renderUsageRuleGroups(rules)}
@@ -3356,22 +3354,28 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       return normalizedName([rule.department, doctor?.name, surgery?.department, surgery?.name, itemText].filter(Boolean).join(" "));
     };
 
-    const usageRuleDoctorOptions = () => state.doctors
-      .slice()
-      .sort(byName)
-      .map((doctor) => `<option value="${escapeHtml(doctor.id)}">${escapeHtml(doctor.name)}</option>`)
-      .join("");
+    const usageRuleDoctorOptions = (department = "", rules = state.usageRules) => {
+      const allowedDoctorIds = department
+        ? new Set(rules.filter((rule) => (rule.department || "미분류") === department).map((rule) => String(rule.doctorId || "")))
+        : null;
+      return state.doctors
+        .slice()
+        .sort(byName)
+        .filter((doctor) => (!department || departmentCode(doctor.name) === department) && (!allowedDoctorIds || allowedDoctorIds.has(String(doctor.id))))
+        .map((doctor) => `<option value="${escapeHtml(doctor.id)}">${escapeHtml(doctor.name)}</option>`)
+        .join("");
+    };
 
-    const usageRuleSurgeryOptions = (rules, doctorId = "") => {
+    const usageRuleSurgeryOptions = (rules, doctorId = "", department = "") => {
       if (!doctorId) return "";
       const surgeries = new Map();
       rules
-        .filter((rule) => sameId(rule.doctorId, doctorId))
+        .filter((rule) => sameId(rule.doctorId, doctorId) && (!department || (rule.department || "미분류") === department))
         .forEach((rule) => {
           const surgery = surgeryById(rule.surgeryId);
           if (!surgery?.name || surgeries.has(String(rule.surgeryId))) return;
-          const department = surgery.department || inferSurgeryDepartment(surgery.name) || "미분류";
-          surgeries.set(String(rule.surgeryId), `${department} - ${surgery.name}`);
+          const surgeryDepartment = surgery.department || inferSurgeryDepartment(surgery.name) || rule.department || "미분류";
+          surgeries.set(String(rule.surgeryId), `${surgeryDepartment} - ${surgery.name}`);
         });
       return [...surgeries.entries()]
         .sort((a, b) => alphaFirstCompare(a[1], b[1]))
@@ -3433,10 +3437,21 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const empty = document.getElementById("usageRuleFilterEmpty");
       if (!doctorFilter || !surgeryFilter || !departmentFilter) return;
       const rules = sortedUsageRules();
+      const syncDoctorFilter = () => {
+        const department = departmentFilter.value;
+        const currentDoctor = doctorFilter.value;
+        const options = department ? usageRuleDoctorOptions(department, rules) : "";
+        doctorFilter.innerHTML = `<option value="">${department ? "전체 원장코드" : "과를 먼저 선택하세요"}</option>${options}`;
+        if (currentDoctor && Array.from(doctorFilter.options).some((option) => option.value === currentDoctor)) {
+          doctorFilter.value = currentDoctor;
+        }
+        doctorFilter.disabled = !department;
+      };
       const syncSurgeryFilter = () => {
         const currentSurgery = surgeryFilter.value;
+        const department = departmentFilter.value;
         const doctorId = doctorFilter.value;
-        const options = usageRuleSurgeryOptions(rules, doctorId);
+        const options = usageRuleSurgeryOptions(rules, doctorId, department);
         surgeryFilter.innerHTML = `<option value="">${doctorId ? "전체 수술" : "원장코드를 선택하면 수술이 표시됩니다"}</option>${options}`;
         if (currentSurgery && Array.from(surgeryFilter.options).some((option) => option.value === currentSurgery)) {
           surgeryFilter.value = currentSurgery;
@@ -3466,9 +3481,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         });
         if (empty) empty.hidden = visibleTotal > 0 || !state.usageRules.length;
       };
-      const applyExternalSelection = (doctorId = "", surgeryId = "") => {
-        doctorFilter.value = Array.from(doctorFilter.options).some((option) => option.value === String(doctorId)) ? String(doctorId) : "";
-        departmentFilter.value = "";
+      const applyExternalSelection = (department = "", doctorId = "", surgeryId = "") => {
+        departmentFilter.value = Array.from(departmentFilter.options).some((option) => option.value === String(department)) ? String(department) : "";
+        syncDoctorFilter();
+        doctorFilter.value = doctorId && Array.from(doctorFilter.options).some((option) => option.value === String(doctorId)) ? String(doctorId) : "";
         syncSurgeryFilter();
         surgeryFilter.value = surgeryId && Array.from(surgeryFilter.options).some((option) => option.value === String(surgeryId)) ? String(surgeryId) : "";
         apply();
@@ -3479,14 +3495,19 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         apply();
       });
       surgeryFilter.addEventListener("change", apply);
-      departmentFilter.addEventListener("change", apply);
-      clear?.addEventListener("click", () => {
-        doctorFilter.value = "";
-        departmentFilter.value = "";
+      departmentFilter.addEventListener("change", () => {
+        syncDoctorFilter();
         syncSurgeryFilter();
         apply();
-        doctorFilter.focus();
       });
+      clear?.addEventListener("click", () => {
+        departmentFilter.value = "";
+        syncDoctorFilter();
+        syncSurgeryFilter();
+        apply();
+        departmentFilter.focus();
+      });
+      syncDoctorFilter();
       syncSurgeryFilter();
       apply();
     };
@@ -3502,17 +3523,16 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const currentSurgery = surgerySelect.value;
         const selectedDoctor = state.doctors.find((item) => item.id === currentDoctor);
         const inferredDepartment = selectedDoctor ? departmentCode(selectedDoctor.name) : "";
-        if (source === "doctor" && inferredDepartment) {
-          department = inferredDepartment;
-          departmentSelect.value = inferredDepartment;
-        }
-        if (source === "department" && currentDoctor && inferredDepartment !== department) {
+        if (currentDoctor && inferredDepartment !== department) {
           currentDoctor = "";
         }
-        const doctors = state.doctors.slice().sort(byName).filter((item) => !department || departmentCode(item.name) === department);
-        doctorSelect.innerHTML = `<option value="">원장코드 선택</option>` + doctors
+        const doctors = department
+          ? state.doctors.slice().sort(byName).filter((item) => departmentCode(item.name) === department)
+          : [];
+        doctorSelect.innerHTML = `<option value="">${department ? "원장코드 선택" : "과를 먼저 선택하세요"}</option>` + doctors
           .map((item) => `<option value="${item.id}" data-department="${escapeHtml(departmentCode(item.name))}">${escapeHtml(item.name)}</option>`)
           .join("");
+        doctorSelect.disabled = !department;
         if (doctors.some((item) => item.id === currentDoctor)) {
           doctorSelect.value = currentDoctor;
         } else {
@@ -3524,13 +3544,14 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         surgerySelect.innerHTML = `<option value="">${department && currentDoctor ? "수술 선택" : "원장코드를 먼저 선택하세요"}</option>` + surgeries
           .map((item) => `<option value="${item.id}">${escapeHtml(item.name)}${isCommonSurgery(item) ? "" : " · 전용"}</option>`)
           .join("");
+        surgerySelect.disabled = !(department && currentDoctor);
         if (surgeries.some((item) => item.id === currentSurgery)) surgerySelect.value = currentSurgery;
-        usageRuleListFilterFromForm?.(currentDoctor, surgerySelect.value);
+        usageRuleListFilterFromForm?.(department, currentDoctor, surgerySelect.value);
       };
       bindUsageRuleListFilters();
       document.getElementById("ruleDepartment").addEventListener("change", () => filterRuleOptions("department"));
       document.getElementById("ruleDoctor").addEventListener("change", () => filterRuleOptions("doctor"));
-      document.getElementById("ruleSurgery").addEventListener("change", () => usageRuleListFilterFromForm?.(document.getElementById("ruleDoctor").value, document.getElementById("ruleSurgery").value));
+      document.getElementById("ruleSurgery").addEventListener("change", () => usageRuleListFilterFromForm?.(document.getElementById("ruleDepartment").value, document.getElementById("ruleDoctor").value, document.getElementById("ruleSurgery").value));
       document.getElementById("usageRuleReset").addEventListener("click", () => {
         form.reset();
         document.getElementById("usageRuleId").value = "";
