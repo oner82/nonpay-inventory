@@ -292,6 +292,8 @@
     .receipt-history-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
     .receipt-history-name { min-width: 0; font-weight: 950; color: var(--ink); }
     .receipt-history-name span { display: block; color: var(--muted); font-size: 12px; font-weight: 800; margin-top: 3px; }
+    .receipt-role-badge { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border-radius: 999px; background: #fff7ed; color: #c2410c; font-size: 12px; font-weight: 950; white-space: nowrap; }
+    .receipt-safety-note { margin: 0 0 12px; padding: 10px 12px; border: 1px solid #fed7aa; border-radius: 12px; background: #fff7ed; color: #9a3412; font-size: 13px; font-weight: 850; line-height: 1.45; }
     .receipt-history-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
     .receipt-history-meta span { min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: #f8fbff; color: #53647a; font-size: 12px; font-weight: 850; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .receipt-memo { color: var(--muted); font-size: 13px; font-weight: 800; }
@@ -355,6 +357,11 @@
     .check-card.use-card { grid-template-columns: 28px 1fr 82px; }
     .toggle-line { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; cursor: pointer; font-weight: 900; }
     .toggle-line input { width: 24px; min-height: 24px; margin: 0; flex: 0 0 auto; }
+    .doctor-scope-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; margin-top: 8px; }
+    .doctor-scope-option { display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); font-size: 13px; font-weight: 900; }
+    .doctor-scope-option input { width: 20px; min-height: 20px; margin: 0; flex: 0 0 auto; }
+    .doctor-scope-option[hidden] { display: none; }
+    .surgery-scope-note { margin-top: 6px; color: var(--muted); font-size: 12px; font-weight: 850; line-height: 1.45; }
     .empty { padding: 16px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); background: #fff; text-align: center; }
 
 
@@ -386,6 +393,7 @@
       .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .row.two { grid-template-columns: 1fr 1fr; }
       .row.three { grid-template-columns: 1fr 1fr 1fr; }
+      .row.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .quick-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
 
@@ -1193,10 +1201,240 @@
       font-weight: 900;
       border-radius: 8px;
     }
+    .implant-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      width: auto;
+      margin-top: 14px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #f8fbff;
+      color: var(--ink);
+      font-weight: 900;
+    }
+    .implant-toggle input { width: 22px; min-height: 22px; margin: 0; }
+    .implant-panel { display: grid; gap: 12px; margin-top: 12px; }
+    .implant-panel[hidden] { display: none !important; }
+    .implant-vendor-card {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid #bfd7ff;
+      border-left: 5px solid #3b82f6;
+      border-radius: 10px;
+      background: #f8fbff;
+    }
+    .implant-vendor-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+    }
+    .implant-photo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+      gap: 8px;
+    }
+    .implant-photo {
+      display: grid;
+      gap: 6px;
+      padding: 7px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+    .implant-photo img {
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: cover;
+      border-radius: 8px;
+      background: #eef4ff;
+    }
+    .implant-photo-actions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 5px;
+    }
+    .implant-photo-actions button {
+      min-height: 34px;
+      padding: 0 6px;
+      border-radius: 8px;
+      font-size: 12px;
+      box-shadow: none;
+    }
+    .implant-photo-pickers {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .implant-photo-pickers input[type="file"] {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+    .implant-ledger-list { display: grid; gap: 12px; }
+    .implant-record-card {
+      display: grid;
+      gap: 12px;
+      border-left: 5px solid #35b7c6;
+    }
+    .implant-vendor-block {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #f8fafc;
+    }
+    .implant-description {
+      white-space: pre-wrap;
+      line-height: 1.45;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 13px;
+    }
+    .implant-photo-thumb {
+      width: 88px;
+      height: 88px;
+      object-fit: cover;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      cursor: pointer;
+    }
+    .implant-photo-strip { display: flex; flex-wrap: wrap; gap: 8px; }
+    .implant-modal-image {
+      display: block;
+      max-width: min(92vw, 980px);
+      max-height: 82vh;
+      margin: 0 auto;
+      border-radius: 10px;
+      background: #fff;
+    }
+    .implant-vendor-contact-list { display: grid; gap: 10px; }
+    .implant-send-preview {
+      padding: 10px;
+      border: 1px dashed #9bc6ff;
+      border-radius: 10px;
+      background: #f8fbff;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .implant-ledger-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .implant-ledger-table {
+      width: 100%;
+      min-width: 860px;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .implant-ledger-table th,
+    .implant-ledger-table td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    .implant-ledger-table th {
+      background: #f8fbff;
+      color: var(--muted);
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .implant-send-list { display: grid; gap: 10px; }
+    .implant-send-card {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-left: 5px solid #23c483;
+      border-radius: 10px;
+      background: #fbfffd;
+    }
+    .implant-send-text {
+      max-height: 180px;
+      overflow: auto;
+      white-space: pre-wrap;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 12px;
+      color: var(--ink);
+    }
     @media (max-width: 720px) {
       .use-content-head { align-items: flex-start; }
       .selected-use-chip { grid-template-columns: 1fr; width: 100%; }
       .selected-use-controls { justify-content: flex-end; }
+      .implant-vendor-head { align-items: stretch; flex-direction: column; }
+      .implant-photo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .implant-photo-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .implant-photo-thumb { width: 76px; height: 76px; }
+    }
+
+    /* 2026-06-03 edit usage patient list + past record guard */
+    .edit-patient-list {
+      display: grid;
+      gap: 9px;
+      margin-top: 14px;
+    }
+    .edit-patient-card {
+      width: 100%;
+      min-height: 0;
+      padding: 12px 13px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      color: var(--ink);
+      box-shadow: 0 6px 16px rgba(16,35,63,.05);
+      text-align: left;
+      cursor: pointer;
+    }
+    .edit-patient-card:hover,
+    .edit-patient-card.active {
+      border-color: rgba(37, 99, 235, .45);
+      background: #eff6ff;
+    }
+    .edit-patient-card.locked {
+      border-color: #fde68a;
+      background: #fffbeb;
+    }
+    .edit-patient-card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+      font-size: 15px;
+      font-weight: 950;
+    }
+    .edit-patient-card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+      line-height: 1.45;
+    }
+    .edit-lock-note {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: 1px solid #fde68a;
+      border-radius: 12px;
+      background: #fffbeb;
+      color: #92400e;
+      font-size: 13px;
+      font-weight: 900;
+      line-height: 1.45;
     }
 
 
@@ -1257,6 +1495,85 @@
 
   
 
+
+    /* 2026-06-03 수술별 사용관리 목록 검색/분류 */
+    .usage-rule-tools {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #f8fbff;
+    }
+    .usage-rule-summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .usage-rule-summary span {
+      display: grid;
+      gap: 2px;
+      min-height: 58px;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+      align-content: center;
+    }
+    .usage-rule-summary strong {
+      display: block;
+      color: var(--ink);
+      font-size: 19px;
+      line-height: 1;
+      font-weight: 950;
+    }
+    .usage-rule-filter-row {
+      display: grid;
+      grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) minmax(120px, 160px) auto;
+      gap: 8px;
+      align-items: center;
+    }
+    .usage-rule-filter-row input,
+    .usage-rule-filter-row select { min-height: 42px; }
+    .usage-rule-filter-row button { min-height: 42px; box-shadow: none; }
+    .usage-rule-help {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 850;
+      line-height: 1.45;
+    }
+    .usage-rule-list { display: grid; gap: 10px; }
+    details.usage-rule-group { background: #f8fbff; }
+    details.usage-rule-group > summary { background: #fff; }
+    .usage-rule-group-body { display: grid; gap: 10px; padding: 0 12px 12px; }
+    .usage-rule-card { margin-top: 0 !important; border-left: 5px solid #93c5fd; }
+    .usage-rule-card[hidden],
+    .usage-rule-group[hidden] { display: none; }
+    .usage-rule-card .item-title span:first-child { min-width: 0; }
+    .usage-rule-products { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .usage-rule-product-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 8px;
+      border: 1px solid rgba(15,23,42,.08);
+      border-radius: 999px;
+      background: #fff;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 850;
+    }
+    @media (max-width: 720px) {
+      .usage-rule-summary { grid-template-columns: 1fr; }
+      .usage-rule-filter-row { grid-template-columns: 1fr; }
+      .usage-rule-filter-row button { width: 100%; }
+    }
+
     /* 수술별 사용관리 수량 버튼/과-원장-수술 단계 선택 보정 */
     .rule-card .qty-stepper { justify-self: end; }
     select option[disabled] { color: #9ca3af; }
@@ -1292,6 +1609,11 @@
     let runTransaction;
     let onSnapshot;
     let enableIndexedDbPersistence;
+    let collection;
+    let getStorage;
+    let storageRef;
+    let uploadBytes;
+    let getDownloadURL;
 
     const status = document.getElementById("status");
     const nav = document.getElementById("nav");
@@ -1307,13 +1629,15 @@
       ["edit", "수정"],
       ["history", "사용내역"],
       ["receipts", "입고관리"],
+      ["implants", "임플란트"],
       ["settings", "설정"]
     ];
 
     const roleAllowedViews = {
-      admin: ["dashboard", "use", "edit", "history", "receipts", "settings"],
-      manager: ["dashboard", "use", "edit", "history", "receipts"],
-      staff: ["dashboard", "use", "history", "receipts"]
+      admin: ["dashboard", "use", "edit", "history", "receipts", "implants", "settings"],
+      manager: ["dashboard", "use", "edit", "history", "receipts", "implants", "settings"],
+      receiver: ["receipts", "implants"],
+      staff: ["dashboard", "use", "edit", "history", "implants"]
     };
 
     const settingsMenus = [
@@ -1321,6 +1645,7 @@
       ["doctors", "과관리"],
       ["surgeries", "수술관리"],
       ["usageRules", "수술별 사용관리"],
+      ["implantVendors", "임플란트 업체"],
       ["backup", "백업"]
     ];
 
@@ -1496,9 +1821,15 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     let pendingEditUsageId = "";
     let db;
     let ref;
+    let storage;
+    let storageFallback;
     let unsubscribe;
+    let implantRecordsUnsubscribe;
+    let implantVendorsUnsubscribe;
     let hydrated = false;
     let saving = false;
+    let implantRecords = [];
+    let implantVendors = [];
 
     const uid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
     const today = () => {
@@ -1518,6 +1849,14 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     const surgeryById = (id) => state.surgeries.find((item) => item.id === id);
     const sameId = (left, right) => String(left ?? "") === String(right ?? "");
     const usageRuleById = (id) => state.usageRules.find((item) => sameId(item.id, id));
+    const surgeryDoctorIds = (surgery) => Array.isArray(surgery?.doctorIds) ? surgery.doctorIds.filter(Boolean).map(String) : [];
+    const isCommonSurgery = (surgery) => surgeryDoctorIds(surgery).length === 0;
+    const surgeryVisibleForDoctor = (surgery, doctorId) => isCommonSurgery(surgery) || surgeryDoctorIds(surgery).some((id) => sameId(id, doctorId));
+    const visibleSurgeriesFor = (department, doctorId) => state.surgeries
+      .slice()
+      .sort((a, b) => alphaFirstCompare(a.name, b.name))
+      .filter((item) => (item.department || inferSurgeryDepartment(item.name)) === department)
+      .filter((item) => doctorId && surgeryVisibleForDoctor(item, doctorId));
 
     const setStatus = (message, type = "ok") => {
       status.textContent = message;
@@ -1588,9 +1927,18 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     const currentUserRole = () => currentAuditUser()?.role || "";
     const allowedViews = () => new Set(roleAllowedViews[currentUserRole()] || []);
     const canOpenView = (view) => allowedViews().has(view);
-    const canEditUsage = () => ["admin", "manager"].includes(currentUserRole());
+    const canEditUsage = () => ["admin", "manager", "staff"].includes(currentUserRole());
+    const canDeleteUsage = () => ["admin", "manager"].includes(currentUserRole());
+    const isTodayUsage = (usage) => (usage?.date || "") === today();
+    const canModifyUsageRecord = (usage) => canEditUsage() && (isTodayUsage(usage) || currentUserRole() === "admin");
+    const canDeleteUsageRecord = (usage) => canDeleteUsage() && (isTodayUsage(usage) || currentUserRole() === "admin");
+    const usagePastLockMessage = (usage) => isTodayUsage(usage)
+      ? ""
+      : "당일이 아닌 사용내역은 관리자만 수정·삭제할 수 있습니다.";
     const canManageReceipts = () => ["admin", "manager"].includes(currentUserRole());
-    const canManageSettings = () => currentUserRole() === "admin";
+    const canRegisterNonpayReceipts = () => ["admin", "manager", "receiver"].includes(currentUserRole());
+    const canManageLandingReceipts = () => ["admin", "manager"].includes(currentUserRole());
+    const canManageSettings = () => ["admin", "manager"].includes(currentUserRole());
     const authShellUrl = "./auth_shell.html";
 
     const showFramedAuthBlock = (message = "로그인이 필요합니다.") => {
@@ -1667,7 +2015,51 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     const patientDisplayName = (usage) => patientIdText(usage)
       ? `${usage.patientName || ""} (${patientIdText(usage)})`
       : (usage.patientName || "");
-    const auditUserText = (item) => item?.createdByName || item?.createdBy?.name || item?.createdBy?.loginId || "";
+    const canAssignImplantPatientNo = () => ["admin", "manager"].includes(currentUserRole());
+    const canEditImplantPatientNo = () => currentUserRole() === "admin";
+    const activeImplantVendors = () => implantVendors
+      .filter((item) => item.active !== false)
+      .slice()
+      .sort((a, b) => alphaFirstCompare(a.name, b.name));
+    const implantVendorById = (id) => implantVendors.find((item) => sameId(item.id, id));
+    const implantVendorOptions = (selectedId = "") => `
+      <option value="">업체 선택</option>
+      ${activeImplantVendors().map((item) => `<option value="${escapeHtml(item.id)}" ${sameId(item.id, selectedId) ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
+      <option value="__custom__" ${selectedId === "__custom__" ? "selected" : ""}>직접 입력</option>
+    `;
+    const implantRecordDate = (record) => record?.surgeryDate || String(record?.createdAt || "").slice(0, 10) || "";
+    const implantPatientNoText = (record) => String(record?.patientNo || "").trim();
+    const implantPatientNoSortValue = (record) => {
+      const value = Number.parseInt(implantPatientNoText(record), 10);
+      return Number.isFinite(value) && value > 0 ? value : 999999;
+    };
+    const sortImplantRecords = (records) => records.slice().sort((a, b) =>
+      alphaFirstCompare(implantRecordDate(a), implantRecordDate(b)) ||
+      implantPatientNoSortValue(a) - implantPatientNoSortValue(b) ||
+      alphaFirstCompare(a.surgeryTime || "", b.surgeryTime || "") ||
+      alphaFirstCompare(a.createdAt || "", b.createdAt || "")
+    );
+    const auditUserText = (item) => {
+      const roleTokens = new Set(["staff", "receiver", "manager", "admin", "일반사용자", "일반 사용자", "입고담당자", "책임사용자", "책임/입고 담당", "관리자"]);
+      const candidates = [
+        item?.createdByName,
+        item?.createdBy?.name,
+        item?.createdBy?.loginId
+      ];
+      for (const raw of candidates) {
+        const value = String(raw || "").trim();
+        if (!value) continue;
+        if (roleTokens.has(value)) continue;
+        return value;
+      }
+      return "";
+    };
+    const auditRoleLabel = (item) => ({
+      admin: "관리자",
+      manager: "책임사용자",
+      receiver: "입고담당자",
+      staff: "일반사용자"
+    }[item?.createdBy?.role] || item?.createdBy?.role || "");
     const auditTimeText = (item) => formatDateTime(item?.createdAt || item?.updatedAt || item?.date || "");
     const auditMetaHtml = (item, label = "입력") => `
       <span>${label}자: ${escapeHtml(auditUserText(item) || "-")}</span>
@@ -1979,6 +2371,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const views = {
         dashboard: renderDashboard,
         receipts: renderReceipts,
+        implants: renderImplants,
         use: renderUse,
         history: renderHistory,
         edit: renderEditUsage,
@@ -2006,7 +2399,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const editProductBtn = event.target.closest("[data-edit-product]");
         if (editProductBtn) {
           if (!canManageSettings()) {
-            alert("관리자만 수정할 수 있습니다.");
+            alert("관리자와 책임사용자만 수정할 수 있습니다.");
             return;
           }
           const item = productById(editProductBtn.dataset.editProduct);
@@ -2021,14 +2414,14 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           document.getElementById("productWarning").value = num(item.warningStock);
           document.getElementById("productLanding").value = num(item.landingQty);
           syncProductFields?.();
-          window.scrollTo({ top: 0, behavior: "smooth" });
+          document.getElementById("productForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
           return;
         }
 
         const deleteProductBtn = event.target.closest("[data-delete-product]");
         if (deleteProductBtn) {
           if (!canManageSettings()) {
-            alert("관리자만 삭제할 수 있습니다.");
+            alert("관리자와 책임사용자만 삭제할 수 있습니다.");
             return;
           }
           const id = deleteProductBtn.dataset.deleteProduct;
@@ -2046,7 +2439,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const editDoctorBtn = event.target.closest("[data-edit-doctor]");
         if (editDoctorBtn) {
           if (!canManageSettings()) {
-            alert("관리자만 수정할 수 있습니다.");
+            alert("관리자와 책임사용자만 수정할 수 있습니다.");
             return;
           }
           const item = state.doctors.find((entry) => sameId(entry.id, editDoctorBtn.dataset.editDoctor));
@@ -2057,14 +2450,14 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           document.getElementById("doctorDepartment").value = departmentCode(item.name);
           document.getElementById("doctorNewDepartment").value = "";
           document.getElementById("doctorNumber").value = item.name.replace(departmentCode(item.name), "");
-          window.scrollTo({ top: 0, behavior: "smooth" });
+          document.getElementById("doctorForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
           return;
         }
 
         const deleteDoctorBtn = event.target.closest("[data-delete-doctor]");
         if (deleteDoctorBtn) {
           if (!canManageSettings()) {
-            alert("관리자만 삭제할 수 있습니다.");
+            alert("관리자와 책임사용자만 삭제할 수 있습니다.");
             return;
           }
           const id = deleteDoctorBtn.dataset.deleteDoctor;
@@ -2080,7 +2473,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const editSurgeryBtn = event.target.closest("[data-edit-surgery]");
         if (editSurgeryBtn) {
           if (!canManageSettings()) {
-            alert("관리자만 수정할 수 있습니다.");
+            alert("관리자와 책임사용자만 수정할 수 있습니다.");
             return;
           }
           const item = surgeryById(editSurgeryBtn.dataset.editSurgery);
@@ -2089,14 +2482,18 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           document.getElementById("surgeryId").value = item.id;
           document.getElementById("surgeryDepartment").value = item.department || inferSurgeryDepartment(item.name);
           document.getElementById("surgeryName").value = item.name;
-          window.scrollTo({ top: 0, behavior: "smooth" });
+          app.querySelectorAll("[data-surgery-doctor]").forEach((input) => {
+            input.checked = surgeryDoctorIds(item).some((id) => sameId(id, input.value));
+          });
+          syncSurgeryDoctorScope?.();
+          document.getElementById("surgeryForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
           return;
         }
 
         const deleteSurgeryBtn = event.target.closest("[data-delete-surgery]");
         if (deleteSurgeryBtn) {
           if (!canManageSettings()) {
-            alert("관리자만 삭제할 수 있습니다.");
+            alert("관리자와 책임사용자만 삭제할 수 있습니다.");
             return;
           }
           const id = deleteSurgeryBtn.dataset.deleteSurgery;
@@ -2110,16 +2507,17 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const editRuleBtn = event.target.closest("[data-edit-rule]");
         if (editRuleBtn) {
           if (!canManageSettings()) {
-            alert("관리자만 수정할 수 있습니다.");
+            alert("관리자와 책임사용자만 수정할 수 있습니다.");
             return;
           }
           const rule = usageRuleById(editRuleBtn.dataset.editRule);
           if (!rule) return;
           document.getElementById("usageRuleFormTitle").textContent = "수술별 사용관리 수정";
           document.getElementById("usageRuleId").value = rule.id;
-          document.getElementById("ruleDepartment").value = rule.department;
-          filterRuleOptions?.();
+          document.getElementById("ruleDepartment").value = rule.department || departmentCode(departmentById(rule.doctorId)?.name || "") || document.getElementById("ruleDepartment").value;
+          filterRuleOptions?.("department");
           document.getElementById("ruleDoctor").value = rule.doctorId;
+          filterRuleOptions?.("doctor");
           document.getElementById("ruleSurgery").value = rule.surgeryId;
           const items = ruleItems(rule);
           app.querySelectorAll("[data-rule-product]").forEach((input) => {
@@ -2128,14 +2526,14 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             const qtyInput = app.querySelector(`[data-rule-product-qty="${input.value}"]`);
             if (qtyInput) qtyInput.value = item ? Math.max(1, num(item.qty)) : 1;
           });
-          window.scrollTo({ top: 0, behavior: "smooth" });
+          document.getElementById("usageRuleForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
           return;
         }
 
         const deleteRuleBtn = event.target.closest("[data-delete-rule]");
         if (deleteRuleBtn) {
           if (!canManageSettings()) {
-            alert("관리자만 삭제할 수 있습니다.");
+            alert("관리자와 책임사용자만 삭제할 수 있습니다.");
             return;
           }
           if (!confirm("수술별 사용관리 규칙을 삭제할까요?")) return;
@@ -2151,6 +2549,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const handlers = {
         dashboard: bindDashboard,
         receipts: bindReceipts,
+        implants: bindImplants,
         use: bindUse,
         history: bindHistory,
         edit: bindEditUsage,
@@ -2160,12 +2559,13 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
 
     const renderSettings = () => {
-      if (!canManageSettings()) return `<div class="empty">관리자만 설정을 사용할 수 있습니다.</div>`;
+      if (!canManageSettings()) return `<div class="empty">관리자와 책임사용자만 설정을 사용할 수 있습니다.</div>`;
       const views = {
         products: renderProducts,
         doctors: renderDoctors,
         surgeries: renderSurgeries,
         usageRules: renderUsageRules,
+        implantVendors: renderImplantVendors,
         backup: renderBackup
       };
       return `
@@ -2191,6 +2591,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         doctors: bindDoctors,
         surgeries: bindSurgeries,
         usageRules: bindUsageRules,
+        implantVendors: bindImplantVendors,
         backup: bindBackup
       };
       handlers[currentSettingsView]?.();
@@ -2397,7 +2798,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     `;
 
     const renderProducts = () => `
-      ${canManageSettings() ? "" : `<div class="empty">관리자만 제품관리를 사용할 수 있습니다.</div>`}
+      ${canManageSettings() ? "" : `<div class="empty">관리자와 책임사용자만 제품관리를 사용할 수 있습니다.</div>`}
       ${canManageSettings() ? `
       <section class="grid two">
         <form class="card" id="productForm">
@@ -2591,7 +2992,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     `;
 
     let syncProductFields = null;
+    let syncSurgeryDoctorScope = null;
     let filterRuleOptions = null;
+    let usageRuleListFilterFromForm = null;
 
     const bindProducts = () => {
       const form = document.getElementById("productForm");
@@ -2639,6 +3042,20 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
     const renderDoctors = () => renderSimpleManager("doctors", "과", "doctor");
 
+    const renderSurgeryDoctorSelector = () => {
+      if (!state.doctors.length) return `<div class="empty">원장코드를 먼저 추가해 주세요. 원장 미선택 시 공통 수술로 저장됩니다.</div>`;
+      return `
+        <div class="doctor-scope-list" id="surgeryDoctorScopeList">
+          ${state.doctors.slice().sort(byName).map((doctor) => `
+            <label class="doctor-scope-option" data-surgery-doctor-option data-department="${escapeHtml(departmentCode(doctor.name))}">
+              <input type="checkbox" value="${escapeHtml(doctor.id)}" data-surgery-doctor>
+              <span>${escapeHtml(doctor.name)}</span>
+            </label>
+          `).join("")}
+        </div>
+      `;
+    };
+
     const renderSurgeries = () => `
       <section class="grid two">
         <form class="card" id="surgeryForm">
@@ -2651,6 +3068,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           </select>
           <label for="surgeryName">수술명</label>
           <input id="surgeryName" required autocomplete="off">
+          <label>표시 원장코드</label>
+          <div class="surgery-scope-note">아무 원장도 선택하지 않으면 같은 과 모든 원장에게 보이는 공통 수술입니다. 특정 원장을 선택하면 해당 원장 사용입력에서만 보입니다.</div>
+          ${renderSurgeryDoctorSelector()}
           <div class="actions">
             <button type="submit">수술 저장</button>
             <button class="secondary" type="button" id="surgeryReset">새로 입력</button>
@@ -2859,6 +3279,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             const meta = receiptProductMeta(receipt);
             const date = receiptDateValue(receipt);
             const updatedText = receipt.updatedAt ? ` · 수정 ${escapeHtml(formatDateTime(receipt.updatedAt))}${receipt.updatedByName || receipt.updatedBy?.name ? ` / ${escapeHtml(receipt.updatedByName || receipt.updatedBy?.name)}` : ""}` : "";
+            const receiverBadge = receipt.type === "nonpay" && auditRoleLabel(receipt) === "입고담당자"
+              ? `<span class="receipt-role-badge" title="입고담당자가 비급여 입고관리에서 입력한 기록입니다.">입고담당자 입력</span>`
+              : "";
             return `
               <div class="item receipt-history-card" data-receipt-row="${escapeHtml(receipt.id)}">
                 <div class="receipt-history-head">
@@ -2867,6 +3290,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
                     <span>${escapeHtml(meta || "-")}</span>
                   </div>
                   <span class="pill">${num(receipt.qty).toLocaleString()}개</span>
+                  ${receiverBadge}
                 </div>
                 <div class="receipt-history-meta">
                   <span>입고일: ${escapeHtml(date || "-")}</span>
@@ -2913,6 +3337,14 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
     const renderReceiptHistory = () => renderReceiptHistoryList();
 
+    const surgeryScopeText = (surgery) => {
+      const doctorIds = surgeryDoctorIds(surgery);
+      if (!doctorIds.length) return "공통 수술";
+      const names = doctorIds.map((id) => departmentById(id)?.name).filter(Boolean);
+      const missingCount = doctorIds.length - names.length;
+      return `${names.join(", ") || "지정 원장"}${missingCount ? ` 외 ${missingCount}` : ""} 전용`;
+    };
+
     const renderGroupedSurgeries = () => {
       const departments = departmentNames();
       const surgeryDepartments = state.surgeries.map((item) => item.department || inferSurgeryDepartment(item.name));
@@ -2929,7 +3361,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             <div class="details-body">
               ${items.map((item) => `
                 <div class="item">
-                  <div class="item-title"><span>${escapeHtml(item.name)}</span></div>
+                  <div class="item-title">
+                    <span>${escapeHtml(item.name)}</span>
+                    <span class="pill ${isCommonSurgery(item) ? "" : "low"}">${escapeHtml(surgeryScopeText(item))}</span>
+                  </div>
+                  <div class="meta"><span>${escapeHtml(isCommonSurgery(item) ? "같은 과 모든 원장 사용입력에 표시" : "선택한 원장코드 사용입력에만 표시")}</span></div>
                   <div class="actions">
                     <button class="secondary" type="button" data-edit-surgery="${item.id}">수정</button>
                     <button class="danger" type="button" data-delete-surgery="${item.id}">삭제</button>
@@ -2986,24 +3422,46 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     const bindDoctors = () => bindSimpleManager("doctors", "과", "doctor");
     const bindSurgeries = () => {
       const form = document.getElementById("surgeryForm");
+      const departmentSelect = document.getElementById("surgeryDepartment");
+      syncSurgeryDoctorScope = () => {
+        const department = departmentSelect.value;
+        app.querySelectorAll("[data-surgery-doctor-option]").forEach((option) => {
+          const visible = !department || option.dataset.department === department;
+          option.hidden = !visible;
+          const input = option.querySelector("[data-surgery-doctor]");
+          if (input) {
+            input.disabled = !visible;
+            if (!visible) input.checked = false;
+          }
+        });
+      };
+      departmentSelect.addEventListener("change", syncSurgeryDoctorScope);
       document.getElementById("surgeryReset").addEventListener("click", () => {
         form.reset();
         document.getElementById("surgeryId").value = "";
         document.getElementById("surgeryFormTitle").textContent = "수술 추가";
+        syncSurgeryDoctorScope();
       });
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         const id = document.getElementById("surgeryId").value || uid();
+        const previous = surgeryById(id) || {};
         const department = document.getElementById("surgeryDepartment").value;
         const name = document.getElementById("surgeryName").value.trim();
+        const doctorIds = Array.from(form.querySelectorAll("[data-surgery-doctor]:checked:not(:disabled)")).map((input) => input.value);
         if (!department || !name) return;
-        state.surgeries = [...state.surgeries.filter((item) => item.id !== id), { id, department, name }];
+        state.surgeries = [...state.surgeries.filter((item) => item.id !== id), { ...previous, id, department, name, doctorIds }];
         render();
         await saveState();
       });
+      syncSurgeryDoctorScope();
     };
 
-    const renderUsageRules = () => `
+    const renderUsageRules = () => {
+      const rules = sortedUsageRules();
+      const departmentCount = new Set(rules.map((rule) => rule.department || "미분류")).size;
+      const productCount = rules.reduce((sum, rule) => sum + ruleItems(rule).reduce((innerSum, item) => innerSum + Math.max(1, num(item.qty)), 0), 0);
+      return `
       <section class="grid two">
         <form class="card" id="usageRuleForm">
           <h2 id="usageRuleFormTitle">수술별 사용관리 추가</h2>
@@ -3015,9 +3473,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           </select>
           <label for="ruleDoctor">원장코드</label>
           <select id="ruleDoctor" required>
-            <option value="">원장코드 선택</option>
-            ${state.doctors.slice().sort(byName).map((item) => `<option value="${item.id}" data-department="${escapeHtml(departmentCode(item.name))}">${escapeHtml(item.name)}</option>`).join("")}
+            <option value="">과를 먼저 선택하세요</option>
           </select>
+          <div class="muted">과를 먼저 선택하면 해당 과 원장코드만 표시되고, 원장코드 선택 후 등록 가능한 수술이 표시됩니다.</div>
           <label for="ruleSurgery">수술</label>
           <select id="ruleSurgery" required>
             <option value="">수술 선택</option>
@@ -3034,10 +3492,35 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         </form>
         <div class="card">
           <h2>수술별 사용관리 목록</h2>
-          ${state.usageRules.slice().sort((a, b) => alphaFirstCompare(a.department, b.department) || alphaFirstCompare(departmentById(a.doctorId)?.name, departmentById(b.doctorId)?.name) || alphaFirstCompare(surgeryById(a.surgeryId)?.name, surgeryById(b.surgeryId)?.name)).map(ruleItem).join("") || `<div class="empty">등록된 규칙이 없습니다.</div>`}
+          <div class="usage-rule-tools" aria-label="수술별 사용관리 목록 찾기">
+            <div class="usage-rule-summary">
+              <span><strong>${rules.length}</strong>등록 규칙</span>
+              <span><strong>${departmentCount}</strong>과 분류</span>
+              <span><strong>${productCount}</strong>추천 수량 합계</span>
+            </div>
+            <div class="usage-rule-filter-row">
+              <select id="usageRuleDepartmentFilter" aria-label="과별 목록 검색">
+                <option value="">전체 과</option>
+                ${[...new Set(rules.map((rule) => rule.department || "미분류"))].sort(departmentCompare).map((department) => `<option value="${escapeHtml(department)}">${escapeHtml(department)}</option>`).join("")}
+              </select>
+              <select id="usageRuleDoctorFilter" aria-label="선택 과의 원장코드별 목록 검색">
+                <option value="">과를 먼저 선택하세요</option>
+              </select>
+              <select id="usageRuleSurgeryFilter" aria-label="선택 원장코드의 수술별 목록 검색">
+                <option value="">원장코드를 선택하면 수술이 표시됩니다</option>
+              </select>
+              <button class="secondary" type="button" id="usageRuleClearFilter">초기화</button>
+            </div>
+          </div>
+          <p class="usage-rule-help">목록은 과별로 접어서 정리했고, 과를 먼저 고른 뒤 해당 과 원장코드와 원장에게 등록된 수술만 순서대로 표시됩니다. 왼쪽 추가 폼에서 과/원장코드를 선택해도 오른쪽 관련 카드가 즉시 필터링됩니다.</p>
+          <div id="usageRuleFilterEmpty" class="empty" hidden>검색 조건에 맞는 규칙이 없습니다.</div>
+          <div id="usageRuleList" class="usage-rule-list">
+            ${renderUsageRuleGroups(rules)}
+          </div>
         </div>
       </section>
     `;
+    };
 
     const ruleItems = (rule) => Array.isArray(rule.items)
       ? rule.items
@@ -3070,18 +3553,89 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       </label>
     `;
 
+    const sortedUsageRules = () => state.usageRules.slice().sort((a, b) =>
+      departmentCompare(a.department || "", b.department || "") ||
+      alphaFirstCompare(departmentById(a.doctorId)?.name, departmentById(b.doctorId)?.name) ||
+      alphaFirstCompare(surgeryById(a.surgeryId)?.name, surgeryById(b.surgeryId)?.name)
+    );
+
+    const usageRuleSearchText = (rule) => {
+      const doctor = departmentById(rule.doctorId);
+      const surgery = surgeryById(rule.surgeryId);
+      const itemText = ruleItems(rule).map((item) => {
+        const product = productById(item.productId);
+        return [product?.name, productCategoryLabel(product?.category), product?.company, product?.subcategory, item.qty].filter(Boolean).join(" ");
+      }).join(" ");
+      return normalizedName([rule.department, doctor?.name, surgery?.department, surgery?.name, itemText].filter(Boolean).join(" "));
+    };
+
+    const usageRuleDoctorOptions = (department = "", rules = state.usageRules) => {
+      const allowedDoctorIds = department
+        ? new Set(rules.filter((rule) => (rule.department || "미분류") === department).map((rule) => String(rule.doctorId || "")))
+        : null;
+      return state.doctors
+        .slice()
+        .sort(byName)
+        .filter((doctor) => (!department || departmentCode(doctor.name) === department) && (!allowedDoctorIds || allowedDoctorIds.has(String(doctor.id))))
+        .map((doctor) => `<option value="${escapeHtml(doctor.id)}">${escapeHtml(doctor.name)}</option>`)
+        .join("");
+    };
+
+    const usageRuleSurgeryOptions = (rules, doctorId = "", department = "") => {
+      if (!doctorId) return "";
+      const surgeries = new Map();
+      rules
+        .filter((rule) => sameId(rule.doctorId, doctorId) && (!department || (rule.department || "미분류") === department))
+        .forEach((rule) => {
+          const surgery = surgeryById(rule.surgeryId);
+          if (!surgery?.name || surgeries.has(String(rule.surgeryId))) return;
+          const surgeryDepartment = surgery.department || inferSurgeryDepartment(surgery.name) || rule.department || "미분류";
+          surgeries.set(String(rule.surgeryId), `${surgeryDepartment} - ${surgery.name}`);
+        });
+      return [...surgeries.entries()]
+        .sort((a, b) => alphaFirstCompare(a[1], b[1]))
+        .map(([id, name]) => `<option value="${escapeHtml(id)}">${escapeHtml(name)}</option>`)
+        .join("");
+    };
+
+    const renderUsageRuleGroups = (rules) => {
+      if (!rules.length) return `<div class="empty">등록된 규칙이 없습니다.</div>`;
+      const grouped = rules.reduce((map, rule) => {
+        const department = rule.department || "미분류";
+        if (!map.has(department)) map.set(department, []);
+        map.get(department).push(rule);
+        return map;
+      }, new Map());
+      return [...grouped.entries()].map(([department, items]) => `
+        <details class="item usage-rule-group" data-rule-group="${escapeHtml(department)}" open>
+          <summary><span>${escapeHtml(department)} 수술별 사용관리</span><span class="pill" data-rule-group-count>${items.length}</span></summary>
+          <div class="usage-rule-group-body">
+            ${items.map(ruleItem).join("")}
+          </div>
+        </details>
+      `).join("");
+    };
+
     const ruleItem = (rule) => {
       const doctor = departmentById(rule.doctorId);
       const surgery = surgeryById(rule.surgeryId);
       const items = ruleItems(rule);
-      const names = items.map((item) => `${productById(item.productId)?.name || "삭제된 제품"} ${num(item.qty) || 1}개`).join(", ");
+      const productChips = items.map((item) => {
+        const product = productById(item.productId);
+        return `<span class="usage-rule-product-chip">${escapeHtml(product?.name || "삭제된 제품")} · ${Math.max(1, num(item.qty))}개</span>`;
+      }).join("");
+      const totalQty = items.reduce((sum, item) => sum + Math.max(1, num(item.qty)), 0);
       return `
-        <div class="item">
+        <div class="item usage-rule-card" data-rule-card data-rule-department="${escapeHtml(rule.department || "미분류")}" data-rule-doctor="${escapeHtml(rule.doctorId || "")}" data-rule-surgery="${escapeHtml(rule.surgeryId || "")}" data-rule-search="${escapeHtml(usageRuleSearchText(rule))}">
           <div class="item-title">
-            <span>${escapeHtml(rule.department)} · ${escapeHtml(doctor?.name || "-")} · ${escapeHtml(surgery?.name || "-")}</span>
-            <span class="pill">추천</span>
+            <span>${escapeHtml(doctor?.name || "-")} · ${escapeHtml(surgery?.name || "-")}</span>
+            <span class="pill">${items.length}종 / ${totalQty}개</span>
           </div>
-          <div class="meta"><span>추천 항목: ${escapeHtml(names || "-")}</span></div>
+          <div class="meta">
+            <span>수술: ${escapeHtml(surgery?.name || "-")}</span>
+            <span>원장코드: ${escapeHtml(doctor?.name || "-")}</span>
+          </div>
+          <div class="usage-rule-products">${productChips || `<span class="usage-rule-product-chip">추천 항목 없음</span>`}</div>
           <div class="actions">
             <button class="secondary" type="button" data-edit-rule="${rule.id}">수정</button>
             <button class="danger" type="button" data-delete-rule="${rule.id}">삭제</button>
@@ -3090,31 +3644,129 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       `;
     };
 
+    const bindUsageRuleListFilters = () => {
+      const doctorFilter = document.getElementById("usageRuleDoctorFilter");
+      const surgeryFilter = document.getElementById("usageRuleSurgeryFilter");
+      const departmentFilter = document.getElementById("usageRuleDepartmentFilter");
+      const clear = document.getElementById("usageRuleClearFilter");
+      const empty = document.getElementById("usageRuleFilterEmpty");
+      if (!doctorFilter || !surgeryFilter || !departmentFilter) return;
+      const rules = sortedUsageRules();
+      const syncDoctorFilter = () => {
+        const department = departmentFilter.value;
+        const currentDoctor = doctorFilter.value;
+        const options = department ? usageRuleDoctorOptions(department, rules) : "";
+        doctorFilter.innerHTML = `<option value="">${department ? "전체 원장코드" : "과를 먼저 선택하세요"}</option>${options}`;
+        if (currentDoctor && Array.from(doctorFilter.options).some((option) => option.value === currentDoctor)) {
+          doctorFilter.value = currentDoctor;
+        }
+        doctorFilter.disabled = !department;
+      };
+      const syncSurgeryFilter = () => {
+        const currentSurgery = surgeryFilter.value;
+        const department = departmentFilter.value;
+        const doctorId = doctorFilter.value;
+        const options = usageRuleSurgeryOptions(rules, doctorId, department);
+        surgeryFilter.innerHTML = `<option value="">${doctorId ? "전체 수술" : "원장코드를 선택하면 수술이 표시됩니다"}</option>${options}`;
+        if (currentSurgery && Array.from(surgeryFilter.options).some((option) => option.value === currentSurgery)) {
+          surgeryFilter.value = currentSurgery;
+        }
+        surgeryFilter.disabled = !doctorId;
+      };
+      const apply = () => {
+        const doctorId = doctorFilter.value;
+        const surgeryId = surgeryFilter.value;
+        const department = departmentFilter.value;
+        let visibleTotal = 0;
+        app.querySelectorAll("[data-rule-group]").forEach((group) => {
+          let groupVisible = 0;
+          group.querySelectorAll("[data-rule-card]").forEach((card) => {
+            const matchesDepartment = !department || card.dataset.ruleDepartment === department;
+            const matchesDoctor = !doctorId || sameId(card.dataset.ruleDoctor, doctorId);
+            const matchesSurgery = !surgeryId || sameId(card.dataset.ruleSurgery, surgeryId);
+            const visible = matchesDepartment && matchesDoctor && matchesSurgery;
+            card.hidden = !visible;
+            if (visible) groupVisible += 1;
+          });
+          group.hidden = groupVisible === 0;
+          const count = group.querySelector("[data-rule-group-count]");
+          if (count) count.textContent = groupVisible;
+          if (groupVisible > 0 && (doctorId || surgeryId || department)) group.open = true;
+          visibleTotal += groupVisible;
+        });
+        if (empty) empty.hidden = visibleTotal > 0 || !state.usageRules.length;
+      };
+      const applyExternalSelection = (department = "", doctorId = "", surgeryId = "") => {
+        departmentFilter.value = Array.from(departmentFilter.options).some((option) => option.value === String(department)) ? String(department) : "";
+        syncDoctorFilter();
+        doctorFilter.value = doctorId && Array.from(doctorFilter.options).some((option) => option.value === String(doctorId)) ? String(doctorId) : "";
+        syncSurgeryFilter();
+        surgeryFilter.value = surgeryId && Array.from(surgeryFilter.options).some((option) => option.value === String(surgeryId)) ? String(surgeryId) : "";
+        apply();
+      };
+      usageRuleListFilterFromForm = applyExternalSelection;
+      doctorFilter.addEventListener("change", () => {
+        syncSurgeryFilter();
+        apply();
+      });
+      surgeryFilter.addEventListener("change", apply);
+      departmentFilter.addEventListener("change", () => {
+        syncDoctorFilter();
+        syncSurgeryFilter();
+        apply();
+      });
+      clear?.addEventListener("click", () => {
+        departmentFilter.value = "";
+        syncDoctorFilter();
+        syncSurgeryFilter();
+        apply();
+        departmentFilter.focus();
+      });
+      syncDoctorFilter();
+      syncSurgeryFilter();
+      apply();
+    };
+
     const bindUsageRules = () => {
       const form = document.getElementById("usageRuleForm");
-      filterRuleOptions = () => {
-        const department = document.getElementById("ruleDepartment").value;
+      filterRuleOptions = (source = "") => {
+        const departmentSelect = document.getElementById("ruleDepartment");
         const doctorSelect = document.getElementById("ruleDoctor");
         const surgerySelect = document.getElementById("ruleSurgery");
-        const currentDoctor = doctorSelect.value;
+        let department = departmentSelect.value;
+        let currentDoctor = doctorSelect.value;
         const currentSurgery = surgerySelect.value;
+        const selectedDoctor = state.doctors.find((item) => item.id === currentDoctor);
+        const inferredDepartment = selectedDoctor ? departmentCode(selectedDoctor.name) : "";
+        if (currentDoctor && inferredDepartment !== department) {
+          currentDoctor = "";
+        }
         const doctors = department
           ? state.doctors.slice().sort(byName).filter((item) => departmentCode(item.name) === department)
           : [];
         doctorSelect.innerHTML = `<option value="">${department ? "원장코드 선택" : "과를 먼저 선택하세요"}</option>` + doctors
-          .map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`)
+          .map((item) => `<option value="${item.id}" data-department="${escapeHtml(departmentCode(item.name))}">${escapeHtml(item.name)}</option>`)
           .join("");
-        if (doctors.some((item) => item.id === currentDoctor)) doctorSelect.value = currentDoctor;
-        const surgeries = department && doctorSelect.value
-          ? state.surgeries.slice().sort((a, b) => alphaFirstCompare(a.name, b.name)).filter((item) => (item.department || inferSurgeryDepartment(item.name)) === department)
+        doctorSelect.disabled = !department;
+        if (doctors.some((item) => item.id === currentDoctor)) {
+          doctorSelect.value = currentDoctor;
+        } else {
+          currentDoctor = "";
+        }
+        const surgeries = department && currentDoctor
+          ? visibleSurgeriesFor(department, currentDoctor)
           : [];
-        surgerySelect.innerHTML = `<option value="">${department && doctorSelect.value ? "수술 선택" : "원장코드를 먼저 선택하세요"}</option>` + surgeries
-          .map((item) => `<option value="${item.id}">${escapeHtml(item.department || inferSurgeryDepartment(item.name))} - ${escapeHtml(item.name)}</option>`)
+        surgerySelect.innerHTML = `<option value="">${department && currentDoctor ? "수술 선택" : "원장코드를 먼저 선택하세요"}</option>` + surgeries
+          .map((item) => `<option value="${item.id}">${escapeHtml(item.name)}${isCommonSurgery(item) ? "" : " · 전용"}</option>`)
           .join("");
+        surgerySelect.disabled = !(department && currentDoctor);
         if (surgeries.some((item) => item.id === currentSurgery)) surgerySelect.value = currentSurgery;
+        usageRuleListFilterFromForm?.(department, currentDoctor, surgerySelect.value);
       };
-      document.getElementById("ruleDepartment").addEventListener("change", filterRuleOptions);
-      document.getElementById("ruleDoctor").addEventListener("change", filterRuleOptions);
+      bindUsageRuleListFilters();
+      document.getElementById("ruleDepartment").addEventListener("change", () => filterRuleOptions("department"));
+      document.getElementById("ruleDoctor").addEventListener("change", () => filterRuleOptions("doctor"));
+      document.getElementById("ruleSurgery").addEventListener("change", () => usageRuleListFilterFromForm?.(document.getElementById("ruleDepartment").value, document.getElementById("ruleDoctor").value, document.getElementById("ruleSurgery").value));
       document.getElementById("usageRuleReset").addEventListener("click", () => {
         form.reset();
         document.getElementById("usageRuleId").value = "";
@@ -3146,20 +3798,26 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
 
     const renderReceipts = () => {
-      const canEnterReceipts = canManageReceipts();
-      const receiptView = canEnterReceipts ? currentReceiptView : "history";
+      const canEnterReceipts = canRegisterNonpayReceipts();
+      const canEnterLanding = canManageLandingReceipts();
+      const canViewReceiptHistory = canManageReceipts();
+      const allowedReceiptViews = [
+        ...(canEnterReceipts ? ["nonpay"] : []),
+        ...(canEnterLanding ? ["landing"] : []),
+        ...(canViewReceiptHistory ? ["history"] : [])
+      ];
+      const receiptView = allowedReceiptViews.includes(currentReceiptView) ? currentReceiptView : allowedReceiptViews[0];
       return `
       <section class="grid">
         <div class="receipt-tabs">
-          ${canEnterReceipts ? `
-            <button class="receipt-tab ${receiptView === "nonpay" ? "active" : ""}" data-receipt-view="nonpay" type="button">비급여 입고관리</button>
-            <button class="receipt-tab ${receiptView === "landing" ? "active" : ""}" data-receipt-view="landing" type="button">랜딩 입고관리</button>
-          ` : ""}
-          <button class="receipt-tab ${receiptView === "history" ? "active" : ""}" data-receipt-view="history" type="button">입고내역</button>
+          ${canEnterReceipts ? `<button class="receipt-tab ${receiptView === "nonpay" ? "active" : ""}" data-receipt-view="nonpay" type="button">비급여 입고관리</button>` : ""}
+          ${canEnterLanding ? `<button class="receipt-tab ${receiptView === "landing" ? "active" : ""}" data-receipt-view="landing" type="button">랜딩 입고관리</button>` : ""}
+          ${canViewReceiptHistory ? `<button class="receipt-tab ${receiptView === "history" ? "active" : ""}" data-receipt-view="history" type="button">입고내역</button>` : ""}
         </div>
         ${receiptView === "nonpay" ? `
           <form class="card receipt-wide" id="nonpayReceiptForm">
             <h2>비급여 입고 등록</h2>
+            ${currentUserRole() === "receiver" ? `<p class="receipt-safety-note">입고담당자 권한입니다. 비급여 입고 수량만 저장할 수 있고, 랜딩 입고·입고내역 수정·삭제는 책임사용자 이상에게 요청해 주세요.</p>` : ""}
             <label for="nonpayReceiptProduct">제품 선택</label>
             <select id="nonpayReceiptProduct" required>
               <option value="">비급여 제품을 선택하세요</option>
@@ -3204,7 +3862,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
     const updateReceiptRecord = async (receiptId, values) => {
       if (!canManageReceipts()) {
-        alert("입고이력 수정은 관리자와 manager만 가능합니다.");
+        alert("입고이력 수정은 관리자와 책임사용자만 가능합니다.");
         return false;
       }
       const receipt = state.receipts.find((item) => sameId(item.id, receiptId));
@@ -3226,7 +3884,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
     const deleteReceiptRecord = async (receiptId) => {
       if (!canManageReceipts()) {
-        alert("입고이력 삭제는 관리자와 manager만 가능합니다.");
+        alert("입고이력 삭제는 관리자와 책임사용자만 가능합니다.");
         return false;
       }
       const receipt = state.receipts.find((item) => sameId(item.id, receiptId));
@@ -3335,8 +3993,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       });
       document.getElementById("nonpayReceiptForm")?.addEventListener("submit", async (event) => {
         event.preventDefault();
-        if (!canManageReceipts()) {
-          alert("입고 등록은 관리자와 책임/입고 담당만 가능합니다.");
+        if (!canRegisterNonpayReceipts()) {
+          alert("비급여 입고 등록은 관리자, 책임사용자, 입고담당자만 가능합니다.");
           return;
         }
         const productId = document.getElementById("nonpayReceiptProduct").value;
@@ -3350,8 +4008,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         await saveState();
       });
       const receiveLandingLine = async (usageId, productId) => {
-        if (!canManageReceipts()) {
-          alert("랜딩 입고 확인은 관리자와 책임/입고 담당만 가능합니다.");
+        if (!canManageLandingReceipts()) {
+          alert("랜딩 입고 확인은 관리자와 책임사용자만 가능합니다.");
           return;
         }
         const usage = state.usages.find((item) => item.id === usageId);
@@ -3417,6 +4075,347 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       bindReceiptHistoryControls("receiptTabHistory", "receiptTabHistoryList");
     };
 
+    const filteredImplantRecords = (date, patientName, patientId, patientNo) => {
+      const nameQuery = normalizedName(patientName || "");
+      const idQuery = normalizedName(patientId || "");
+      const noQuery = normalizedName(patientNo || "");
+      return sortImplantRecords(implantRecords).filter((record) => {
+        if (date && implantRecordDate(record) !== date) return false;
+        if (nameQuery && !normalizedName(record.patientName || "").includes(nameQuery)) return false;
+        if (idQuery && !normalizedName(record.patientId || "").includes(idQuery)) return false;
+        if (noQuery && !normalizedName(implantPatientNoText(record)).includes(noQuery)) return false;
+        return true;
+      });
+    };
+
+    const implantRecordsForDate = (date) => sortImplantRecords(implantRecords.filter((record) => implantRecordDate(record) === date));
+
+    const assignImplantPatientNosForDate = async (date) => {
+      if (!canAssignImplantPatientNo()) return 0;
+      if (!date) throw new Error("날짜를 선택해 주세요.");
+      const recordsForDate = implantRecordsForDate(date);
+      const used = new Set(recordsForDate.map(implantPatientNoText).filter(Boolean));
+      const duplicate = Array.from(used).find((value) => recordsForDate.filter((record) => implantPatientNoText(record) === value).length > 1);
+      if (duplicate) throw new Error(`같은 날짜에 ${duplicate}번 환자번호가 중복되어 있습니다. 관리자 수동 수정이 필요합니다.`);
+      const targets = sortImplantRecords(recordsForDate.filter((record) => !implantPatientNoText(record)));
+      let nextNo = 1;
+      const updates = [];
+      targets.forEach((record) => {
+        while (used.has(String(nextNo))) nextNo += 1;
+        const patientNo = String(nextNo);
+        used.add(patientNo);
+        updates.push(setDoc(doc(db, "implantRecords", record.id), {
+          patientNo,
+          patientNoAssignedAt: new Date().toISOString(),
+          closedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          ...auditUpdateFields()
+        }, { merge: true }));
+      });
+      await Promise.all(updates);
+      return updates.length;
+    };
+
+    const implantDescriptionText = (record) => (Array.isArray(record.implants) ? record.implants : [])
+      .map((implant) => `[${implant.vendor || "업체 없음"}]\n${implant.description || ""}`)
+      .join("\n\n");
+
+    const implantLedgerRows = (records) => records.flatMap((record) => {
+      const implants = Array.isArray(record.implants) && record.implants.length ? record.implants : [{ vendor: "", description: "", photos: [] }];
+      return implants.map((implant) => [
+        implantRecordDate(record),
+        implantPatientNoText(record) ? `#${implantPatientNoText(record)}` : "",
+        record.patientName || "",
+        record.patientId || "",
+        record.surgeryName || surgeryById(record.surgeryId)?.name || "",
+        record.surgeonCode || departmentById(record.doctorId)?.name || "",
+        auditUserText(record) || "",
+        auditTimeText(record) || "",
+        implant.vendor || "",
+        implant.description || "",
+        (implant.photos || []).length
+      ]);
+    });
+
+    const implantLedgerTableHtml = (records) => {
+      if (!records.length) return `<div class="empty">선택한 날짜의 임플란트 마감 자료가 없습니다.</div>`;
+      return `
+        <div class="implant-ledger-table-wrap">
+          <table class="implant-ledger-table">
+            <thead>
+              <tr>
+                <th>날짜</th><th>번호</th><th>환자이름</th><th>ID</th><th>수술명</th><th>원장코드</th><th>저장자</th><th>업체</th><th>사용분</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${records.map((record) => `
+                <tr>
+                  <td>${escapeHtml(implantRecordDate(record))}</td>
+                  <td>${escapeHtml(implantPatientNoText(record) ? `#${implantPatientNoText(record)}` : "미마감")}</td>
+                  <td>${escapeHtml(record.patientName || "")}</td>
+                  <td>${escapeHtml(record.patientId || "")}</td>
+                  <td>${escapeHtml(record.surgeryName || surgeryById(record.surgeryId)?.name || "")}</td>
+                  <td>${escapeHtml(record.surgeonCode || departmentById(record.doctorId)?.name || "")}</td>
+                  <td>${escapeHtml(auditUserText(record) || "-")}</td>
+                  <td>${escapeHtml((record.implants || []).map((implant) => implant.vendor).filter(Boolean).join(", "))}</td>
+                  <td><div class="implant-description">${escapeHtml(implantDescriptionText(record))}</div></td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    };
+
+    const exportImplantLedgerExcel = (date) => {
+      const records = implantRecordsForDate(date);
+      if (!records.length) {
+        alert("엑셀로 저장할 임플란트 기록이 없습니다.");
+        return;
+      }
+      downloadExcel(
+        `임플란트장부_${date || "all"}.xlsx`,
+        ["날짜", "번호", "환자이름", "ID", "수술명", "원장코드", "저장자", "저장시각", "업체", "사용분", "사진수"],
+        implantLedgerRows(records)
+      );
+    };
+
+    const implantVendorContact = (vendorName = "", vendorId = "") => {
+      const byId = vendorId ? implantVendorById(vendorId) : null;
+      if (byId) return byId;
+      return implantVendors.find((vendor) => normalizedName(vendor.name) === normalizedName(vendorName)) || {};
+    };
+
+    const implantSendMessage = (date, vendorName, lines) => [
+      `${date} 임플란트 사용분`,
+      "",
+      ...lines.map(({ record, implant }) => [
+        `${implantPatientNoText(record) ? `#${implantPatientNoText(record)} ` : ""}${record.surgeonCode || departmentById(record.doctorId)?.name || ""}`,
+        record.surgeryName || surgeryById(record.surgeryId)?.name || "",
+        implant.description || ""
+      ].filter(Boolean).join("\n"))
+    ].join("\n\n");
+
+    const implantSendGroups = (date) => {
+      const groups = new Map();
+      implantRecordsForDate(date).forEach((record) => {
+        (record.implants || []).forEach((implant) => {
+          const key = implant.vendor || "업체 없음";
+          const current = groups.get(key) || { vendor: key, contact: implantVendorContact(key, implant.vendorId), lines: [] };
+          current.lines.push({ record, implant });
+          groups.set(key, current);
+        });
+      });
+      return Array.from(groups.values()).sort((a, b) => alphaFirstCompare(a.vendor, b.vendor));
+    };
+
+    const implantSendPanelHtml = (date) => {
+      const groups = implantSendGroups(date);
+      if (!groups.length) return `<div class="empty">업체별로 발송할 임플란트 기록이 없습니다.</div>`;
+      return `
+        <div class="implant-send-list">
+          ${groups.map((group) => {
+            const message = implantSendMessage(date, group.vendor, group.lines);
+            const email = group.contact?.email || "";
+            const phone = group.contact?.phone || "";
+            return `
+              <div class="implant-send-card">
+                <div class="item-title">
+                  <span>${escapeHtml(group.vendor)}</span>
+                  <span class="pill">${group.lines.length}건</span>
+                </div>
+                <div class="meta">
+                  ${email ? `<span>이메일: ${escapeHtml(email)}</span>` : ""}
+                  ${phone ? `<span>연락처: ${escapeHtml(phone)}</span>` : ""}
+                  ${!email && !phone ? `<span>설정에 연락처가 없습니다.</span>` : ""}
+                </div>
+                <div class="implant-send-text">${escapeHtml(message)}</div>
+                <div class="actions">
+                  ${email ? `<button type="button" data-send-implant-email="${escapeHtml(group.vendor)}">메일 작성</button>` : ""}
+                  ${phone ? `<button class="secondary" type="button" data-send-implant-sms="${escapeHtml(group.vendor)}">문자 작성</button>` : ""}
+                  <button class="secondary" type="button" data-copy-implant-send="${escapeHtml(group.vendor)}">내용 복사</button>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    };
+
+    const implantPhotoHtml = (photo) => `
+      <img class="implant-photo-thumb" src="${escapeHtml(photo.url || photo.preview || "")}" alt="임플란트 사진" data-implant-photo-view="${escapeHtml(photo.url || photo.preview || "")}">
+    `;
+
+    const implantRecordCardHtml = (record) => {
+      const vendors = Array.isArray(record.implants) ? record.implants : [];
+      const patientNo = implantPatientNoText(record);
+      const doctorText = record.surgeonCode || departmentById(record.doctorId)?.name || "-";
+      const surgeryText = record.surgeryName || surgeryById(record.surgeryId)?.name || "-";
+      return `
+        <div class="card implant-record-card" data-implant-record="${escapeHtml(record.id)}">
+          <div class="item-title">
+            <span>${patientNo ? `${escapeHtml(patientNo)}번 ` : ""}${escapeHtml(record.patientName || "이름 없음")}${record.patientId ? ` (${escapeHtml(record.patientId)})` : ""}</span>
+            <span class="pill">${escapeHtml(implantRecordDate(record) || "-")}</span>
+          </div>
+          <div class="meta">
+            <span>원장코드: ${escapeHtml(doctorText)}</span>
+            <span>과: ${escapeHtml(record.department || "-")}</span>
+            <span>수술: ${escapeHtml(surgeryText)}</span>
+            ${record.surgeryTime ? `<span>수술시간: ${escapeHtml(record.surgeryTime)}</span>` : ""}
+          </div>
+          ${canEditImplantPatientNo() ? `
+            <div class="row two">
+              <div>
+                <label for="implantPatientNo-${escapeHtml(record.id)}">환자번호 수동 수정</label>
+                <input id="implantPatientNo-${escapeHtml(record.id)}" data-implant-patient-no-input="${escapeHtml(record.id)}" value="${escapeHtml(patientNo)}" inputmode="numeric" autocomplete="off">
+              </div>
+              <div class="actions">
+                <button class="secondary" type="button" data-implant-patient-no-save="${escapeHtml(record.id)}">번호 저장</button>
+              </div>
+            </div>
+          ` : ""}
+          ${vendors.length ? vendors.map((implant) => `
+            <div class="implant-vendor-block">
+              <div class="item-title">
+                <span>${escapeHtml(implant.vendor || "업체 없음")}</span>
+                <span class="pill">${(implant.photos || []).length}장</span>
+              </div>
+              <div class="implant-description">${escapeHtml(implant.description || "")}</div>
+              <div class="implant-photo-strip">
+                ${(implant.photos || []).map(implantPhotoHtml).join("")}
+              </div>
+            </div>
+          `).join("") : `<div class="empty">업체별 기록이 없습니다.</div>`}
+          <div class="implant-send-preview">
+            업체 발송용 데이터 준비: 환자명/환자ID 제외, 환자번호 ${escapeHtml(patientNo || "미부여")} · ${escapeHtml(doctorText)} · ${escapeHtml(surgeryText)} · 업체별 사용내용만 출력 가능
+          </div>
+        </div>
+      `;
+    };
+
+    const renderImplants = () => {
+      const date = today();
+      return `
+        <section class="grid">
+          <div class="card">
+            <h2>임플란트 전산장부</h2>
+            <div class="row four">
+              <div>
+                <label for="implantFilterDate">날짜</label>
+                <input id="implantFilterDate" type="date" value="${escapeHtml(date)}">
+              </div>
+              <div>
+                <label for="implantFilterPatientNo">환자번호</label>
+                <input id="implantFilterPatientNo" inputmode="numeric" autocomplete="off" placeholder="1">
+              </div>
+              <div>
+                <label for="implantFilterName">환자명</label>
+                <input id="implantFilterName" autocomplete="off">
+              </div>
+              <div>
+                <label for="implantFilterPatientId">환자ID</label>
+                <input id="implantFilterPatientId" autocomplete="off">
+              </div>
+            </div>
+            <div class="actions">
+              <button class="secondary" type="button" id="implantFilterReset">초기화</button>
+              ${canAssignImplantPatientNo() ? `<button type="button" id="closeTodayImplants">오늘 사용분 마감하기</button>` : ""}
+              ${canAssignImplantPatientNo() ? `<button class="secondary" type="button" id="assignImplantPatientNos">선택 날짜 번호 부여</button>` : ""}
+              <button class="secondary" type="button" id="exportImplantLedger">엑셀 다운로드</button>
+              <button type="button" id="prepareImplantVendorSend">임플란트 장부 업체에 발송하기</button>
+            </div>
+          </div>
+          <div class="card">
+            <h2>병원 확인용 마감 자료</h2>
+            <div id="implantCloseSummary"></div>
+          </div>
+          <div class="card" id="implantSendPanel" hidden>
+            <h2>업체별 발송자료</h2>
+            <div class="implant-send-preview">환자명과 환자ID는 업체 발송자료에서 제외됩니다. 실제 자동 발송은 병원 메일/SMS API 연결 후 같은 자료를 그대로 사용할 수 있습니다.</div>
+            <div id="implantSendList"></div>
+          </div>
+          <div id="implantLedgerList" class="implant-ledger-list"></div>
+          <div class="modal-backdrop" id="implantPhotoModal" hidden role="dialog" aria-modal="true" aria-label="임플란트 사진 확대">
+            <div class="search-modal-panel">
+              <div class="search-modal-head">
+                <h3>사진 확인</h3>
+                <button class="search-modal-close" type="button" id="closeImplantPhotoModal" aria-label="사진 닫기">×</button>
+              </div>
+              <img class="implant-modal-image" id="implantPhotoModalImage" alt="임플란트 사진 확대">
+              <div class="actions" id="implantPhotoEditTools" hidden>
+                <button class="secondary" type="button" id="implantModalRotate">회전</button>
+                <button class="secondary" type="button" id="implantModalCrop">자르기</button>
+                <button type="button" id="implantModalDone">완료</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      `;
+    };
+
+    const renderImplantVendors = () => `
+      <section class="grid">
+        <form class="card" id="implantVendorForm">
+          <h2 id="implantVendorFormTitle">임플란트 업체 연락처 추가</h2>
+          <input type="hidden" id="implantVendorId">
+          <div class="row two">
+            <div>
+              <label for="implantVendorName">업체명</label>
+              <input id="implantVendorName" required autocomplete="off">
+            </div>
+            <div>
+              <label for="implantVendorContactName">담당자</label>
+              <input id="implantVendorContactName" autocomplete="off">
+            </div>
+          </div>
+          <div class="row three">
+            <div>
+              <label for="implantVendorPhone">연락처</label>
+              <input id="implantVendorPhone" inputmode="tel" autocomplete="off">
+            </div>
+            <div>
+              <label for="implantVendorEmail">이메일</label>
+              <input id="implantVendorEmail" type="email" autocomplete="off">
+            </div>
+            <div>
+              <label for="implantVendorMessenger">문자/카톡 메모</label>
+              <input id="implantVendorMessenger" autocomplete="off">
+            </div>
+          </div>
+          <label for="implantVendorMemo">발송 메모</label>
+          <textarea id="implantVendorMemo" placeholder="예: 매일 16시까지 사진 포함 장부 발송"></textarea>
+          <div class="actions">
+            <button type="submit">업체 저장</button>
+            <button class="secondary" type="button" id="implantVendorReset">새로 입력</button>
+          </div>
+        </form>
+        <div class="card">
+          <h2>등록 업체</h2>
+          <div class="implant-vendor-contact-list">
+            ${implantVendors.length ? implantVendors.slice().sort((a, b) => alphaFirstCompare(a.name, b.name)).map((vendor) => `
+              <div class="item ${vendor.active === false ? "landing-line" : ""}">
+                <div class="item-title">
+                  <span>${escapeHtml(vendor.name || "업체명 없음")}</span>
+                  <span class="pill ${vendor.active === false ? "low" : ""}">${vendor.active === false ? "비활성" : "사용"}</span>
+                </div>
+                <div class="meta">
+                  ${vendor.contactName ? `<span>담당자: ${escapeHtml(vendor.contactName)}</span>` : ""}
+                  ${vendor.phone ? `<span>연락처: ${escapeHtml(vendor.phone)}</span>` : ""}
+                  ${vendor.email ? `<span>이메일: ${escapeHtml(vendor.email)}</span>` : ""}
+                  ${vendor.messenger ? `<span>문자/카톡: ${escapeHtml(vendor.messenger)}</span>` : ""}
+                </div>
+                ${vendor.memo ? `<div class="implant-send-preview">${escapeHtml(vendor.memo)}</div>` : ""}
+                <div class="actions">
+                  <button class="secondary" type="button" data-edit-implant-vendor="${escapeHtml(vendor.id)}">수정</button>
+                  <button class="${vendor.active === false ? "secondary" : "danger"}" type="button" data-toggle-implant-vendor="${escapeHtml(vendor.id)}">${vendor.active === false ? "다시 사용" : "비활성"}</button>
+                </div>
+              </div>
+            `).join("") : `<div class="empty">등록된 임플란트 업체가 없습니다.</div>`}
+          </div>
+        </div>
+      </section>
+    `;
+
     const renderUse = () => `
       <section class="grid">
         <form class="card" id="useForm">
@@ -3481,9 +4480,34 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               <div id="useProductSearchResults" class="product-picker search-modal-results"></div>
             </div>
           </div>
+          <div class="modal-backdrop" id="implantPhotoModal" hidden role="dialog" aria-modal="true" aria-label="임플란트 사진 확대">
+            <div class="search-modal-panel">
+              <div class="search-modal-head">
+                <h3>사진 확인</h3>
+                <button class="search-modal-close" type="button" id="closeImplantPhotoModal" aria-label="사진 닫기">×</button>
+              </div>
+              <img class="implant-modal-image" id="implantPhotoModalImage" alt="임플란트 사진 확대">
+              <div class="actions" id="implantPhotoEditTools" hidden>
+                <button class="secondary" type="button" id="implantModalRotate">회전</button>
+                <button class="secondary" type="button" id="implantModalCrop">자르기</button>
+                <button type="button" id="implantModalDone">완료</button>
+              </div>
+            </div>
+          </div>
           <label>제품 여러 개 선택</label>
           <div class="product-picker">
             ${renderGroupedProducts(false)}
+          </div>
+          <label class="implant-toggle" for="useImplantEnabled">
+            <input id="useImplantEnabled" type="checkbox">
+            <span>임플란트 기록</span>
+          </label>
+          <div id="implantUsePanel" class="implant-panel" hidden>
+            <div class="implant-send-preview">환자명, 환자ID, 과, 원장코드, 수술명, 수술일은 위 사용입력 정보로 자동 저장됩니다.</div>
+            <div id="implantVendorEntries"></div>
+            <div class="actions">
+              <button class="secondary" type="button" id="addImplantVendorEntry">임플란트 업체 추가</button>
+            </div>
           </div>
           <div class="actions"><button type="submit">사용내역 저장</button></div>
         </form>
@@ -3569,22 +4593,64 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       });
     };
 
-    const renderEditUsage = () => canEditUsage() ? `
+    const editUsagePatientsForDate = (date) => state.usages
+      .filter((usage) => (usage.date || "") === date)
+      .slice()
+      .sort((a, b) => alphaFirstCompare(a.patientName, b.patientName) || alphaFirstCompare(patientIdText(a), patientIdText(b)));
+
+    const editUsagePatientCardHtml = (usage, selectedId = "") => {
+      const doctor = departmentById(usage.doctorId);
+      const surgery = surgeryById(usage.surgeryId);
+      const surgeryDepartment = surgery ? (surgery.department || inferSurgeryDepartment(surgery.name)) : "-";
+      const productItems = usageProductItems(usage);
+      const productSummary = productItems
+        .slice(0, 3)
+        .map((item) => `${productById(item.productId)?.name || "삭제된 제품"}${item.qty > 1 ? ` ${item.qty}개` : ""}`)
+        .join(", ");
+      const extraCount = Math.max(0, productItems.length - 3);
+      const locked = !canModifyUsageRecord(usage);
+      return `
+        <button class="edit-patient-card ${selectedId === usage.id ? "active" : ""} ${locked ? "locked" : ""}" type="button" data-edit-usage-card="${escapeHtml(usage.id)}">
+          <div class="edit-patient-card-head">
+            <span>${escapeHtml(patientDisplayName(usage) || "이름 없음")}</span>
+            <span class="pill ${locked ? "low" : ""}">${locked ? "관리자 전용" : "수정 가능"}</span>
+          </div>
+          <div class="edit-patient-card-meta">
+            <span>원장: ${escapeHtml(doctor?.name || "-")}</span>
+            <span>수술: ${escapeHtml(surgeryDepartment)} - ${escapeHtml(surgery?.name || "-")}</span>
+            <span>제품: ${productItems.reduce((sum, item) => sum + item.qty, 0)}개${productSummary ? ` · ${escapeHtml(productSummary)}${extraCount ? ` 외 ${extraCount}종` : ""}` : ""}</span>
+          </div>
+        </button>
+      `;
+    };
+
+    const editUsagePatientListHtml = (date, selectedId = "") => {
+      const patients = editUsagePatientsForDate(date);
+      if (!patients.length) return `<div class="empty">선택한 날짜에 사용내역이 없습니다.</div>`;
+      return patients.map((usage) => editUsagePatientCardHtml(usage, selectedId)).join("");
+    };
+
+    const renderEditUsage = () => {
+      if (!canEditUsage()) return `<div class="empty">사용내역 수정은 관리자, 책임사용자, 일반사용자만 가능합니다.</div>`;
+      const pendingUsage = pendingEditUsageId ? state.usages.find((usage) => usage.id === pendingEditUsageId) : null;
+      const editSelectDate = pendingUsage?.date || today();
+      return `
       <section class="grid">
         <div class="card">
           <h2>환자 사용내역 선택</h2>
-          <label for="editUsageSelect">환자 선택</label>
-          <select id="editUsageSelect">
-            <option value="">수정할 환자 사용내역을 선택하세요</option>
-            ${state.usages.slice().reverse().map((usage) => {
-              const doctor = departmentById(usage.doctorId);
-              const surgery = surgeryById(usage.surgeryId);
-              return `<option value="${usage.id}">${escapeHtml(usage.date)} · ${escapeHtml(patientDisplayName(usage))} · ${escapeHtml(doctor?.name || "-")} · ${escapeHtml(surgery?.name || "-")}</option>`;
-            }).join("")}
-          </select>
+          <div>
+            <label for="editUsageSelectDate">사용일 선택</label>
+            <input id="editUsageSelectDate" type="date" value="${escapeHtml(editSelectDate)}">
+          </div>
+          <input type="hidden" id="editUsageSelect" value="${escapeHtml(pendingUsage?.id || "")}">
+          <p class="helper">기본값은 오늘 날짜입니다. 날짜를 바꾸면 아래 환자 카드만 바뀝니다. 수정할 환자는 카드에서 바로 선택하세요.</p>
+          <div id="editUsagePatientList" class="edit-patient-list">
+            ${editUsagePatientListHtml(editSelectDate, pendingUsage?.id || "")}
+          </div>
         </div>
         <form class="card" id="editUsageForm" style="display:none;">
-          <h2>사용내용 수정</h2>
+          <h2 id="editUsageFormTitle">사용내용 수정</h2>
+          <div id="editUsageLockNote"></div>
           <input type="hidden" id="editUsageId">
           <div class="row three">
             <div>
@@ -3642,12 +4708,17 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           </div>
         </form>
       </section>
-    ` : `<div class="empty">관리자와 책임/입고 담당만 사용내역을 수정할 수 있습니다.</div>`;
+    `;
+    };
 
     const bindEditUsage = () => {
       if (!canEditUsage()) return;
+      const dateInput = document.getElementById("editUsageSelectDate");
       const select = document.getElementById("editUsageSelect");
       const form = document.getElementById("editUsageForm");
+      const patientList = document.getElementById("editUsagePatientList");
+      const lockNote = document.getElementById("editUsageLockNote");
+      const formTitle = document.getElementById("editUsageFormTitle");
       const useDepartment = document.getElementById("editDepartment");
       const doctorSelect = document.getElementById("editDoctor");
       const surgerySelect = document.getElementById("editSurgery");
@@ -3655,6 +4726,20 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const productSearch = document.getElementById("editProductSearch");
       const productSearchResults = document.getElementById("editProductSearchResults");
       const deleteButton = document.getElementById("editUsageDelete");
+      const renderUsageSelectOptions = (date, selectedId = "") => {
+        const validSelectedId = selectedId && state.usages.some((usage) => usage.id === selectedId && (usage.date || "") === date) ? selectedId : "";
+        select.value = validSelectedId;
+        if (patientList) patientList.innerHTML = editUsagePatientListHtml(date, validSelectedId);
+      };
+      const resetLoadedUsage = () => {
+        select.value = "";
+        form.style.display = "none";
+        deleteButton.style.display = "none";
+        if (lockNote) lockNote.innerHTML = "";
+        if (formTitle) formTitle.textContent = "사용내용 수정";
+        pendingEditUsageId = "";
+        if (patientList) patientList.querySelectorAll("[data-edit-usage-card]").forEach((card) => card.classList.remove("active"));
+      };
       const selectedItems = () => Array.from(form.querySelectorAll("[data-use-product]:checked")).map((input) => ({
         productId: input.value,
         qty: Math.max(1, num(form.querySelector(`[data-use-qty="${input.value}"]`)?.value))
@@ -3705,10 +4790,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           .join("");
         if (doctors.some((item) => item.id === currentDoctor)) doctorSelect.value = currentDoctor;
         const surgeries = department && doctorSelect.value
-          ? state.surgeries.slice().sort((a, b) => alphaFirstCompare(a.name, b.name)).filter((item) => (item.department || inferSurgeryDepartment(item.name)) === department)
+          ? visibleSurgeriesFor(department, doctorSelect.value)
           : [];
         surgerySelect.innerHTML = `<option value="">${department && doctorSelect.value ? "수술 선택" : "원장 코드를 먼저 선택하세요"}</option>` + surgeries
-          .map((item) => `<option value="${item.id}">${escapeHtml(item.department || inferSurgeryDepartment(item.name))} - ${escapeHtml(item.name)}</option>`)
+          .map((item) => `<option value="${item.id}">${escapeHtml(item.department || inferSurgeryDepartment(item.name))} - ${escapeHtml(item.name)}${isCommonSurgery(item) ? "" : " · 전용"}</option>`)
           .join("");
         if (surgeries.some((item) => item.id === currentSurgery)) surgerySelect.value = currentSurgery;
       };
@@ -3752,11 +4837,23 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           deleteButton.style.display = "none";
           return;
         }
+        if (dateInput.value !== (usage.date || today())) {
+          dateInput.value = usage.date || today();
+          renderUsageSelectOptions(dateInput.value, usage.id);
+        }
+        const canModify = canModifyUsageRecord(usage);
+        const lockMessage = usagePastLockMessage(usage);
         form.style.display = "";
-        deleteButton.style.display = "";
+        deleteButton.style.display = canDeleteUsageRecord(usage) ? "" : "none";
+        if (formTitle) formTitle.textContent = canModify ? "사용내용 수정" : "사용내용 확인";
+        if (lockNote) {
+          lockNote.innerHTML = canModify || !lockMessage ? "" : `<div class="edit-lock-note">${escapeHtml(lockMessage)} 관리자에게 요청해 주세요.</div>`;
+        }
         form.querySelectorAll("input, select, textarea, button").forEach((element) => {
-          element.disabled = false;
+          element.disabled = !canModify;
         });
+        document.getElementById("editUsageCancel").disabled = false;
+        if (deleteButton) deleteButton.disabled = !canDeleteUsageRecord(usage);
         syncEditStockLimits(usage);
         document.getElementById("editUsageId").value = usage.id;
         document.getElementById("editPatientName").value = usage.patientName || "";
@@ -3782,7 +4879,30 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         usageProductItems(usage).forEach((item) => selectProduct(item.productId, item.qty));
         renderSearch();
         renderSelected();
+        if (!canModify) {
+          form.querySelectorAll("input, select, textarea, button").forEach((element) => {
+            element.disabled = true;
+          });
+          document.getElementById("editUsageCancel").disabled = false;
+          if (deleteButton) deleteButton.disabled = true;
+        }
+        if (patientList) {
+          patientList.querySelectorAll("[data-edit-usage-card]").forEach((card) => {
+            card.classList.toggle("active", card.dataset.editUsageCard === usage.id);
+          });
+        }
       };
+      dateInput.addEventListener("change", () => {
+        dateInput.value = dateInput.value || today();
+        renderUsageSelectOptions(dateInput.value);
+        resetLoadedUsage();
+      });
+      patientList?.addEventListener("click", (event) => {
+        const card = event.target.closest("[data-edit-usage-card]");
+        if (!card) return;
+        select.value = card.dataset.editUsageCard;
+        loadUsage(card.dataset.editUsageCard);
+      });
       select.addEventListener("change", () => loadUsage(select.value));
       useDepartment.addEventListener("change", filterOptions);
       form.querySelectorAll("[data-use-product], [data-use-qty]").forEach((input) => {
@@ -3796,35 +4916,25 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         });
       });
       productSearch.addEventListener("input", renderSearch);
-      document.getElementById("editUsageCancel").addEventListener("click", () => {
-        select.value = "";
-        form.style.display = "none";
-        deleteButton.style.display = "none";
-        pendingEditUsageId = "";
-      });
+      document.getElementById("editUsageCancel").addEventListener("click", resetLoadedUsage);
       deleteButton.addEventListener("click", async () => {
         const usageId = document.getElementById("editUsageId").value;
         if (!usageId) return;
         const deleted = await deleteUsageRecord(usageId, {
-          onSuccess: () => {
-            select.value = "";
-            form.style.display = "none";
-            deleteButton.style.display = "none";
-            pendingEditUsageId = "";
-          }
+          onSuccess: resetLoadedUsage
         });
         if (!deleted) return;
-        select.innerHTML = `<option value="">수정할 환자 사용내역을 선택하세요</option>${state.usages.slice().reverse().map((usage) => {
-          const doctor = departmentById(usage.doctorId);
-          const surgery = surgeryById(usage.surgeryId);
-          return `<option value="${usage.id}">${escapeHtml(usage.date)} · ${escapeHtml(patientDisplayName(usage))} · ${escapeHtml(doctor?.name || "-")} · ${escapeHtml(surgery?.name || "-")}</option>`;
-        }).join("")}`;
+        renderUsageSelectOptions(dateInput.value || today());
       });
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         const id = document.getElementById("editUsageId").value;
         const usage = state.usages.find((item) => item.id === id);
         if (!usage) return;
+        if (!canModifyUsageRecord(usage)) {
+          alert(usagePastLockMessage(usage) || "사용내역 수정 권한이 없습니다.");
+          return;
+        }
         const newItems = selectedItems();
         const newProductIds = newItems.flatMap((item) => Array.from({ length: item.qty }, () => item.productId));
         if (!document.getElementById("editPatientName").value.trim() || !doctorSelect.value || !surgerySelect.value) {
@@ -3879,9 +4989,342 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       filterOptions();
       renderSearch();
       if (pendingEditUsageId) {
-        select.value = pendingEditUsageId;
-        loadUsage(pendingEditUsageId);
+        const pendingUsage = state.usages.find((usage) => usage.id === pendingEditUsageId);
+        if (pendingUsage) {
+          dateInput.value = pendingUsage.date || today();
+          renderUsageSelectOptions(dateInput.value, pendingEditUsageId);
+          loadUsage(pendingEditUsageId);
+        }
       }
+    };
+
+    const showImplantPhotoModal = (url) => {
+      const modal = document.getElementById("implantPhotoModal");
+      const image = document.getElementById("implantPhotoModalImage");
+      if (!modal || !image || !url) return;
+      image.src = url;
+      modal.hidden = false;
+    };
+
+    const hideImplantPhotoModal = () => {
+      const modal = document.getElementById("implantPhotoModal");
+      const image = document.getElementById("implantPhotoModalImage");
+      const tools = document.getElementById("implantPhotoEditTools");
+      if (image) image.removeAttribute("src");
+      if (image) image.style.transform = "";
+      if (tools) tools.hidden = true;
+      if (modal) modal.hidden = true;
+    };
+
+    const bindImplants = () => {
+      const list = document.getElementById("implantLedgerList");
+      const dateInput = document.getElementById("implantFilterDate");
+      const nameInput = document.getElementById("implantFilterName");
+      const idInput = document.getElementById("implantFilterPatientId");
+      const noInput = document.getElementById("implantFilterPatientNo");
+      const summary = document.getElementById("implantCloseSummary");
+      const sendPanel = document.getElementById("implantSendPanel");
+      const sendList = document.getElementById("implantSendList");
+      const renderList = () => {
+        const records = filteredImplantRecords(dateInput.value, nameInput.value, idInput.value, noInput.value).reverse();
+        list.innerHTML = records.length
+          ? records.map(implantRecordCardHtml).join("")
+          : `<div class="empty">조회 조건에 맞는 임플란트 기록이 없습니다.</div>`;
+        if (summary) summary.innerHTML = implantLedgerTableHtml(implantRecordsForDate(dateInput.value));
+      };
+      [dateInput, nameInput, idInput, noInput].forEach((input) => input.addEventListener("input", renderList));
+      document.getElementById("implantFilterReset")?.addEventListener("click", () => {
+        dateInput.value = today();
+        nameInput.value = "";
+        idInput.value = "";
+        noInput.value = "";
+        renderList();
+      });
+      document.getElementById("assignImplantPatientNos")?.addEventListener("click", async () => {
+        if (!canAssignImplantPatientNo()) return;
+        const date = dateInput.value;
+        try {
+          const count = await assignImplantPatientNosForDate(date);
+          alert(count ? `${count}건의 환자번호를 부여했습니다.` : "환자번호가 없는 임플란트 기록이 없습니다.");
+        } catch (error) {
+          alert(error.message);
+        }
+      });
+      document.getElementById("closeTodayImplants")?.addEventListener("click", async () => {
+        if (!canAssignImplantPatientNo()) return;
+        dateInput.value = today();
+        try {
+          const count = await assignImplantPatientNosForDate(today());
+          alert(count ? `오늘 사용분 마감 완료: ${count}건 번호를 부여했습니다.` : "오늘 사용분은 이미 마감되어 있습니다.");
+          renderList();
+        } catch (error) {
+          alert(error.message);
+        }
+      });
+      document.getElementById("exportImplantLedger")?.addEventListener("click", () => {
+        exportImplantLedgerExcel(dateInput.value);
+      });
+      document.getElementById("prepareImplantVendorSend")?.addEventListener("click", async () => {
+        const date = dateInput.value || today();
+        const unnumbered = implantRecordsForDate(date).filter((record) => !implantPatientNoText(record));
+        if (unnumbered.length) {
+          if (canAssignImplantPatientNo() && confirm(`${unnumbered.length}건에 환자번호가 없습니다. 먼저 마감하고 발송자료를 만들까요?`)) {
+            try {
+              await assignImplantPatientNosForDate(date);
+            } catch (error) {
+              alert(error.message);
+              return;
+            }
+          } else {
+            alert("업체 발송 전 환자번호가 필요합니다.");
+            return;
+          }
+        }
+        sendPanel.hidden = false;
+        sendList.innerHTML = implantSendPanelHtml(date);
+        sendPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      sendPanel?.addEventListener("click", async (event) => {
+        const vendor = event.target.closest("[data-send-implant-email]")?.dataset.sendImplantEmail
+          || event.target.closest("[data-send-implant-sms]")?.dataset.sendImplantSms
+          || event.target.closest("[data-copy-implant-send]")?.dataset.copyImplantSend;
+        if (!vendor) return;
+        const date = dateInput.value || today();
+        const group = implantSendGroups(date).find((item) => item.vendor === vendor);
+        if (!group) return;
+        const message = implantSendMessage(date, group.vendor, group.lines);
+        const emailButton = event.target.closest("[data-send-implant-email]");
+        const smsButton = event.target.closest("[data-send-implant-sms]");
+        if (emailButton) {
+          const subject = encodeURIComponent(`${date} 임플란트 사용분`);
+          const body = encodeURIComponent(message);
+          window.location.href = `mailto:${group.contact?.email || ""}?subject=${subject}&body=${body}`;
+          return;
+        }
+        if (smsButton) {
+          const phone = String(group.contact?.phone || "").replace(/[^0-9+]/g, "");
+          window.location.href = `sms:${phone}?body=${encodeURIComponent(message)}`;
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(message);
+          alert("업체 발송자료를 복사했습니다.");
+        } catch (error) {
+          alert(message);
+        }
+      });
+      list.addEventListener("click", async (event) => {
+        const image = event.target.closest("[data-implant-photo-view]");
+        if (image) {
+          showImplantPhotoModal(image.dataset.implantPhotoView);
+          return;
+        }
+        const saveButton = event.target.closest("[data-implant-patient-no-save]");
+        if (saveButton) {
+          if (!canEditImplantPatientNo()) return;
+          const id = saveButton.dataset.implantPatientNoSave;
+          const record = implantRecords.find((item) => sameId(item.id, id));
+          const input = list.querySelector(`[data-implant-patient-no-input="${id}"]`);
+          const nextNo = String(input?.value || "").trim();
+          if (!record || !nextNo) {
+            alert("환자번호를 입력해 주세요.");
+            return;
+          }
+          const duplicate = implantRecords.some((item) =>
+            !sameId(item.id, id) &&
+            implantRecordDate(item) === implantRecordDate(record) &&
+            implantPatientNoText(item) === nextNo
+          );
+          if (duplicate) {
+            alert("같은 날짜에 이미 사용 중인 환자번호입니다.");
+            return;
+          }
+          await setDoc(doc(db, "implantRecords", id), {
+            patientNo: nextNo,
+            patientNoManuallyEditedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            ...auditUpdateFields()
+          }, { merge: true });
+        }
+      });
+      document.getElementById("closeImplantPhotoModal")?.addEventListener("click", hideImplantPhotoModal);
+      document.getElementById("implantPhotoModal")?.addEventListener("click", (event) => {
+        if (event.target.id === "implantPhotoModal") hideImplantPhotoModal();
+      });
+      renderList();
+    };
+
+    const resetImplantVendorForm = () => {
+      document.getElementById("implantVendorId").value = "";
+      document.getElementById("implantVendorFormTitle").textContent = "임플란트 업체 연락처 추가";
+      document.getElementById("implantVendorForm")?.reset();
+    };
+
+    const bindImplantVendors = () => {
+      const form = document.getElementById("implantVendorForm");
+      if (!form) return;
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const id = document.getElementById("implantVendorId").value || uid();
+        const vendor = {
+          id,
+          name: document.getElementById("implantVendorName").value.trim(),
+          contactName: document.getElementById("implantVendorContactName").value.trim(),
+          phone: document.getElementById("implantVendorPhone").value.trim(),
+          email: document.getElementById("implantVendorEmail").value.trim(),
+          messenger: document.getElementById("implantVendorMessenger").value.trim(),
+          memo: document.getElementById("implantVendorMemo").value.trim(),
+          active: implantVendorById(id)?.active !== false,
+          updatedAt: new Date().toISOString(),
+          ...(implantVendorById(id)?.createdAt ? {} : { createdAt: new Date().toISOString() }),
+          ...(implantVendorById(id)?.createdBy ? auditUpdateFields() : auditCreateFields())
+        };
+        if (!vendor.name) {
+          alert("업체명을 입력해 주세요.");
+          return;
+        }
+        await setDoc(doc(db, "implantVendors", id), vendor, { merge: true });
+        resetImplantVendorForm();
+      });
+      document.getElementById("implantVendorReset")?.addEventListener("click", resetImplantVendorForm);
+      app.querySelectorAll("[data-edit-implant-vendor]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const vendor = implantVendorById(button.dataset.editImplantVendor);
+          if (!vendor) return;
+          document.getElementById("implantVendorFormTitle").textContent = "임플란트 업체 연락처 수정";
+          document.getElementById("implantVendorId").value = vendor.id;
+          document.getElementById("implantVendorName").value = vendor.name || "";
+          document.getElementById("implantVendorContactName").value = vendor.contactName || "";
+          document.getElementById("implantVendorPhone").value = vendor.phone || "";
+          document.getElementById("implantVendorEmail").value = vendor.email || "";
+          document.getElementById("implantVendorMessenger").value = vendor.messenger || "";
+          document.getElementById("implantVendorMemo").value = vendor.memo || "";
+          form.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      });
+      app.querySelectorAll("[data-toggle-implant-vendor]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const vendor = implantVendorById(button.dataset.toggleImplantVendor);
+          if (!vendor) return;
+          await setDoc(doc(db, "implantVendors", vendor.id), {
+            active: vendor.active === false,
+            updatedAt: new Date().toISOString(),
+            ...auditUpdateFields()
+          }, { merge: true });
+        });
+      });
+    };
+
+    const loadImageFromFile = (file) => new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = reject;
+      image.src = URL.createObjectURL(file);
+    });
+
+    const compressImplantImage = async (photo) => {
+      const image = await loadImageFromFile(photo.file);
+      const cropSize = photo.cropped ? Math.min(image.naturalWidth, image.naturalHeight) : null;
+      const sourceX = cropSize ? Math.round((image.naturalWidth - cropSize) / 2) : 0;
+      const sourceY = cropSize ? Math.round((image.naturalHeight - cropSize) / 2) : 0;
+      const sourceWidth = cropSize || image.naturalWidth;
+      const sourceHeight = cropSize || image.naturalHeight;
+      const maxSide = 1600;
+      const scale = Math.min(1, maxSide / Math.max(sourceWidth, sourceHeight));
+      const baseWidth = Math.max(1, Math.round(sourceWidth * scale));
+      const baseHeight = Math.max(1, Math.round(sourceHeight * scale));
+      const rotated = Math.abs((photo.rotation || 0) % 180) === 90;
+      const canvas = document.createElement("canvas");
+      canvas.width = rotated ? baseHeight : baseWidth;
+      canvas.height = rotated ? baseWidth : baseHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(((photo.rotation || 0) * Math.PI) / 180);
+      ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, -baseWidth / 2, -baseHeight / 2, baseWidth, baseHeight);
+      ctx.restore();
+      URL.revokeObjectURL(image.src);
+      return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.82));
+    };
+
+    const uploadImplantPhoto = async (recordId, implantId, photo, surgeryDate) => {
+      if (!storageRef || !uploadBytes || !getDownloadURL) throw new Error("Firebase Storage가 준비되지 않았습니다.");
+      const blob = await compressImplantImage(photo);
+      const safeName = String(photo.file.name || "implant.jpg").replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `implant-records/${surgeryDate || today()}/${recordId}/${implantId}/${photo.id}-${safeName}.jpg`;
+      const candidates = [storage, storageFallback].filter(Boolean);
+      let lastError;
+      for (const bucket of candidates) {
+        try {
+          const refPath = storageRef(bucket, path);
+          await uploadBytes(refPath, blob, { contentType: "image/jpeg" });
+          const url = await getDownloadURL(refPath);
+          return {
+            id: photo.id,
+            url,
+            path,
+            name: photo.file.name || "",
+            size: blob.size,
+            contentType: "image/jpeg",
+            rotation: photo.rotation || 0,
+            cropped: Boolean(photo.cropped),
+            uploadedAt: new Date().toISOString()
+          };
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw lastError || new Error("사진 업로드에 실패했습니다.");
+    };
+
+    const createImplantRecordFromUsage = async (usage, implantDrafts) => {
+      const validDrafts = implantDrafts.filter((draft) => {
+        const vendorId = draft.vendorId || "";
+        const vendor = vendorId === "__custom__" ? draft.customVendor : implantVendorById(vendorId)?.name;
+        return String(vendor || "").trim() && String(draft.description || "").trim();
+      });
+      if (!validDrafts.length) return;
+      const recordId = uid();
+      const surgery = surgeryById(usage.surgeryId);
+      const doctor = departmentById(usage.doctorId);
+      const surgeryDate = usage.date || today();
+      const implants = [];
+      for (const draft of validDrafts) {
+        const vendor = draft.vendorId === "__custom__"
+          ? draft.customVendor.trim()
+          : (implantVendorById(draft.vendorId)?.name || draft.customVendor || "").trim();
+        const implantId = draft.id || uid();
+        const photos = [];
+        for (const photo of draft.photos || []) {
+          photos.push(await uploadImplantPhoto(recordId, implantId, photo, surgeryDate));
+        }
+        implants.push({
+          id: implantId,
+          vendorId: draft.vendorId && draft.vendorId !== "__custom__" ? draft.vendorId : "",
+          vendor,
+          description: draft.description.trim(),
+          photos
+        });
+      }
+      await setDoc(doc(db, "implantRecords", recordId), {
+        id: recordId,
+        usageId: usage.id,
+        surgeryDate,
+        surgeryTime: usage.surgeryTime || "",
+        patientNo: "",
+        patientName: usage.patientName || "",
+        patientId: usage.patientId || "",
+        department: surgery?.department || inferSurgeryDepartment(surgery?.name || "") || departmentCode(doctor?.name || ""),
+        doctorId: usage.doctorId || "",
+        surgeonCode: doctor?.name || "",
+        surgeryId: usage.surgeryId || "",
+        surgeryName: surgery?.name || "",
+        implants,
+        sendReady: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        ...auditCreateFields()
+      });
     };
 
     const bindUse = () => {
@@ -3897,6 +5340,12 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const openProductSearch = document.getElementById("openUseProductSearch");
       const closeProductSearch = document.getElementById("closeUseProductSearch");
       const productSearchModal = document.getElementById("useProductSearchModal");
+      const implantEnabled = document.getElementById("useImplantEnabled");
+      const implantPanel = document.getElementById("implantUsePanel");
+      const implantEntriesWrap = document.getElementById("implantVendorEntries");
+      const addImplantVendorEntry = document.getElementById("addImplantVendorEntry");
+      const implantDrafts = [];
+      let activeImplantEditPair = "";
       let manualRestrictNonpay = false;
       const setRestrictButton = (value) => {
         manualRestrictNonpay = Boolean(value);
@@ -3987,6 +5436,97 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         if (qtyInput) qtyInput.value = Math.max(1, num(qty));
         renderSelectedUseList();
       };
+      const addImplantDraft = () => {
+        implantDrafts.push({ id: uid(), vendorId: "", customVendor: "", description: "", photos: [] });
+        renderImplantDrafts();
+      };
+      const implantDraftById = (id) => implantDrafts.find((item) => item.id === id);
+      const renderImplantDrafts = () => {
+        implantEntriesWrap.innerHTML = implantDrafts.map((draft, index) => `
+          <div class="implant-vendor-card" data-implant-draft="${escapeHtml(draft.id)}">
+            <div class="implant-vendor-head">
+              <strong>업체 ${index + 1}</strong>
+              <button class="danger" type="button" data-remove-implant-draft="${escapeHtml(draft.id)}">업체 삭제</button>
+            </div>
+            <div class="row two">
+              <div>
+                <label for="implantVendorSelect-${escapeHtml(draft.id)}">업체명</label>
+                <select id="implantVendorSelect-${escapeHtml(draft.id)}" data-implant-vendor-select="${escapeHtml(draft.id)}">
+                  ${implantVendorOptions(draft.vendorId)}
+                </select>
+              </div>
+              <div ${draft.vendorId === "__custom__" ? "" : "hidden"}>
+                <label for="implantVendorCustom-${escapeHtml(draft.id)}">직접 입력</label>
+                <input id="implantVendorCustom-${escapeHtml(draft.id)}" data-implant-vendor-custom="${escapeHtml(draft.id)}" value="${escapeHtml(draft.customVendor || "")}" autocomplete="off">
+              </div>
+            </div>
+            <label for="implantDescription-${escapeHtml(draft.id)}">사용내용</label>
+            <textarea id="implantDescription-${escapeHtml(draft.id)}" data-implant-description="${escapeHtml(draft.id)}" placeholder="Plate 255-209-L&#10;Screw 22mm 3ea">${escapeHtml(draft.description || "")}</textarea>
+            <label for="implantPhotos-${escapeHtml(draft.id)}">사진첨부</label>
+            <div class="implant-photo-pickers">
+              <button class="secondary" type="button" data-open-implant-gallery="${escapeHtml(draft.id)}">파일 선택</button>
+              <button type="button" data-open-implant-camera="${escapeHtml(draft.id)}">사진 찍기</button>
+              <span class="muted">Android/iPad 카메라와 갤러리를 지원합니다.</span>
+              <input id="implantGallery-${escapeHtml(draft.id)}" type="file" accept="image/*" multiple data-implant-photo-input="${escapeHtml(draft.id)}">
+              <input id="implantCamera-${escapeHtml(draft.id)}" type="file" accept="image/*" capture="environment" data-implant-camera-input="${escapeHtml(draft.id)}">
+            </div>
+            <div class="implant-photo-grid">
+              ${(draft.photos || []).map((photo, photoIndex) => `
+                <div class="implant-photo" data-implant-photo="${escapeHtml(photo.id)}">
+                  <img src="${escapeHtml(photo.preview)}" alt="임플란트 사진 미리보기" style="transform:rotate(${num(photo.rotation)}deg);">
+                  <div class="implant-photo-actions">
+                    <button class="secondary" type="button" data-preview-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}">확대</button>
+                    <button class="secondary" type="button" data-edit-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}">편집</button>
+                    <button class="secondary" type="button" data-rotate-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}">회전</button>
+                    <button class="secondary" type="button" data-crop-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}">${photo.cropped ? "원본" : "자르기"}</button>
+                    <button class="secondary" type="button" data-move-implant-photo-up="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}" ${photoIndex === 0 ? "disabled" : ""}>앞</button>
+                    <button class="secondary" type="button" data-move-implant-photo-down="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}" ${photoIndex === draft.photos.length - 1 ? "disabled" : ""}>뒤</button>
+                    <button class="danger" type="button" data-remove-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}">삭제</button>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        `).join("") || `<div class="empty">임플란트 업체를 추가해 주세요.</div>`;
+      };
+      const updateImplantDraftFromInput = (target) => {
+        const vendorSelect = target.closest("[data-implant-draft]")?.querySelector("[data-implant-vendor-select]");
+        const id = target.dataset.implantVendorSelect || target.dataset.implantVendorCustom || target.dataset.implantDescription || vendorSelect?.dataset.implantVendorSelect;
+        const draft = implantDraftById(id);
+        if (!draft) return;
+        if (target.matches("[data-implant-vendor-select]")) {
+          draft.vendorId = target.value;
+          renderImplantDrafts();
+        } else if (target.matches("[data-implant-vendor-custom]")) {
+          draft.customVendor = target.value;
+        } else if (target.matches("[data-implant-description]")) {
+          draft.description = target.value;
+        }
+      };
+      const parseImplantPair = (value) => {
+        const [draftId, photoId] = String(value || "").split("::");
+        const draft = implantDraftById(draftId);
+        const photo = draft?.photos?.find((item) => item.id === photoId);
+        return { draft, photo };
+      };
+      const refreshImplantPhotoEditor = () => {
+        const { photo } = parseImplantPair(activeImplantEditPair);
+        const image = document.getElementById("implantPhotoModalImage");
+        const tools = document.getElementById("implantPhotoEditTools");
+        const cropButton = document.getElementById("implantModalCrop");
+        if (!photo || !image || !tools) return;
+        image.src = photo.preview;
+        image.style.transform = `rotate(${num(photo.rotation)}deg)`;
+        tools.hidden = false;
+        if (cropButton) cropButton.textContent = photo.cropped ? "원본으로" : "자르기";
+      };
+      const openImplantPhotoEditor = (pair) => {
+        activeImplantEditPair = pair;
+        const { photo } = parseImplantPair(pair);
+        if (!photo) return;
+        showImplantPhotoModal(photo.preview);
+        refreshImplantPhotoEditor();
+      };
       const renderProductSearchResults = () => {
         const query = normalizedName(productSearch.value);
         if (!query) {
@@ -4018,7 +5558,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const rule = currentUseRule();
         const restrictActive = isRestrictOn();
         if (!rule) {
-          recommendation.innerHTML = "";
+          const hasSurgerySelection = useDepartment.value && departmentSelect.value && surgerySelect.value;
+          recommendation.innerHTML = hasSurgerySelection
+            ? `<div class="empty">추천 비급여가 등록되지 않은 수술입니다. 수술은 저장할 수 있으며, 필요한 제품은 아래에서 직접 선택해 주세요.</div>`
+            : "";
           app.querySelectorAll("[data-use-product]").forEach((input) => input.closest(".check-card").style.display = "");
           renderSelectedUseList();
           return;
@@ -4085,10 +5628,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           .join("");
         if (doctors.some((item) => item.id === currentDoctor)) departmentSelect.value = currentDoctor;
         const surgeries = department && departmentSelect.value
-          ? state.surgeries.slice().sort((a, b) => alphaFirstCompare(a.name, b.name)).filter((item) => (item.department || inferSurgeryDepartment(item.name)) === department)
+          ? visibleSurgeriesFor(department, departmentSelect.value)
           : [];
         surgerySelect.innerHTML = `<option value="">${department && departmentSelect.value ? "수술 선택" : "원장 코드를 먼저 선택하세요"}</option>` + surgeries
-          .map((item) => `<option value="${item.id}">${escapeHtml(item.department || inferSurgeryDepartment(item.name))} - ${escapeHtml(item.name)}</option>`)
+          .map((item) => `<option value="${item.id}">${escapeHtml(item.department || inferSurgeryDepartment(item.name))} - ${escapeHtml(item.name)}${isCommonSurgery(item) ? "" : " · 전용"}</option>`)
           .join("");
         if (surgeries.some((item) => item.id === currentSurgery)) surgerySelect.value = currentSurgery;
         renderUseRecommendation();
@@ -4121,6 +5664,134 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         if (event.key === "Escape" && productSearchModal && !productSearchModal.hidden) hideProductSearchModal();
       }, { once: false });
       productSearch.addEventListener("input", renderProductSearchResults);
+      implantEnabled?.addEventListener("change", () => {
+        implantPanel.hidden = !implantEnabled.checked;
+        if (implantEnabled.checked && !implantDrafts.length) addImplantDraft();
+      });
+      addImplantVendorEntry?.addEventListener("click", addImplantDraft);
+      implantEntriesWrap?.addEventListener("input", (event) => {
+        updateImplantDraftFromInput(event.target);
+      });
+      implantEntriesWrap?.addEventListener("change", async (event) => {
+        const target = event.target;
+        updateImplantDraftFromInput(target);
+        if (target.matches("[data-implant-photo-input], [data-implant-camera-input]")) {
+          const draft = implantDraftById(target.dataset.implantPhotoInput || target.dataset.implantCameraInput);
+          if (!draft) return;
+          const files = Array.from(target.files || []).filter((file) => file.type.startsWith("image/"));
+          files.forEach((file) => draft.photos.push({
+            id: uid(),
+            file,
+            preview: URL.createObjectURL(file),
+            rotation: 0,
+            cropped: false
+          }));
+          target.value = "";
+          renderImplantDrafts();
+        }
+      });
+      implantEntriesWrap?.addEventListener("click", (event) => {
+        const galleryButton = event.target.closest("[data-open-implant-gallery]");
+        if (galleryButton) {
+          implantEntriesWrap.querySelector(`[data-implant-photo-input="${galleryButton.dataset.openImplantGallery}"]`)?.click();
+          return;
+        }
+        const cameraButton = event.target.closest("[data-open-implant-camera]");
+        if (cameraButton) {
+          implantEntriesWrap.querySelector(`[data-implant-camera-input="${cameraButton.dataset.openImplantCamera}"]`)?.click();
+          return;
+        }
+        const removeDraft = event.target.closest("[data-remove-implant-draft]");
+        if (removeDraft) {
+          const index = implantDrafts.findIndex((item) => item.id === removeDraft.dataset.removeImplantDraft);
+          if (index >= 0) {
+            (implantDrafts[index].photos || []).forEach((photo) => URL.revokeObjectURL(photo.preview));
+            implantDrafts.splice(index, 1);
+            renderImplantDrafts();
+          }
+          return;
+        }
+        const previewButton = event.target.closest("[data-preview-implant-photo]");
+        if (previewButton) {
+          const { photo } = parseImplantPair(previewButton.dataset.previewImplantPhoto);
+          activeImplantEditPair = "";
+          const tools = document.getElementById("implantPhotoEditTools");
+          const image = document.getElementById("implantPhotoModalImage");
+          if (tools) tools.hidden = true;
+          if (image) image.style.transform = "";
+          if (photo) showImplantPhotoModal(photo.preview);
+          return;
+        }
+        const editButton = event.target.closest("[data-edit-implant-photo]");
+        if (editButton) {
+          openImplantPhotoEditor(editButton.dataset.editImplantPhoto);
+          return;
+        }
+        const rotateButton = event.target.closest("[data-rotate-implant-photo]");
+        if (rotateButton) {
+          const { photo } = parseImplantPair(rotateButton.dataset.rotateImplantPhoto);
+          if (photo) {
+            photo.rotation = ((photo.rotation || 0) + 90) % 360;
+            renderImplantDrafts();
+          }
+          return;
+        }
+        const cropButton = event.target.closest("[data-crop-implant-photo]");
+        if (cropButton) {
+          const { photo } = parseImplantPair(cropButton.dataset.cropImplantPhoto);
+          if (photo) {
+            photo.cropped = !photo.cropped;
+            renderImplantDrafts();
+          }
+          return;
+        }
+        const removePhoto = event.target.closest("[data-remove-implant-photo]");
+        if (removePhoto) {
+          const { draft, photo } = parseImplantPair(removePhoto.dataset.removeImplantPhoto);
+          if (draft && photo) {
+            URL.revokeObjectURL(photo.preview);
+            draft.photos = draft.photos.filter((item) => item.id !== photo.id);
+            renderImplantDrafts();
+          }
+          return;
+        }
+        const moveUp = event.target.closest("[data-move-implant-photo-up]");
+        const moveDown = event.target.closest("[data-move-implant-photo-down]");
+        if (moveUp || moveDown) {
+          const pair = moveUp?.dataset.moveImplantPhotoUp || moveDown?.dataset.moveImplantPhotoDown;
+          const { draft, photo } = parseImplantPair(pair);
+          if (!draft || !photo) return;
+          const index = draft.photos.findIndex((item) => item.id === photo.id);
+          const nextIndex = moveUp ? index - 1 : index + 1;
+          if (nextIndex < 0 || nextIndex >= draft.photos.length) return;
+          [draft.photos[index], draft.photos[nextIndex]] = [draft.photos[nextIndex], draft.photos[index]];
+          renderImplantDrafts();
+        }
+      });
+      document.getElementById("closeImplantPhotoModal")?.addEventListener("click", hideImplantPhotoModal);
+      document.getElementById("implantPhotoModal")?.addEventListener("click", (event) => {
+        if (event.target.id === "implantPhotoModal") hideImplantPhotoModal();
+      });
+      document.getElementById("implantModalRotate")?.addEventListener("click", () => {
+        const { photo } = parseImplantPair(activeImplantEditPair);
+        if (!photo) return;
+        photo.rotation = ((photo.rotation || 0) + 90) % 360;
+        refreshImplantPhotoEditor();
+        renderImplantDrafts();
+        refreshImplantPhotoEditor();
+      });
+      document.getElementById("implantModalCrop")?.addEventListener("click", () => {
+        const { photo } = parseImplantPair(activeImplantEditPair);
+        if (!photo) return;
+        photo.cropped = !photo.cropped;
+        refreshImplantPhotoEditor();
+        renderImplantDrafts();
+        refreshImplantPhotoEditor();
+      });
+      document.getElementById("implantModalDone")?.addEventListener("click", () => {
+        activeImplantEditPair = "";
+        hideImplantPhotoModal();
+      });
       renderProductSearchResults();
       filterUseOptions();
       document.getElementById("useForm").addEventListener("submit", async (event) => {
@@ -4169,11 +5840,29 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           alert("재고가 부족한 제품이 있습니다.");
           return;
         }
+        const implantWillSave = implantEnabled?.checked;
+        const implantDraftPayload = implantWillSave ? implantDrafts.map((draft) => ({
+          ...draft,
+          vendorId: draft.vendorId || "",
+          customVendor: String(draft.customVendor || "").trim(),
+          description: String(draft.description || "").trim()
+        })).filter((draft) => {
+          const vendor = draft.vendorId === "__custom__" ? draft.customVendor : implantVendorById(draft.vendorId)?.name;
+          return String(vendor || "").trim() || draft.description || (draft.photos || []).length;
+        }) : [];
+        const invalidImplant = implantDraftPayload.find((draft) => {
+          const vendor = draft.vendorId === "__custom__" ? draft.customVendor : implantVendorById(draft.vendorId)?.name;
+          return !String(vendor || "").trim() || !draft.description;
+        });
+        if (invalidImplant) {
+          alert("임플란트 기록은 업체명과 사용내용을 모두 입력해 주세요.");
+          return;
+        }
         useItems.forEach((item) => {
           const product = productById(item.productId);
           product.stock = num(product.stock) - item.qty;
         });
-        state.usages.push({
+        const usageRecord = {
           id: uid(),
           patientName: document.getElementById("patientName").value.trim(),
           patientId: document.getElementById("patientId").value.trim(),
@@ -4183,11 +5872,21 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           date: today(),
           createdAt: new Date().toISOString(),
           ...auditCreateFields()
-        });
+        };
+        state.usages.push(usageRecord);
         currentView = "edit";
         pendingEditUsageId = state.usages[state.usages.length - 1]?.id || "";
         render();
         await saveState();
+        if (implantDraftPayload.length) {
+          try {
+            await createImplantRecordFromUsage(usageRecord, implantDraftPayload);
+            setStatus("사용내역 및 임플란트 기록 저장 완료", "ok");
+          } catch (error) {
+            console.error(error);
+            alert(`사용내역은 저장됐지만 임플란트 기록 저장에 실패했습니다: ${error.message}`);
+          }
+        }
       });
     };
 
@@ -4455,8 +6154,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     `;
 
     const usageItem = (usage, options = {}) => {
-      const showDelete = options.showDelete !== false && canEditUsage();
-      const showEdit = options.showEdit !== false && showDelete;
+      const showDelete = options.showDelete !== false && canDeleteUsageRecord(usage);
+      const showEdit = options.showEdit !== false && canEditUsage();
+      const showActions = options.showDelete !== false && (showEdit || showDelete);
       const doctor = departmentById(usage.doctorId);
       const surgery = surgeryById(usage.surgeryId);
       const surgeryDepartment = surgery ? (surgery.department || inferSurgeryDepartment(surgery.name)) : "-";
@@ -4504,9 +6204,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               ` : ""}
             </div>
           </div>
-          ${showDelete ? `<div class="actions">
-            ${showEdit ? `<button class="secondary" type="button" data-edit-usage="${usage.id}">사용내용 수정</button>` : ""}
-            <button class="danger" type="button" data-delete-usage="${usage.id}">사용내역 삭제</button>
+          ${showActions ? `<div class="actions">
+            ${showEdit ? `<button class="secondary" type="button" data-edit-usage="${usage.id}">${canModifyUsageRecord(usage) ? "사용내용 수정" : "사용내용 확인"}</button>` : ""}
+            ${showDelete ? `<button class="danger" type="button" data-delete-usage="${usage.id}">사용내역 삭제</button>` : ""}
           </div>` : ""}
         </div>
       `;
@@ -4717,12 +6417,13 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
 
     const deleteUsageRecord = async (usageId, { onSuccess } = {}) => {
-      if (!canEditUsage()) {
-        alert("관리자와 책임/입고 담당만 사용내역을 삭제할 수 있습니다.");
+      const usage = state.usages.find((item) => String(item.id) === String(usageId));
+      if (!usage) return false;
+      if (!canDeleteUsageRecord(usage)) {
+        alert(usagePastLockMessage(usage) || "사용내역 삭제는 관리자와 책임사용자만 가능합니다.");
         return false;
       }
-      const usage = state.usages.find((item) => String(item.id) === String(usageId));
-      if (!usage || !confirm("사용내역을 삭제하고 재고를 복구할까요?")) return false;
+      if (!confirm("사용내역을 삭제하고 재고를 복구할까요?")) return false;
       usage.productIds.forEach((id) => {
         const product = productById(id);
         if (product) product.stock = num(product.stock) + 1;
@@ -4928,15 +6629,42 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
     const capitalize = (value) => value.charAt(0).toUpperCase() + value.slice(1);
 
+    const subscribeImplantCollections = () => {
+      if (!db || !collection || !onSnapshot) return;
+      if (!implantRecordsUnsubscribe) {
+        implantRecordsUnsubscribe = onSnapshot(collection(db, "implantRecords"), (snapshot) => {
+          implantRecords = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+          if (hydrated && currentView === "implants") render();
+        }, (error) => {
+          console.error(error);
+          setStatus(`임플란트 기록 연결 오류: ${error.message}`, "error");
+        });
+      }
+      if (!implantVendorsUnsubscribe) {
+        implantVendorsUnsubscribe = onSnapshot(collection(db, "implantVendors"), (snapshot) => {
+          implantVendors = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+          if (hydrated && (currentView === "use" || (currentView === "settings" && currentSettingsView === "implantVendors"))) render();
+        }, (error) => {
+          console.error(error);
+          setStatus(`임플란트 업체 연결 오류: ${error.message}`, "error");
+        });
+      }
+    };
+
     const boot = async () => {
       if (!ensureLocalSession()) return;
       render();
       try {
         const firebaseApp = initializeApp(firebaseConfig);
         db = getFirestore(firebaseApp);
+        if (getStorage) {
+          storage = getStorage(firebaseApp, "gs://nonpay-inventory.firebasestorage.app");
+          storageFallback = getStorage(firebaseApp, "gs://nonpay-inventory.appspot.com");
+        }
         const verifiedUser = await verifySessionUser();
         if (!verifiedUser) return;
         ref = doc(db, "app", "main");
+        subscribeImplantCollections();
         try {
           await enableIndexedDbPersistence(db);
         } catch (error) {
@@ -4973,6 +6701,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
     window.addEventListener("beforeunload", () => {
       if (unsubscribe) unsubscribe();
+      if (implantRecordsUnsubscribe) implantRecordsUnsubscribe();
+      if (implantVendorsUnsubscribe) implantVendorsUnsubscribe();
     });
 
     const loadFirebaseAndBoot = async () => {
@@ -4982,6 +6712,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         setStatus("Firebase 모듈 불러오는 중", "ok");
         const appModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js");
         const firestoreModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js");
+        const storageModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js");
         initializeApp = appModule.initializeApp;
         getFirestore = firestoreModule.getFirestore;
         doc = firestoreModule.doc;
@@ -4990,6 +6721,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         runTransaction = firestoreModule.runTransaction;
         onSnapshot = firestoreModule.onSnapshot;
         enableIndexedDbPersistence = firestoreModule.enableIndexedDbPersistence;
+        collection = firestoreModule.collection;
+        getStorage = storageModule.getStorage;
+        storageRef = storageModule.ref;
+        uploadBytes = storageModule.uploadBytes;
+        getDownloadURL = storageModule.getDownloadURL;
         await boot();
       } catch (error) {
         console.error(error);
