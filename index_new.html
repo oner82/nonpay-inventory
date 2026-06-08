@@ -5931,7 +5931,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       return { x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight };
     };
 
-    const renderImplantPhotoBlob = async (photo, maxSide = 1200, quality = 0.72) => {
+    const renderImplantPhotoBlob = async (photo, maxSide = 2400, quality = 0.9) => {
       const image = await loadImageFromImplantPhoto(photo);
       const source = implantSourceRect(photo, image);
       const sourceX = source.x;
@@ -5955,7 +5955,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/jpeg", quality));
     };
 
-    const compressImplantImage = (photo) => renderImplantPhotoBlob(photo, 1200, 0.72);
+    const compressImplantImage = (photo) => renderImplantPhotoBlob(photo, 2400, 0.9);
     const blobToDataUrl = (blob) => new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result || "");
@@ -5963,7 +5963,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       reader.readAsDataURL(blob);
     });
     const implantPhotoFallbackPayload = async (photo, errorMessage = "") => {
-      const blob = await renderImplantPhotoBlob(photo, 480, 0.56);
+      const blob = await renderImplantPhotoBlob(photo, 1200, 0.82);
       return {
         id: photo.id || uid(),
         url: photo.url || "",
@@ -5984,7 +5984,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     const refreshEditedImplantPreview = async (photo) => {
       if (!photo) return;
       if (photo.editedPreview) URL.revokeObjectURL(photo.editedPreview);
-      const blob = await renderImplantPhotoBlob(photo, 900, 0.78);
+      const blob = await renderImplantPhotoBlob(photo, 1200, 0.86);
       photo.editedPreview = URL.createObjectURL(blob);
     };
 
