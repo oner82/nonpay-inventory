@@ -2074,16 +2074,39 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       : (usage.patientName || "");
     const canAssignImplantPatientNo = () => ["admin", "manager"].includes(currentUserRole());
     const canEditImplantPatientNo = () => currentUserRole() === "admin";
+    const implantRecordsForUsage = (usageId) => sortImplantRecords(implantRecords.filter((record) => sameId(record.usageId, usageId)));
+    const isImplantLedgerClosed = (record) => Boolean(implantPatientNoText(record) || record?.closedAt || record?.patientNoAssignedAt);
+    const implantEditLockMessage = (record) => {
+      if (!record) return "";
+      if (isImplantLedgerClosed(record)) return "임플란트 장부가 마감되어 관리자만 임플란트 기록을 수정할 수 있습니다.";
+      if (implantRecordDate(record) !== today()) return "당일이 아닌 임플란트 기록은 관리자만 수정할 수 있습니다.";
+      return "";
+    };
+    const canModifyImplantRecord = (record) => {
+      if (!canEditUsage()) return false;
+      if (currentUserRole() === "admin") return true;
+      if (isImplantLedgerClosed(record)) return false;
+      const linkedUsage = state.usages.find((usage) => sameId(usage.id, record?.usageId));
+      if (linkedUsage) return isTodayUsage(linkedUsage);
+      return implantRecordDate(record) === today();
+    };
     const activeImplantVendors = () => implantVendors
       .filter((item) => item.active !== false)
       .slice()
       .sort((a, b) => alphaFirstCompare(a.name, b.name));
     const implantVendorById = (id) => implantVendors.find((item) => sameId(item.id, id));
-    const implantVendorOptions = (selectedId = "") => `
-      <option value="">업체 선택</option>
-      ${activeImplantVendors().map((item) => `<option value="${escapeHtml(item.id)}" ${sameId(item.id, selectedId) ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
-      <option value="__custom__" ${selectedId === "__custom__" ? "selected" : ""}>직접 입력</option>
-    `;
+    const implantVendorOptions = (selectedId = "") => {
+      const activeVendors = activeImplantVendors();
+      const selectedInactive = selectedId && selectedId !== "__custom__" && !activeVendors.some((item) => sameId(item.id, selectedId))
+        ? implantVendorById(selectedId)
+        : null;
+      return `
+        <option value="">업체 선택</option>
+        ${selectedInactive ? `<option value="${escapeHtml(selectedInactive.id)}" selected>${escapeHtml(selectedInactive.name || "비활성 업체")} · 비활성</option>` : ""}
+        ${activeVendors.map((item) => `<option value="${escapeHtml(item.id)}" ${sameId(item.id, selectedId) ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
+        <option value="__custom__" ${selectedId === "__custom__" ? "selected" : ""}>직접 입력</option>
+      `;
+    };
     const implantRecordDate = (record) => record?.surgeryDate || String(record?.createdAt || "").slice(0, 10) || "";
     const implantPatientNoText = (record) => String(record?.patientNo || "").trim();
     const implantPatientNoSortValue = (record) => {
@@ -4754,6 +4777,15 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             <input id="editProductSearch" autocomplete="off" placeholder="제품명을 입력하면 바로 찾을 수 있습니다">
             <div id="editProductSearchResults" class="product-picker"></div>
           </div>
+          <div class="card" id="editImplantSection" hidden>
+            <h3>임플란트 기록 수정</h3>
+            <p class="helper">선택한 환자 사용내역과 연결된 임플란트 업체명·사용내용을 함께 수정합니다. 기존 사진은 유지되며, 사진 추가/교체는 사용입력 탭의 신규 기록에서만 가능합니다.</p>
+            <div id="editImplantLockNote"></div>
+            <div id="editImplantRows" class="implant-panel"></div>
+            <div class="actions">
+              <button class="secondary" type="button" id="addEditImplantRow">임플란트 업체 추가</button>
+            </div>
+          </div>
           <label>제품 여러 개 선택</label>
           <div class="product-picker">
             ${renderGroupedProducts(false)}
@@ -4782,7 +4814,14 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const selectedList = document.getElementById("editSelectedUseList");
       const productSearch = document.getElementById("editProductSearch");
       const productSearchResults = document.getElementById("editProductSearchResults");
+      const editImplantSection = document.getElementById("editImplantSection");
+      const editImplantLockNote = document.getElementById("editImplantLockNote");
+      const editImplantRowsWrap = document.getElementById("editImplantRows");
+      const addEditImplantRow = document.getElementById("addEditImplantRow");
       const deleteButton = document.getElementById("editUsageDelete");
+      let editImplantRecordId = "";
+      let editImplantRows = [];
+      let editImplantCanModify = true;
       const renderUsageSelectOptions = (date, selectedId = "") => {
         const validSelectedId = selectedId && state.usages.some((usage) => usage.id === selectedId && (usage.date || "") === date) ? selectedId : "";
         select.value = validSelectedId;
@@ -4794,6 +4833,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         deleteButton.style.display = "none";
         if (lockNote) lockNote.innerHTML = "";
         if (formTitle) formTitle.textContent = "사용내용 수정";
+        if (editImplantSection) editImplantSection.hidden = true;
+        if (editImplantLockNote) editImplantLockNote.innerHTML = "";
+        editImplantRecordId = "";
+        editImplantRows = [];
         pendingEditUsageId = "";
         if (patientList) patientList.querySelectorAll("[data-edit-usage-card]").forEach((card) => card.classList.remove("active"));
       };
@@ -4818,6 +4861,96 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           input.value = 1;
           input.disabled = false;
         });
+      };
+      const implantVendorSelectValue = (implant) => {
+        if (implant.vendorId) return implant.vendorId;
+        const matched = implantVendors.find((vendor) => normalizedName(vendor.name) === normalizedName(implant.vendor));
+        return matched?.id || (implant.vendor ? "__custom__" : "");
+      };
+      const implantVendorCustomValue = (implant) => {
+        const selected = implantVendorSelectValue(implant);
+        return selected === "__custom__" ? (implant.vendor || "") : "";
+      };
+      const renderEditImplantRows = () => {
+        if (!editImplantRowsWrap) return;
+        editImplantRowsWrap.innerHTML = editImplantRows.length ? editImplantRows.map((row, index) => `
+          <div class="implant-vendor-card" data-edit-implant-row="${escapeHtml(row.id)}">
+            <div class="implant-vendor-head">
+              <strong>업체 ${index + 1}</strong>
+              <button class="danger" type="button" data-remove-edit-implant-row="${escapeHtml(row.id)}" ${editImplantCanModify ? "" : "disabled"}>업체 삭제</button>
+            </div>
+            <div class="row two">
+              <div>
+                <label for="editImplantVendorSelect-${escapeHtml(row.id)}">업체명</label>
+                <select id="editImplantVendorSelect-${escapeHtml(row.id)}" data-edit-implant-vendor-select="${escapeHtml(row.id)}" ${editImplantCanModify ? "" : "disabled"}>
+                  ${implantVendorOptions(row.vendorId)}
+                </select>
+              </div>
+              <div ${row.vendorId === "__custom__" ? "" : "hidden"}>
+                <label for="editImplantVendorCustom-${escapeHtml(row.id)}">직접 입력</label>
+                <input id="editImplantVendorCustom-${escapeHtml(row.id)}" data-edit-implant-vendor-custom="${escapeHtml(row.id)}" value="${escapeHtml(row.customVendor || "")}" autocomplete="off" ${editImplantCanModify ? "" : "disabled"}>
+              </div>
+            </div>
+            <label for="editImplantDescription-${escapeHtml(row.id)}">사용내용</label>
+            <textarea id="editImplantDescription-${escapeHtml(row.id)}" data-edit-implant-description="${escapeHtml(row.id)}" placeholder="Plate 255-209-L&#10;Screw 22mm 3ea" ${editImplantCanModify ? "" : "disabled"}>${escapeHtml(row.description || "")}</textarea>
+            <div class="meta">
+              <span>기존 사진 ${(row.photos || []).length}장 유지</span>
+              ${(row.photos || []).map((photo) => photo.url ? `<img class="implant-photo-thumb" src="${escapeHtml(photo.url)}" alt="임플란트 기존 사진" data-implant-photo-view="${escapeHtml(photo.url)}">` : "").join("")}
+            </div>
+          </div>
+        `).join("") : `<div class="empty">연결된 임플란트 업체 기록이 없습니다. 필요하면 업체를 추가한 뒤 저장하세요.</div>`;
+      };
+      const updateEditImplantRowFromInput = (target) => {
+        const rowId = target.dataset.editImplantVendorSelect || target.dataset.editImplantVendorCustom || target.dataset.editImplantDescription;
+        const row = editImplantRows.find((item) => item.id === rowId);
+        if (!row) return;
+        if (target.matches("[data-edit-implant-vendor-select]")) {
+          row.vendorId = target.value;
+          if (target.value !== "__custom__") row.customVendor = "";
+          renderEditImplantRows();
+        } else if (target.matches("[data-edit-implant-vendor-custom]")) {
+          row.customVendor = target.value;
+        } else if (target.matches("[data-edit-implant-description]")) {
+          row.description = target.value;
+        }
+      };
+      const readEditImplantRows = () => Array.from(editImplantRowsWrap?.querySelectorAll("[data-edit-implant-row]") || []).map((rowElement) => {
+        const rowId = rowElement.dataset.editImplantRow;
+        const current = editImplantRows.find((item) => item.id === rowId) || {};
+        const vendorId = rowElement.querySelector("[data-edit-implant-vendor-select]")?.value || "";
+        const customVendor = rowElement.querySelector("[data-edit-implant-vendor-custom]")?.value.trim() || "";
+        const description = rowElement.querySelector("[data-edit-implant-description]")?.value.trim() || "";
+        const vendor = vendorId === "__custom__"
+          ? customVendor
+          : (implantVendorById(vendorId)?.name || current.vendor || "");
+        return {
+          id: rowId || uid(),
+          vendorId: vendorId && vendorId !== "__custom__" ? vendorId : "",
+          customVendor,
+          vendor: String(vendor || "").trim(),
+          description,
+          photos: Array.isArray(current.photos) ? current.photos : []
+        };
+      }).filter((row) => row.vendor || row.description || row.photos.length);
+      const loadEditImplantsForUsage = (usage, canModify) => {
+        const record = implantRecordsForUsage(usage.id)[0];
+        editImplantCanModify = canModify && (!record || canModifyImplantRecord(record));
+        const implantLockMessage = record && !editImplantCanModify ? implantEditLockMessage(record) : "";
+        editImplantRecordId = record?.id || "";
+        editImplantRows = (Array.isArray(record?.implants) ? record.implants : []).map((implant) => ({
+          id: implant.id || uid(),
+          vendorId: implantVendorSelectValue(implant),
+          customVendor: implantVendorCustomValue(implant),
+          vendor: implant.vendor || "",
+          description: implant.description || "",
+          photos: Array.isArray(implant.photos) ? implant.photos : []
+        }));
+        if (editImplantSection) editImplantSection.hidden = false;
+        if (editImplantLockNote) {
+          editImplantLockNote.innerHTML = implantLockMessage ? `<div class="edit-lock-note">${escapeHtml(implantLockMessage)} 관리자에게 요청해 주세요.</div>` : "";
+        }
+        if (addEditImplantRow) addEditImplantRow.disabled = !editImplantCanModify;
+        renderEditImplantRows();
       };
       const syncEditStockLimits = (usage) => {
         const originalCounts = usageProductItems(usage).reduce((map, item) => {
@@ -4934,6 +5067,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         }
         clearProducts();
         usageProductItems(usage).forEach((item) => selectProduct(item.productId, item.qty));
+        loadEditImplantsForUsage(usage, canModify);
         renderSearch();
         renderSelected();
         if (!canModify) {
@@ -4973,6 +5107,28 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         });
       });
       productSearch.addEventListener("input", renderSearch);
+      editImplantRowsWrap?.addEventListener("input", (event) => updateEditImplantRowFromInput(event.target));
+      editImplantRowsWrap?.addEventListener("change", (event) => updateEditImplantRowFromInput(event.target));
+      editImplantRowsWrap?.addEventListener("click", (event) => {
+        const image = event.target.closest("[data-implant-photo-view]");
+        if (image) {
+          showImplantPhotoModal(image.dataset.implantPhotoView);
+          return;
+        }
+        const removeButton = event.target.closest("[data-remove-edit-implant-row]");
+        if (!removeButton || !editImplantCanModify) return;
+        editImplantRows = editImplantRows.filter((row) => row.id !== removeButton.dataset.removeEditImplantRow);
+        renderEditImplantRows();
+      });
+      addEditImplantRow?.addEventListener("click", () => {
+        if (!editImplantCanModify) return;
+        editImplantRows.push({ id: uid(), vendorId: "", customVendor: "", vendor: "", description: "", photos: [] });
+        renderEditImplantRows();
+      });
+      document.getElementById("closeImplantPhotoModal")?.addEventListener("click", hideImplantPhotoModal);
+      document.getElementById("implantPhotoModal")?.addEventListener("click", (event) => {
+        if (event.target.id === "implantPhotoModal") hideImplantPhotoModal();
+      });
       document.getElementById("editUsageCancel").addEventListener("click", resetLoadedUsage);
       deleteButton.addEventListener("click", async () => {
         const usageId = document.getElementById("editUsageId").value;
@@ -5000,6 +5156,12 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         }
         if (!newProductIds.length) {
           alert("제품을 하나 이상 선택해 주세요.");
+          return;
+        }
+        const nextImplants = readEditImplantRows();
+        const incompleteImplant = nextImplants.find((implant) => !implant.vendor || !implant.description);
+        if (incompleteImplant) {
+          alert("임플란트 기록은 업체명과 사용내용을 모두 입력해 주세요.");
           return;
         }
         usage.productIds.forEach((productId) => {
@@ -5041,6 +5203,13 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         currentView = "dashboard";
         pendingEditUsageId = "";
         await saveState("수정 완료");
+        if (editImplantCanModify) {
+          try {
+            await saveImplantRecordFromEdit(next, editImplantRecordId, nextImplants);
+          } catch (error) {
+            alert(`사용내역은 저장됐지만 임플란트 기록 수정에 실패했습니다: ${error.message}`);
+          }
+        }
         render();
       });
       filterOptions();
@@ -5332,6 +5501,49 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         }
       }
       throw lastError || new Error("사진 업로드에 실패했습니다.");
+    };
+
+    const implantRecordBasePayload = (usage) => {
+      const surgery = surgeryById(usage.surgeryId);
+      const doctor = departmentById(usage.doctorId);
+      return {
+        usageId: usage.id,
+        surgeryDate: usage.date || today(),
+        surgeryTime: usage.surgeryTime || "",
+        patientName: usage.patientName || "",
+        patientId: usage.patientId || "",
+        department: surgery?.department || inferSurgeryDepartment(surgery?.name || "") || departmentCode(doctor?.name || ""),
+        doctorId: usage.doctorId || "",
+        surgeonCode: doctor?.name || "",
+        surgeryId: usage.surgeryId || "",
+        surgeryName: surgery?.name || ""
+      };
+    };
+
+    const saveImplantRecordFromEdit = async (usage, recordId, implants) => {
+      const cleanImplants = implants.map((implant) => ({
+        id: implant.id || uid(),
+        vendorId: implant.vendorId || "",
+        vendor: implant.vendor || "",
+        description: implant.description || "",
+        photos: Array.isArray(implant.photos) ? implant.photos : []
+      }));
+      if (!recordId && !cleanImplants.length) return;
+      const nextRecordId = recordId || uid();
+      const existing = recordId ? implantRecords.find((record) => sameId(record.id, recordId)) : null;
+      if (existing && !canModifyImplantRecord(existing)) {
+        throw new Error("임플란트 기록 수정 권한이 없습니다.");
+      }
+      await setDoc(doc(db, "implantRecords", nextRecordId), {
+        id: nextRecordId,
+        ...(existing?.patientNo ? { patientNo: existing.patientNo } : { patientNo: "" }),
+        ...implantRecordBasePayload(usage),
+        implants: cleanImplants,
+        sendReady: cleanImplants.length > 0,
+        updatedAt: new Date().toISOString(),
+        ...(existing?.createdAt ? {} : { createdAt: new Date().toISOString() }),
+        ...(existing ? auditUpdateFields() : auditCreateFields())
+      }, { merge: true });
     };
 
     const createImplantRecordFromUsage = async (usage, implantDrafts) => {
