@@ -4393,7 +4393,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const pending = num(implant.pendingPhotoCount);
       const errors = Array.isArray(implant.photoUploadErrors) ? implant.photoUploadErrors : [];
       if (!pending && !errors.length) return "";
-      return `<div class="muted">${pending ? `사진 ${pending}장 업로드 대기` : ""}${pending && errors.length ? " · " : ""}${errors.length ? `사진 업로드 확인 필요 ${errors.length}건` : ""}</div>`;
+      const missingPhotoHint = pending && !(implant.photos || []).length ? " · 사진이 보이지 않으면 수정에서 다시 첨부" : "";
+      return `<div class="muted">${pending ? `사진 ${pending}장 업로드 대기${missingPhotoHint}` : ""}${pending && errors.length ? " · " : ""}${errors.length ? `사진 업로드 확인 필요 ${errors.length}건` : ""}</div>`;
     };
 
     const implantRecordCardHtml = (record) => {
@@ -5892,7 +5893,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
       const loadImageFromImplantPhoto = (photo) => photo.file
       ? loadImageFromFile(photo.file)
-      : loadImageFromUrl(photo.preview || photo.url || "");
+      : loadImageFromUrl(photo.preview || photo.url || photo.dataUrl || "");
 
     const implantCropNumber = (value, fallback = 0) => {
       const parsed = Number.parseFloat(value);
@@ -5930,7 +5931,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       return { x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight };
     };
 
-    const renderImplantPhotoBlob = async (photo, maxSide = 1600) => {
+    const renderImplantPhotoBlob = async (photo, maxSide = 1200, quality = 0.72) => {
       const image = await loadImageFromImplantPhoto(photo);
       const source = implantSourceRect(photo, image);
       const sourceX = source.x;
@@ -5951,10 +5952,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, -baseWidth / 2, -baseHeight / 2, baseWidth, baseHeight);
       ctx.restore();
       if ((photo.file || image.dataset.objectUrl) && image.src) URL.revokeObjectURL(image.src);
-      return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.82));
+      return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/jpeg", quality));
     };
 
-    const compressImplantImage = (photo) => renderImplantPhotoBlob(photo, 1600);
+    const compressImplantImage = (photo) => renderImplantPhotoBlob(photo, 1200, 0.72);
     const blobToDataUrl = (blob) => new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result || "");
@@ -5962,7 +5963,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       reader.readAsDataURL(blob);
     });
     const implantPhotoFallbackPayload = async (photo, errorMessage = "") => {
-      const blob = await renderImplantPhotoBlob(photo, 700);
+      const blob = await renderImplantPhotoBlob(photo, 480, 0.56);
       return {
         id: photo.id || uid(),
         url: photo.url || "",
@@ -5983,8 +5984,16 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     const refreshEditedImplantPreview = async (photo) => {
       if (!photo) return;
       if (photo.editedPreview) URL.revokeObjectURL(photo.editedPreview);
-      const blob = await renderImplantPhotoBlob(photo, 900);
+      const blob = await renderImplantPhotoBlob(photo, 900, 0.78);
       photo.editedPreview = URL.createObjectURL(blob);
+    };
+
+    const initialImplantPhotoPayload = async (photo) => {
+      if (photo.url || photo.dataUrl) return cleanImplantPhotoPayload(photo);
+      if (photo.file || photo.preview || photo.editedPreview) {
+        return implantPhotoFallbackPayload(photo, "Storage upload pending");
+      }
+      return cleanImplantPhotoPayload(photo);
     };
 
     const uploadImplantPhoto = async (recordId, implantId, photo, surgeryDate) => {
@@ -6057,14 +6066,21 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         throw new Error("임플란트 기록 수정 권한이 없습니다.");
       }
       const surgeryDate = usage.date || today();
-      const cleanImplants = implants.map((implant) => ({
-        id: implant.id || uid(),
-        vendorId: implant.vendorId || "",
-        vendor: implant.vendor || "",
-        description: implant.description || "",
-        photos: (implant.photos || []).filter((photo) => photo.url || photo.dataUrl).map(cleanImplantPhotoPayload),
-        pendingPhotoCount: (implant.photos || []).filter((photo) => photo.file || photo.needsReupload).length
-      }));
+      const cleanImplants = [];
+      for (const implant of implants) {
+        const initialPhotos = [];
+        for (const photo of implant.photos || []) {
+          initialPhotos.push(await initialImplantPhotoPayload(photo));
+        }
+        cleanImplants.push({
+          id: implant.id || uid(),
+          vendorId: implant.vendorId || "",
+          vendor: implant.vendor || "",
+          description: implant.description || "",
+          photos: initialPhotos.filter((photo) => photo.url || photo.dataUrl),
+          pendingPhotoCount: (implant.photos || []).filter((photo) => photo.file || photo.needsReupload).length
+        });
+      }
       await setDoc(doc(db, "implantRecords", nextRecordId), {
         id: nextRecordId,
         ...(existing?.patientNo ? { patientNo: existing.patientNo } : { patientNo: "" }),
@@ -6123,19 +6139,24 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const surgery = surgeryById(usage.surgeryId);
       const doctor = departmentById(usage.doctorId);
       const surgeryDate = usage.date || today();
-      const implants = validDrafts.map((draft) => {
+      const implants = [];
+      for (const draft of validDrafts) {
         const vendor = draft.vendorId === "__custom__"
           ? draft.customVendor.trim()
           : (implantVendorById(draft.vendorId)?.name || draft.customVendor || "").trim();
-        return {
+        const initialPhotos = [];
+        for (const photo of draft.photos || []) {
+          initialPhotos.push(await initialImplantPhotoPayload(photo));
+        }
+        implants.push({
           id: draft.id || uid(),
           vendorId: draft.vendorId && draft.vendorId !== "__custom__" ? draft.vendorId : "",
           vendor,
           description: draft.description.trim(),
-          photos: [],
+          photos: initialPhotos.filter((photo) => photo.url || photo.dataUrl),
           pendingPhotoCount: (draft.photos || []).length
-        };
-      });
+        });
+      }
       const baseRecord = {
         id: recordId,
         usageId: usage.id,
