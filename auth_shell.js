@@ -14,10 +14,10 @@ const roleLabels = {
 };
 
 const roleAllowedViews = {
-  admin: ["dashboard", "use", "edit", "history", "receipts", "settings"],
-  manager: ["dashboard", "use", "edit", "history", "receipts", "settings"],
-  receiver: ["receipts"],
-  staff: ["dashboard", "use", "edit", "history"]
+  admin: ["dashboard", "use", "edit", "history", "receipts", "implants", "settings"],
+  manager: ["dashboard", "use", "edit", "history", "receipts", "implants", "settings"],
+  receiver: ["receipts", "implants"],
+  staff: ["dashboard", "use", "edit", "history", "implants"]
 };
 let accounts = [];
 let setupMode = false;
@@ -133,7 +133,7 @@ function showApp() {
   setupMode = false;
   $("loginScreen").style.display = "none";
   $("appShell").style.display = "block";
-  $("inventoryFrame").src = "./index_new.html?v=20260606-implant-photo";
+  $("inventoryFrame").src = "./index_new.html?v=20260608-implant-tab";
   $("currentUserText").textContent = `${currentUser.name} (${currentUser.loginId})`;
   $("roleText").textContent = roleLabels[currentUser.role] || currentUser.role;
   $("accountManageBtn").style.display = currentUser.role === "admin" ? "inline-flex" : "none";
