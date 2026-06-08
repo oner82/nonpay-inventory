@@ -1252,6 +1252,10 @@
       border-radius: 8px;
       background: #eef4ff;
     }
+    .implant-photo img.cropped {
+      outline: 3px solid rgba(35,196,131,.75);
+      outline-offset: -3px;
+    }
     .implant-photo-actions {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1317,6 +1321,13 @@
       margin: 0 auto;
       border-radius: 10px;
       background: #fff;
+    }
+    .implant-modal-image.cropped {
+      width: min(82vw, 82vh, 720px);
+      height: min(82vw, 82vh, 720px);
+      object-fit: cover;
+      outline: 4px solid rgba(35,196,131,.85);
+      outline-offset: -4px;
     }
     .implant-vendor-contact-list { display: grid; gap: 10px; }
     .implant-send-preview {
@@ -4910,11 +4921,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
                 const src = editImplantPhotoSrc(photo);
                 return src ? `
                 <div class="implant-photo" data-edit-implant-photo="${escapeHtml(photo.id)}">
-                  <img src="${escapeHtml(src)}" alt="임플란트 ${photo.file ? "신규" : "기존"} 사진" style="transform:rotate(${num(photo.rotation)}deg);">
+                  <img class="${photo.cropped ? "cropped" : ""}" src="${escapeHtml(src)}" alt="임플란트 ${photo.file ? "신규" : "기존"} 사진" style="transform:rotate(${num(photo.rotation)}deg);">
                   <div class="implant-photo-actions">
                     <button class="secondary" type="button" data-preview-edit-implant-photo="${escapeHtml(row.id)}::${escapeHtml(photo.id)}">확대</button>
-                    ${photo.file ? `<button class="secondary" type="button" data-rotate-edit-implant-photo="${escapeHtml(row.id)}::${escapeHtml(photo.id)}" ${editImplantCanModify ? "" : "disabled"}>회전</button>` : ""}
-                    ${photo.file ? `<button class="secondary" type="button" data-crop-edit-implant-photo="${escapeHtml(row.id)}::${escapeHtml(photo.id)}" ${editImplantCanModify ? "" : "disabled"}>${photo.cropped ? "원본" : "자르기"}</button>` : ""}
+                    <button class="secondary" type="button" data-rotate-edit-implant-photo="${escapeHtml(row.id)}::${escapeHtml(photo.id)}" ${editImplantCanModify ? "" : "disabled"}>회전</button>
+                    <button class="secondary" type="button" data-crop-edit-implant-photo="${escapeHtml(row.id)}::${escapeHtml(photo.id)}" ${editImplantCanModify ? "" : "disabled"}>${photo.cropped ? "원본" : "자르기"}</button>
                     <button class="secondary" type="button" data-move-edit-implant-photo-up="${escapeHtml(row.id)}::${escapeHtml(photo.id)}" ${!editImplantCanModify || photoIndex === 0 ? "disabled" : ""}>앞</button>
                     <button class="secondary" type="button" data-move-edit-implant-photo-down="${escapeHtml(row.id)}::${escapeHtml(photo.id)}" ${!editImplantCanModify || photoIndex === photos.length - 1 ? "disabled" : ""}>뒤</button>
                     <button class="danger" type="button" data-remove-edit-implant-photo="${escapeHtml(row.id)}::${escapeHtml(photo.id)}" ${editImplantCanModify ? "" : "disabled"}>삭제</button>
@@ -5183,14 +5194,18 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           const pair = previewButton.dataset.previewEditImplantPhoto;
           const { photo } = parseEditImplantPair(pair);
           const src = photo ? editImplantPhotoSrc(photo) : "";
-          if (src) showImplantPhotoModal(src);
+          if (src) {
+            showImplantPhotoModal(src);
+            document.getElementById("implantPhotoModalImage")?.classList.toggle("cropped", Boolean(photo?.cropped));
+          }
           return;
         }
         const rotateButton = event.target.closest("[data-rotate-edit-implant-photo]");
         if (rotateButton && editImplantCanModify) {
           const { photo } = parseEditImplantPair(rotateButton.dataset.rotateEditImplantPhoto);
-          if (photo?.file) {
+          if (photo) {
             photo.rotation = ((photo.rotation || 0) + 90) % 360;
+            if (!photo.file && photo.url) photo.needsReupload = true;
             renderEditImplantRows();
           }
           return;
@@ -5198,8 +5213,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const cropButton = event.target.closest("[data-crop-edit-implant-photo]");
         if (cropButton && editImplantCanModify) {
           const { photo } = parseEditImplantPair(cropButton.dataset.cropEditImplantPhoto);
-          if (photo?.file) {
+          if (photo) {
             photo.cropped = !photo.cropped;
+            if (!photo.file && photo.url) photo.needsReupload = true;
             renderEditImplantRows();
           }
           return;
@@ -5274,9 +5290,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           return;
         }
         const nextImplants = readEditImplantRows();
-        const incompleteImplant = nextImplants.find((implant) => !implant.vendor || !implant.description);
+        const incompleteImplant = nextImplants.find((implant) => !implant.vendor || (!implant.description && !(implant.photos || []).length));
         if (incompleteImplant) {
-          alert("임플란트 기록은 업체명과 사용내용을 모두 입력해 주세요.");
+          alert("임플란트 기록은 업체명을 선택하고, 사용내용 또는 사진 중 하나는 입력해 주세요.");
           return;
         }
         usage.productIds.forEach((productId) => {
@@ -5344,6 +5360,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const image = document.getElementById("implantPhotoModalImage");
       if (!modal || !image || !url) return;
       image.src = url;
+      image.classList.remove("cropped");
       modal.hidden = false;
     };
 
@@ -5353,6 +5370,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const tools = document.getElementById("implantPhotoEditTools");
       if (image) image.removeAttribute("src");
       if (image) image.style.transform = "";
+      if (image) image.classList.remove("cropped");
       if (tools) tools.hidden = true;
       if (modal) modal.hidden = true;
     };
@@ -5563,8 +5581,27 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       image.src = URL.createObjectURL(file);
     });
 
+    const loadImageFromUrl = async (url) => {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("사진 원본을 불러오지 못했습니다.");
+      const objectUrl = URL.createObjectURL(await response.blob());
+      return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => {
+          image.dataset.objectUrl = objectUrl;
+          resolve(image);
+        };
+        image.onerror = reject;
+        image.src = objectUrl;
+      });
+    };
+
+    const loadImageFromImplantPhoto = (photo) => photo.file
+      ? loadImageFromFile(photo.file)
+      : loadImageFromUrl(photo.preview || photo.url || "");
+
     const compressImplantImage = async (photo) => {
-      const image = await loadImageFromFile(photo.file);
+      const image = await loadImageFromImplantPhoto(photo);
       const cropSize = photo.cropped ? Math.min(image.naturalWidth, image.naturalHeight) : null;
       const sourceX = cropSize ? Math.round((image.naturalWidth - cropSize) / 2) : 0;
       const sourceY = cropSize ? Math.round((image.naturalHeight - cropSize) / 2) : 0;
@@ -5584,14 +5621,14 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       ctx.rotate(((photo.rotation || 0) * Math.PI) / 180);
       ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, -baseWidth / 2, -baseHeight / 2, baseWidth, baseHeight);
       ctx.restore();
-      URL.revokeObjectURL(image.src);
+      if ((photo.file || image.dataset.objectUrl) && image.src) URL.revokeObjectURL(image.src);
       return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.82));
     };
 
     const uploadImplantPhoto = async (recordId, implantId, photo, surgeryDate) => {
       if (!storageRef || !uploadBytes || !getDownloadURL) throw new Error("Firebase Storage가 준비되지 않았습니다.");
       const blob = await compressImplantImage(photo);
-      const safeName = String(photo.file.name || "implant.jpg").replace(/[^a-zA-Z0-9._-]/g, "_");
+      const safeName = String(photo.file?.name || photo.name || "implant.jpg").replace(/[^a-zA-Z0-9._-]/g, "_");
       const path = `implant-records/${surgeryDate || today()}/${recordId}/${implantId}/${photo.id}-${safeName}.jpg`;
       const candidates = [storage, storageFallback].filter(Boolean);
       let lastError;
@@ -5604,7 +5641,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             id: photo.id,
             url,
             path,
-            name: photo.file.name || "",
+            name: photo.file?.name || photo.name || "",
             size: blob.size,
             contentType: "image/jpeg",
             rotation: photo.rotation || 0,
@@ -5660,7 +5697,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const implantId = implant.id || uid();
         const photos = [];
         for (const photo of implant.photos || []) {
-          if (photo.file) {
+          if (photo.file || photo.needsReupload) {
             photos.push(await uploadImplantPhoto(nextRecordId, implantId, photo, surgeryDate));
           } else if (photo.url) {
             photos.push(cleanImplantPhotoPayload(photo));
@@ -5690,7 +5727,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const validDrafts = implantDrafts.filter((draft) => {
         const vendorId = draft.vendorId || "";
         const vendor = vendorId === "__custom__" ? draft.customVendor : implantVendorById(vendorId)?.name;
-        return String(vendor || "").trim() && String(draft.description || "").trim();
+        return String(vendor || "").trim() && (String(draft.description || "").trim() || (draft.photos || []).length);
       });
       if (!validDrafts.length) return;
       const recordId = uid();
@@ -5882,7 +5919,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             <div class="implant-photo-grid">
               ${(draft.photos || []).map((photo, photoIndex) => `
                 <div class="implant-photo" data-implant-photo="${escapeHtml(photo.id)}">
-                  <img src="${escapeHtml(photo.preview)}" alt="임플란트 사진 미리보기" style="transform:rotate(${num(photo.rotation)}deg);">
+                  <img class="${photo.cropped ? "cropped" : ""}" src="${escapeHtml(photo.preview)}" alt="임플란트 사진 미리보기" style="transform:rotate(${num(photo.rotation)}deg);">
                   <div class="implant-photo-actions">
                     <button class="secondary" type="button" data-preview-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}">확대</button>
                     <button class="secondary" type="button" data-edit-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}">편집</button>
@@ -5926,6 +5963,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         if (!photo || !image || !tools) return;
         image.src = photo.preview;
         image.style.transform = `rotate(${num(photo.rotation)}deg)`;
+        image.classList.toggle("cropped", Boolean(photo.cropped));
         tools.hidden = false;
         if (cropButton) cropButton.textContent = photo.cropped ? "원본으로" : "자르기";
       };
@@ -6128,7 +6166,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           const image = document.getElementById("implantPhotoModalImage");
           if (tools) tools.hidden = true;
           if (image) image.style.transform = "";
-          if (photo) showImplantPhotoModal(photo.preview);
+          if (photo) {
+            showImplantPhotoModal(photo.preview);
+            document.getElementById("implantPhotoModalImage")?.classList.toggle("cropped", Boolean(photo.cropped));
+          }
           return;
         }
         const editButton = event.target.closest("[data-edit-implant-photo]");
@@ -6261,10 +6302,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         }) : [];
         const invalidImplant = implantDraftPayload.find((draft) => {
           const vendor = draft.vendorId === "__custom__" ? draft.customVendor : implantVendorById(draft.vendorId)?.name;
-          return !String(vendor || "").trim() || !draft.description;
+          return !String(vendor || "").trim() || (!draft.description && !(draft.photos || []).length);
         });
         if (invalidImplant) {
-          alert("임플란트 기록은 업체명과 사용내용을 모두 입력해 주세요.");
+          alert("임플란트 기록은 업체명을 선택하고, 사용내용 또는 사진 중 하나는 입력해 주세요.");
           return;
         }
         useItems.forEach((item) => {
