@@ -133,7 +133,7 @@ function showApp() {
   setupMode = false;
   $("loginScreen").style.display = "none";
   $("appShell").style.display = "block";
-  $("inventoryFrame").src = "./index_new.html?v=20260608-implant-photo-only";
+  $("inventoryFrame").src = `./index_new.html?v=20260608-implant-crop-resize&t=${Date.now()}`;
   $("currentUserText").textContent = `${currentUser.name} (${currentUser.loginId})`;
   $("roleText").textContent = roleLabels[currentUser.role] || currentUser.role;
   $("accountManageBtn").style.display = currentUser.role === "admin" ? "inline-flex" : "none";
