@@ -5992,25 +5992,14 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         throw new Error("임플란트 기록 수정 권한이 없습니다.");
       }
       const surgeryDate = usage.date || today();
-      const cleanImplants = [];
-      for (const implant of implants) {
-        const implantId = implant.id || uid();
-        const photos = [];
-        for (const photo of implant.photos || []) {
-          if (photo.file || photo.needsReupload) {
-            photos.push(await uploadImplantPhoto(nextRecordId, implantId, photo, surgeryDate));
-          } else if (photo.url) {
-            photos.push(cleanImplantPhotoPayload(photo));
-          }
-        }
-        cleanImplants.push({
-          id: implantId,
-          vendorId: implant.vendorId || "",
-          vendor: implant.vendor || "",
-          description: implant.description || "",
-          photos
-        });
-      }
+      const cleanImplants = implants.map((implant) => ({
+        id: implant.id || uid(),
+        vendorId: implant.vendorId || "",
+        vendor: implant.vendor || "",
+        description: implant.description || "",
+        photos: (implant.photos || []).filter((photo) => photo.url).map(cleanImplantPhotoPayload),
+        pendingPhotoCount: (implant.photos || []).filter((photo) => photo.file || photo.needsReupload).length
+      }));
       await setDoc(doc(db, "implantRecords", nextRecordId), {
         id: nextRecordId,
         ...(existing?.patientNo ? { patientNo: existing.patientNo } : { patientNo: "" }),
@@ -6020,6 +6009,40 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         updatedAt: new Date().toISOString(),
         ...(existing?.createdAt ? {} : { createdAt: new Date().toISOString() }),
         ...(existing ? auditUpdateFields() : auditCreateFields())
+      }, { merge: true });
+
+      const uploadedImplants = [];
+      for (const implant of implants) {
+        const implantId = implant.id || uid();
+        const photos = (implant.photos || [])
+          .filter((photo) => photo.url && !(photo.file || photo.needsReupload))
+          .map(cleanImplantPhotoPayload);
+        const photoUploadErrors = [];
+        for (const photo of implant.photos || []) {
+          if (photo.file || photo.needsReupload) {
+            try {
+              photos.push(await uploadImplantPhoto(nextRecordId, implantId, photo, surgeryDate));
+            } catch (error) {
+              console.error(error);
+              if (photo.url) photos.push(cleanImplantPhotoPayload(photo));
+              photoUploadErrors.push(error.message || "사진 업로드 실패");
+            }
+          }
+        }
+        uploadedImplants.push({
+          id: implantId,
+          vendorId: implant.vendorId || "",
+          vendor: implant.vendor || "",
+          description: implant.description || "",
+          photos,
+          pendingPhotoCount: 0,
+          ...(photoUploadErrors.length ? { photoUploadErrors } : {})
+        });
+      }
+      await setDoc(doc(db, "implantRecords", nextRecordId), {
+        implants: uploadedImplants,
+        updatedAt: new Date().toISOString(),
+        hasPhotoUploadError: uploadedImplants.some((implant) => (implant.photoUploadErrors || []).length)
       }, { merge: true });
     };
 
