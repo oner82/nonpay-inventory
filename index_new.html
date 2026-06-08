@@ -1234,8 +1234,8 @@
     }
     .implant-photo-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
-      gap: 8px;
+      grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+      gap: 10px;
     }
     .implant-photo {
       display: grid;
@@ -1258,15 +1258,16 @@
     }
     .implant-photo-actions {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 5px;
     }
     .implant-photo-actions button {
       min-height: 34px;
-      padding: 0 6px;
+      padding: 0 8px;
       border-radius: 8px;
       font-size: 12px;
       box-shadow: none;
+      white-space: nowrap;
     }
     .implant-photo-pickers {
       display: flex;
@@ -1714,6 +1715,7 @@
     let doc;
     let getDoc;
     let setDoc;
+    let deleteDoc;
     let runTransaction;
     let onSnapshot;
     let enableIndexedDbPersistence;
@@ -4220,7 +4222,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
 
     const implantRecordsForDate = (date) => sortImplantRecords(implantRecords.filter((record) => implantRecordDate(record) === date));
-    const implantPhotoViewSrc = (photo) => photo?.editedPreview || photo?.preview || photo?.url || "";
+    const implantPhotoViewSrc = (photo) => photo?.editedPreview || photo?.preview || photo?.url || photo?.dataUrl || "";
 
     const assignImplantPatientNosForDate = async (date) => {
       if (!canAssignImplantPatientNo()) return 0;
@@ -4294,6 +4296,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
                     <span class="pill">${(implant.photos || []).length}장</span>
                   </div>
                   ${implant.description ? `<div class="implant-description">${escapeHtml(implant.description)}</div>` : `<div class="muted">사용내용 없음 · 사진 기록</div>`}
+                  ${implantPhotoStatusHtml(implant)}
                   <div class="implant-photo-strip">
                     ${(implant.photos || []).map(implantPhotoHtml).join("")}
                   </div>
@@ -4380,9 +4383,18 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       `;
     };
 
-    const implantPhotoHtml = (photo) => `
-      <img class="implant-photo-thumb" src="${escapeHtml(photo.url || photo.preview || "")}" alt="임플란트 사진" data-implant-photo-view="${escapeHtml(photo.url || photo.preview || "")}">
-    `;
+    const implantPhotoHtml = (photo) => {
+      const src = implantPhotoViewSrc(photo);
+      return src ? `
+        <img class="implant-photo-thumb" src="${escapeHtml(src)}" alt="임플란트 사진" data-implant-photo-view="${escapeHtml(src)}">
+      ` : "";
+    };
+    const implantPhotoStatusHtml = (implant) => {
+      const pending = num(implant.pendingPhotoCount);
+      const errors = Array.isArray(implant.photoUploadErrors) ? implant.photoUploadErrors : [];
+      if (!pending && !errors.length) return "";
+      return `<div class="muted">${pending ? `사진 ${pending}장 업로드 대기` : ""}${pending && errors.length ? " · " : ""}${errors.length ? `사진 업로드 확인 필요 ${errors.length}건` : ""}</div>`;
+    };
 
     const implantRecordCardHtml = (record) => {
       const vendors = Array.isArray(record.implants) ? record.implants : [];
@@ -4402,6 +4414,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             ${record.surgeryTime ? `<span>수술시간: ${escapeHtml(record.surgeryTime)}</span>` : ""}
           </div>
           ${canEditImplantPatientNo() ? `
+            <div class="actions">
+              <button class="danger" type="button" data-delete-implant-record="${escapeHtml(record.id)}">장부 삭제</button>
+            </div>
+          ` : ""}
+          ${canEditImplantPatientNo() ? `
             <div class="row two">
               <div>
                 <label for="implantPatientNo-${escapeHtml(record.id)}">환자번호 수동 수정</label>
@@ -4419,6 +4436,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
                 <span class="pill">${(implant.photos || []).length}장</span>
               </div>
               <div class="implant-description">${escapeHtml(implant.description || "")}</div>
+              ${implantPhotoStatusHtml(implant)}
               <div class="implant-photo-strip">
                 ${(implant.photos || []).map(implantPhotoHtml).join("")}
               </div>
@@ -4987,12 +5005,13 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               <input id="editImplantGallery-${escapeHtml(row.id)}" type="file" accept="image/*" multiple data-edit-implant-photo-input="${escapeHtml(row.id)}" ${editImplantCanModify ? "" : "disabled"}>
               <input id="editImplantCamera-${escapeHtml(row.id)}" type="file" accept="image/*" capture="environment" data-edit-implant-camera-input="${escapeHtml(row.id)}" ${editImplantCanModify ? "" : "disabled"}>
             </div>
+            ${implantPhotoStatusHtml(row)}
             <div class="implant-photo-grid">
               ${photos.map((photo, photoIndex) => {
                 const src = editImplantPhotoSrc(photo);
                 return src ? `
                 <div class="implant-photo" data-edit-implant-photo="${escapeHtml(photo.id)}">
-                  <img class="${photo.cropped ? "cropped" : ""}" src="${escapeHtml(src)}" alt="임플란트 ${photo.file ? "신규" : "기존"} 사진" style="transform:rotate(${num(photo.rotation)}deg);">
+                  <img class="${photo.cropped ? "cropped" : ""}" src="${escapeHtml(src)}" alt="임플란트 ${photo.file ? "신규" : "기존"} 사진" data-preview-edit-implant-photo="${escapeHtml(row.id)}::${escapeHtml(photo.id)}" style="transform:rotate(${num(photo.rotation)}deg); cursor:pointer;">
                   <div class="implant-photo-actions">
                     <button class="secondary" type="button" data-preview-edit-implant-photo="${escapeHtml(row.id)}::${escapeHtml(photo.id)}">확대</button>
                     <button class="secondary" type="button" data-rotate-edit-implant-photo="${escapeHtml(row.id)}::${escapeHtml(photo.id)}" ${editImplantCanModify ? "" : "disabled"}>회전</button>
@@ -5036,7 +5055,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           customVendor,
           vendor: String(vendor || "").trim(),
           description,
-          photos: Array.isArray(current.photos) ? current.photos : []
+          photos: Array.isArray(current.photos) ? current.photos : [],
+          pendingPhotoCount: num(current.pendingPhotoCount),
+          photoUploadErrors: Array.isArray(current.photoUploadErrors) ? current.photoUploadErrors : []
         };
       }).filter((row) => row.vendor || row.description || row.photos.length);
       const editImplantRowById = (id) => editImplantRows.find((item) => item.id === id);
@@ -5075,7 +5096,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           customVendor: implantVendorCustomValue(implant),
           vendor: implant.vendor || "",
           description: implant.description || "",
-          photos: Array.isArray(implant.photos) ? implant.photos : []
+          photos: Array.isArray(implant.photos) ? implant.photos : [],
+          pendingPhotoCount: num(implant.pendingPhotoCount),
+          photoUploadErrors: Array.isArray(implant.photoUploadErrors) ? implant.photoUploadErrors : []
         }));
         if (editImplantSection) editImplantSection.hidden = false;
         if (editImplantLockNote) {
@@ -5276,7 +5299,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           const { photo } = parseEditImplantPair(rotateButton.dataset.rotateEditImplantPhoto);
           if (photo) {
             photo.rotation = ((photo.rotation || 0) + 90) % 360;
-            if (!photo.file && photo.url) photo.needsReupload = true;
+            if (!photo.file && (photo.url || photo.dataUrl)) photo.needsReupload = true;
             await refreshEditedImplantPreview(photo);
             renderEditImplantRows();
           }
@@ -5287,7 +5310,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           const { photo } = parseEditImplantPair(cropButton.dataset.cropEditImplantPhoto);
           if (photo) {
             await openImplantCropEditor(photo, async (changedPhoto) => {
-              if (!changedPhoto.file && changedPhoto.url) changedPhoto.needsReupload = true;
+              if (!changedPhoto.file && (changedPhoto.url || changedPhoto.dataUrl)) changedPhoto.needsReupload = true;
               await refreshEditedImplantPreview(changedPhoto);
               renderEditImplantRows();
             });
@@ -5732,6 +5755,18 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           showImplantPhotoModal(image.dataset.implantPhotoView);
           return;
         }
+        const deleteRecordButton = event.target.closest("[data-delete-implant-record]");
+        if (deleteRecordButton) {
+          if (!canEditImplantPatientNo()) return;
+          const id = deleteRecordButton.dataset.deleteImplantRecord;
+          const record = implantRecords.find((item) => sameId(item.id, id));
+          if (!record) return;
+          if (!confirm("이 임플란트 장부를 삭제할까요? 연결된 사용내역은 삭제하지 않습니다.")) return;
+          await deleteDoc(doc(db, "implantRecords", id));
+          implantRecords = implantRecords.filter((item) => !sameId(item.id, id));
+          renderList();
+          return;
+        }
         const saveButton = event.target.closest("[data-implant-patient-no-save]");
         if (saveButton) {
           if (!canEditImplantPatientNo()) return;
@@ -5915,6 +5950,30 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
 
     const compressImplantImage = (photo) => renderImplantPhotoBlob(photo, 1600);
+    const blobToDataUrl = (blob) => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result || "");
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+    const implantPhotoFallbackPayload = async (photo, errorMessage = "") => {
+      const blob = await renderImplantPhotoBlob(photo, 700);
+      return {
+        id: photo.id || uid(),
+        url: photo.url || "",
+        path: photo.path || "",
+        dataUrl: await blobToDataUrl(blob),
+        name: photo.file?.name || photo.name || "implant.jpg",
+        size: blob.size,
+        contentType: "image/jpeg",
+        rotation: photo.rotation || 0,
+        cropped: Boolean(photo.cropped),
+        cropRect: photo.cropped && photo.cropRect ? normalizeImplantCropRect(photo.cropRect) : null,
+        uploadedAt: new Date().toISOString(),
+        storageUploadFailed: true,
+        storageUploadError: errorMessage
+      };
+    };
 
     const refreshEditedImplantPreview = async (photo) => {
       if (!photo) return;
@@ -5975,6 +6034,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       id: photo.id || uid(),
       url: photo.url || "",
       path: photo.path || "",
+      dataUrl: photo.dataUrl || "",
       name: photo.name || "",
       size: num(photo.size),
       contentType: photo.contentType || "image/jpeg",
@@ -5997,7 +6057,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         vendorId: implant.vendorId || "",
         vendor: implant.vendor || "",
         description: implant.description || "",
-        photos: (implant.photos || []).filter((photo) => photo.url).map(cleanImplantPhotoPayload),
+        photos: (implant.photos || []).filter((photo) => photo.url || photo.dataUrl).map(cleanImplantPhotoPayload),
         pendingPhotoCount: (implant.photos || []).filter((photo) => photo.file || photo.needsReupload).length
       }));
       await setDoc(doc(db, "implantRecords", nextRecordId), {
@@ -6015,7 +6075,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       for (const implant of implants) {
         const implantId = implant.id || uid();
         const photos = (implant.photos || [])
-          .filter((photo) => photo.url && !(photo.file || photo.needsReupload))
+          .filter((photo) => (photo.url || photo.dataUrl) && !(photo.file || photo.needsReupload))
           .map(cleanImplantPhotoPayload);
         const photoUploadErrors = [];
         for (const photo of implant.photos || []) {
@@ -6025,6 +6085,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             } catch (error) {
               console.error(error);
               if (photo.url) photos.push(cleanImplantPhotoPayload(photo));
+              else photos.push(await implantPhotoFallbackPayload(photo, error.message || "사진 업로드 실패"));
               photoUploadErrors.push(error.message || "사진 업로드 실패");
             }
           }
@@ -6100,6 +6161,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             photos.push(await uploadImplantPhoto(recordId, implantId, photo, surgeryDate));
           } catch (error) {
             console.error(error);
+            photos.push(await implantPhotoFallbackPayload(photo, error.message || "사진 업로드 실패"));
             photoUploadErrors.push(error.message || "사진 업로드 실패");
           }
         }
@@ -6262,7 +6324,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             <div class="implant-photo-grid">
               ${(draft.photos || []).map((photo, photoIndex) => `
                 <div class="implant-photo" data-implant-photo="${escapeHtml(photo.id)}">
-                  <img class="${photo.cropped ? "cropped" : ""}" src="${escapeHtml(implantPhotoViewSrc(photo))}" alt="임플란트 사진 미리보기" style="transform:rotate(${num(photo.rotation)}deg);">
+                  <img class="${photo.cropped ? "cropped" : ""}" src="${escapeHtml(implantPhotoViewSrc(photo))}" alt="임플란트 사진 미리보기" data-preview-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}" style="transform:rotate(${num(photo.rotation)}deg); cursor:pointer;">
                   <div class="implant-photo-actions">
                     <button class="secondary" type="button" data-preview-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}">확대</button>
                     <button class="secondary" type="button" data-edit-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}">편집</button>
@@ -7221,6 +7283,15 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       );
     };
 
+    const deleteImplantRecordsForUsage = async (usageId) => {
+      const linkedRecords = implantRecords.filter((record) => sameId(record.usageId, usageId));
+      if (!linkedRecords.length) return 0;
+      if (!deleteDoc) throw new Error("Firestore delete is not ready.");
+      await Promise.all(linkedRecords.map((record) => deleteDoc(doc(db, "implantRecords", record.id))));
+      implantRecords = implantRecords.filter((record) => !sameId(record.usageId, usageId));
+      return linkedRecords.length;
+    };
+
     const deleteUsageRecord = async (usageId, { onSuccess } = {}) => {
       const usage = state.usages.find((item) => String(item.id) === String(usageId));
       if (!usage) return false;
@@ -7235,6 +7306,12 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       });
       state.usages = state.usages.filter((item) => String(item.id) !== String(usage.id));
       await saveState("사용내역 삭제 완료 · 재고 복구", { authoritative: true });
+      try {
+        await deleteImplantRecordsForUsage(usage.id);
+      } catch (error) {
+        console.error(error);
+        alert(`사용내역은 삭제됐지만 연결된 임플란트 장부 삭제에 실패했습니다: ${error.message}`);
+      }
       if (typeof onSuccess === "function") onSuccess();
       render();
       return true;
@@ -7523,6 +7600,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         doc = firestoreModule.doc;
         getDoc = firestoreModule.getDoc;
         setDoc = firestoreModule.setDoc;
+        deleteDoc = firestoreModule.deleteDoc;
         runTransaction = firestoreModule.runTransaction;
         onSnapshot = firestoreModule.onSnapshot;
         enableIndexedDbPersistence = firestoreModule.enableIndexedDbPersistence;
