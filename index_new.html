@@ -2212,11 +2212,27 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       return implantRecordDate(record) === today();
     };
     const implantVendorById = (id) => implantVendors.find((item) => sameId(item.id, id));
+    const implantVendorNameAliases = {
+      "다림티센": "다림티센(써지가이드)",
+      "와이즈메디칼": "와이즈 메디칼",
+      "GSMedical": "GS Medical",
+      "루모스메디칼": "루모스메디컬"
+    };
+    const compactVendorName = (value) => normalizedName(value).replace(/[\s\-_.&()（）,，]/g, "");
     const findImplantVendorByName = (name = "") => {
       const key = normalizedName(name);
       if (!key) return null;
       const exact = implantVendors.find((vendor) => normalizedName(vendor.name) === key);
       if (exact) return exact;
+      const aliasName = Object.entries(implantVendorNameAliases)
+        .find(([alias]) => normalizedName(alias) === key)?.[1];
+      if (aliasName) {
+        const aliasVendor = implantVendors.find((vendor) => normalizedName(vendor.name) === normalizedName(aliasName));
+        if (aliasVendor) return aliasVendor;
+      }
+      const compactKey = compactVendorName(name);
+      const compactMatches = implantVendors.filter((vendor) => compactVendorName(vendor.name) === compactKey);
+      if (compactMatches.length === 1) return compactMatches[0];
       const loose = implantVendors.filter((vendor) => {
         const vendorKey = normalizedName(vendor.name);
         return vendorKey && (vendorKey.includes(key) || key.includes(vendorKey));
@@ -2257,7 +2273,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const name = String(byId?.name || product.company || "").trim();
       if (!name || name === "업체 없음") return { key: "", vendorId: "", customVendor: "", vendor: "" };
       const matched = byId || findImplantVendorByName(name);
-      if (matched) return { key: implantVendorKey(name), vendorId: matched.id, customVendor: "", vendor: matched.name || name };
+      if (matched) return { key: `id:${matched.id}`, vendorId: matched.id, customVendor: "", vendor: matched.name || name };
       return { key: implantVendorKey(name), vendorId: "__custom__", customVendor: name, vendor: name };
     };
     const implantVendorSelectionForCompany = (company = "") => implantVendorSelectionForProduct({ company });
