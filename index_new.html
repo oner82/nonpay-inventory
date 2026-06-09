@@ -2211,21 +2211,23 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       if (linkedUsage) return isTodayUsage(linkedUsage);
       return implantRecordDate(record) === today();
     };
-    const activeImplantVendors = () => implantVendors
-      .filter((item) => item.active !== false)
-      .slice()
-      .sort((a, b) => alphaFirstCompare(a.name, b.name));
     const implantVendorById = (id) => implantVendors.find((item) => sameId(item.id, id));
     const implantVendorOptions = (selectedId = "") => {
-      const activeVendors = activeImplantVendors();
-      const selectedInactive = selectedId && selectedId !== "__custom__" && !activeVendors.some((item) => sameId(item.id, selectedId))
-        ? implantVendorById(selectedId)
-        : null;
+      const vendors = implantVendors.slice().sort((a, b) => alphaFirstCompare(a.name, b.name));
       return `
         <option value="">업체 선택</option>
-        ${selectedInactive ? `<option value="${escapeHtml(selectedInactive.id)}" selected>${escapeHtml(selectedInactive.name || "비활성 업체")} · 비활성</option>` : ""}
-        ${activeVendors.map((item) => `<option value="${escapeHtml(item.id)}" ${sameId(item.id, selectedId) ? "selected" : ""}>${escapeHtml(item.name)}</option>`).join("")}
+        ${vendors.map((item) => `<option value="${escapeHtml(item.id)}" ${sameId(item.id, selectedId) ? "selected" : ""}>${escapeHtml(item.name)}${item.active === false ? " · 발송 정지" : ""}</option>`).join("")}
         <option value="__custom__" ${selectedId === "__custom__" ? "selected" : ""}>직접 입력</option>
+      `;
+    };
+    const productCompanyOptions = (selectedName = "") => {
+      const selected = String(selectedName || "").trim();
+      const vendors = implantVendors.slice().sort((a, b) => alphaFirstCompare(a.name, b.name));
+      const hasSelected = !selected || vendors.some((vendor) => normalizedName(vendor.name) === normalizedName(selected));
+      return `
+        <option value="">업체 선택</option>
+        ${!hasSelected ? `<option value="${escapeHtml(selected)}" selected>${escapeHtml(selected)} · 기존 업체</option>` : ""}
+        ${vendors.map((vendor) => `<option value="${escapeHtml(vendor.name || "")}" ${normalizedName(vendor.name) === normalizedName(selected) ? "selected" : ""}>${escapeHtml(vendor.name || "업체명 없음")}${vendor.active === false ? " · 발송 정지" : ""}</option>`).join("")}
       `;
     };
     const productNeedsImplantLedger = (product) => {
@@ -2638,6 +2640,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           document.getElementById("productId").value = item.id;
           document.getElementById("productCategory").value = item.category;
           document.getElementById("productName").value = item.name;
+          document.getElementById("productCompany").innerHTML = productCompanyOptions(item.company || "");
           document.getElementById("productCompany").value = item.company || "";
           document.getElementById("productSubcategory").value = item.subcategory || "";
           document.getElementById("productStock").value = num(item.stock);
@@ -3044,7 +3047,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           <input id="productName" required autocomplete="off">
           <div id="productCompanyWrap">
             <label for="productCompany">업체명</label>
-            <input id="productCompany" autocomplete="off">
+            <select id="productCompany">
+              ${productCompanyOptions()}
+            </select>
+            <div class="helper" id="productCompanyHelp">인체조직/ANCHOR&etc 제품은 설정의 임플란트 업체를 먼저 등록한 뒤 선택합니다.</div>
           </div>
           <div id="productSubcategoryWrap">
             <label for="productSubcategory">세부 분류</label>
@@ -3230,34 +3236,51 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const form = document.getElementById("productForm");
       syncProductFields = () => {
         const category = document.getElementById("productCategory").value;
+        const companySelect = document.getElementById("productCompany");
+        const companyHelp = document.getElementById("productCompanyHelp");
         document.getElementById("productCompanyWrap").style.display = category === "비급여" ? "none" : "block";
         document.getElementById("productSubcategoryWrap").style.display = category === "ANCHOR" ? "block" : "none";
         document.getElementById("productLandingWrap").style.display = category === "비급여" ? "none" : "block";
         if (category === "비급여") {
-          document.getElementById("productCompany").value = "";
+          companySelect.value = "";
           document.getElementById("productSubcategory").value = "";
           document.getElementById("productLanding").value = "0";
         }
+        companySelect.required = category !== "비급여";
+        companySelect.disabled = category !== "비급여" && !implantVendors.length;
+        if (companyHelp) companyHelp.textContent = implantVendors.length
+          ? "인체조직/ANCHOR&etc 제품은 등록된 임플란트 업체 중에서 선택합니다."
+          : "인체조직/ANCHOR&etc 제품을 등록하려면 먼저 설정 > 임플란트 업체에서 업체를 등록해 주세요.";
       };
       document.getElementById("productCategory").addEventListener("change", syncProductFields);
       document.getElementById("productReset").addEventListener("click", () => {
         form.reset();
         document.getElementById("productId").value = "";
         document.getElementById("productFormTitle").textContent = "제품 추가";
+        document.getElementById("productCompany").innerHTML = productCompanyOptions();
         syncProductFields();
       });
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         const id = document.getElementById("productId").value || uid();
+        const category = document.getElementById("productCategory").value;
+        if (category !== "비급여" && !implantVendors.length) {
+          alert("인체조직/ANCHOR&etc 제품은 임플란트 업체를 먼저 등록해야 제품등록 할 수 있습니다.");
+          return;
+        }
+        if (category !== "비급여" && !document.getElementById("productCompany").value.trim()) {
+          alert("인체조직/ANCHOR&etc 제품은 임플란트 업체를 선택해 주세요.");
+          return;
+        }
         const next = {
           id,
-          category: document.getElementById("productCategory").value,
+          category,
           name: document.getElementById("productName").value.trim(),
-          company: document.getElementById("productCategory").value === "비급여" ? "" : document.getElementById("productCompany").value.trim(),
-          subcategory: document.getElementById("productCategory").value === "ANCHOR" ? document.getElementById("productSubcategory").value : "",
+          company: category === "비급여" ? "" : document.getElementById("productCompany").value.trim(),
+          subcategory: category === "ANCHOR" ? document.getElementById("productSubcategory").value : "",
           stock: num(document.getElementById("productStock").value),
           warningStock: num(document.getElementById("productWarning").value),
-          landingQty: document.getElementById("productCategory").value === "비급여" ? 0 : num(document.getElementById("productLanding").value)
+          landingQty: category === "비급여" ? 0 : num(document.getElementById("productLanding").value)
         };
         if (!next.name) return;
         const { used, received } = productMovementCounts();
@@ -4432,6 +4455,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       if (byId) return byId;
       return implantVendors.find((vendor) => normalizedName(vendor.name) === normalizedName(vendorName)) || {};
     };
+    const isImplantVendorSendPaused = (vendorName = "", vendorId = "") => implantVendorContact(vendorName, vendorId)?.active === false;
 
     const implantSendMessage = (date, vendorName, lines) => [
       `${date} 임플란트 사용분`,
@@ -4448,6 +4472,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       implantRecordsForDate(date).forEach((record) => {
         (record.implants || []).forEach((implant) => {
           const key = implant.vendor || "업체 없음";
+          if (isImplantVendorSendPaused(key, implant.vendorId)) return;
           const current = groups.get(key) || { vendor: key, contact: implantVendorContact(key, implant.vendorId), lines: [] };
           current.lines.push({ record, implant });
           groups.set(key, current);
@@ -4671,7 +4696,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               <div class="item ${vendor.active === false ? "landing-line" : ""}">
                 <div class="item-title">
                   <span>${escapeHtml(vendor.name || "업체명 없음")}</span>
-                  <span class="pill ${vendor.active === false ? "low" : ""}">${vendor.active === false ? "비활성" : "사용"}</span>
+                  <span class="pill ${vendor.active === false ? "low" : ""}">${vendor.active === false ? "발송 정지" : "발송 가능"}</span>
                 </div>
                 <div class="meta">
                   ${vendor.contactName ? `<span>담당자: ${escapeHtml(vendor.contactName)}</span>` : ""}
@@ -4682,7 +4707,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
                 ${vendor.memo ? `<div class="implant-send-preview">${escapeHtml(vendor.memo)}</div>` : ""}
                 <div class="actions">
                   <button class="secondary" type="button" data-edit-implant-vendor="${escapeHtml(vendor.id)}">수정</button>
-                  <button class="${vendor.active === false ? "secondary" : "danger"}" type="button" data-toggle-implant-vendor="${escapeHtml(vendor.id)}">${vendor.active === false ? "다시 사용" : "비활성"}</button>
+                  <button class="${vendor.active === false ? "secondary" : "danger"}" type="button" data-toggle-implant-vendor="${escapeHtml(vendor.id)}">${vendor.active === false ? "발송 재개" : "발송 정지"}</button>
                 </div>
               </div>
             `).join("") : `<div class="empty">등록된 임플란트 업체가 없습니다.</div>`}
