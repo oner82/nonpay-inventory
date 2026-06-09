@@ -2228,6 +2228,32 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         <option value="__custom__" ${selectedId === "__custom__" ? "selected" : ""}>직접 입력</option>
       `;
     };
+    const productNeedsImplantLedger = (product) => {
+      const category = productCategory(product?.category);
+      return category === "인체조직" || category === "ANCHOR";
+    };
+    const implantVendorKey = (value) => normalizedName(value);
+    const implantVendorSelectionForCompany = (company = "") => {
+      const name = String(company || "").trim();
+      if (!name || name === "업체 없음") return { key: "", vendorId: "", customVendor: "", vendor: "" };
+      const matched = implantVendors.find((vendor) => implantVendorKey(vendor.name) === implantVendorKey(name));
+      if (matched) return { key: implantVendorKey(name), vendorId: matched.id, customVendor: "", vendor: matched.name || name };
+      return { key: implantVendorKey(name), vendorId: "__custom__", customVendor: name, vendor: name };
+    };
+    const implantDraftVendorName = (draft = {}) => draft.vendorId === "__custom__"
+      ? (draft.customVendor || draft.vendor || "")
+      : (implantVendorById(draft.vendorId)?.name || draft.vendor || draft.customVendor || "");
+    const implantRowHasContent = (row = {}) => Boolean(String(row.description || "").trim() || (row.photos || []).length);
+    const implantVendorTargetsFromUseItems = (items = []) => {
+      const targets = new Map();
+      items.forEach((item) => {
+        const product = productById(item.productId);
+        if (!productNeedsImplantLedger(product)) return;
+        const target = implantVendorSelectionForCompany(product.company);
+        if (target.key && !targets.has(target.key)) targets.set(target.key, target);
+      });
+      return [...targets.values()];
+    };
     const implantRecordDate = (record) => record?.surgeryDate || String(record?.createdAt || "").slice(0, 10) || "";
     const implantPatientNoText = (record) => String(record?.patientNo || "").trim();
     const implantPatientNoSortValue = (record) => {
@@ -5052,13 +5078,16 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         productId: input.value,
         qty: Math.max(1, num(form.querySelector(`[data-use-qty="${input.value}"]`)?.value))
       }));
-      const renderSelected = () => renderUseItemsList(selectedItems(), selectedList);
-      const selectProduct = (productId, qty = 1) => {
+      const renderSelected = (options = {}) => {
+        renderUseItemsList(selectedItems(), selectedList);
+        if (options.syncImplants !== false) syncEditImplantRowsFromSelectedProducts();
+      };
+      const selectProduct = (productId, qty = 1, options = {}) => {
         const checkbox = form.querySelector(`[data-use-product="${productId}"]`);
         const qtyInput = form.querySelector(`[data-use-qty="${productId}"]`);
         if (checkbox) checkbox.checked = true;
         if (qtyInput) qtyInput.value = Math.max(1, num(qty));
-        renderSelected();
+        renderSelected(options);
       };
       const clearProducts = () => {
         form.querySelectorAll("[data-use-product]").forEach((input) => {
@@ -5188,6 +5217,56 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           cropped: false
         }));
         renderEditImplantRows();
+      };
+      const syncEditImplantRowsFromSelectedProducts = () => {
+        if (!editImplantCanModify) return;
+        const targets = implantVendorTargetsFromUseItems(selectedItems());
+        const targetKeys = new Set(targets.map((target) => target.key));
+        let changed = false;
+        for (let index = editImplantRows.length - 1; index >= 0; index -= 1) {
+          const row = editImplantRows[index];
+          if (row.autoSource === "product" && !targetKeys.has(row.autoCompanyKey) && !implantRowHasContent(row)) {
+            editImplantRows.splice(index, 1);
+            changed = true;
+          }
+        }
+        targets.forEach((target) => {
+          const existing = editImplantRows.find((row) => (
+            row.autoCompanyKey === target.key ||
+            implantVendorKey(implantDraftVendorName(row)) === target.key
+          ));
+          if (existing) {
+            if (!existing.autoCompanyKey) existing.autoCompanyKey = target.key;
+            return;
+          }
+          const reusable = editImplantRows.find((row) => !row.autoSource && !implantDraftVendorName(row) && !implantRowHasContent(row));
+          if (reusable) {
+            Object.assign(reusable, {
+              vendorId: target.vendorId,
+              customVendor: target.customVendor,
+              vendor: target.vendor,
+              autoSource: "product",
+              autoCompanyKey: target.key
+            });
+            changed = true;
+            return;
+          }
+          editImplantRows.push({
+            id: uid(),
+            vendorId: target.vendorId,
+            customVendor: target.customVendor,
+            vendor: target.vendor,
+            description: "",
+            photos: [],
+            pendingPhotoCount: 0,
+            photoUploadErrors: [],
+            autoSource: "product",
+            autoCompanyKey: target.key
+          });
+          changed = true;
+        });
+        if (targets.length && editImplantSection) editImplantSection.hidden = false;
+        if (changed) renderEditImplantRows();
       };
       const markEditImplantPhotoChanged = (photo) => {
         if (photo && !photo.file && (photo.url || photo.dataUrl)) photo.needsReupload = true;
@@ -5360,7 +5439,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           }
         }
         clearProducts();
-        usageProductItems(usage).forEach((item) => selectProduct(item.productId, item.qty));
+        usageProductItems(usage).forEach((item) => selectProduct(item.productId, item.qty, { syncImplants: false }));
         loadEditImplantsForUsage(usage, canModify);
         renderSearch();
         renderSelected();
@@ -5566,7 +5645,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const nextImplants = readEditImplantRows();
         const incompleteImplant = nextImplants.find((implant) => !implant.vendor || (!implant.description && !(implant.photos || []).length));
         if (incompleteImplant) {
-          alert("임플란트 기록은 업체명을 선택하고, 사용내용 또는 사진 중 하나는 입력해 주세요.");
+          alert("임플란트 장부가 작성되지 않았습니다. 업체명과 사용내용 또는 사진을 확인해 주세요.");
           return;
         }
         setButtonBusy(submitButton, true, "저장 중...");
@@ -6458,6 +6537,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const items = selectedUseItems();
         if (!items.length) {
           selectedUseList.innerHTML = `<span>선택된 제품이 없습니다.</span>`;
+          syncImplantDraftsFromSelectedProducts();
           return;
         }
         const chipClass = (category) => {
@@ -6518,6 +6598,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             renderSelectedUseList();
           });
         });
+        syncImplantDraftsFromSelectedProducts();
       };
       const selectUseProduct = (productId, qty = 1) => {
         const checkbox = form.querySelector(`[data-use-product="${productId}"]`);
@@ -6529,6 +6610,63 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const addImplantDraft = () => {
         implantDrafts.push({ id: uid(), vendorId: "", customVendor: "", description: "", photos: [] });
         renderImplantDrafts();
+      };
+      const syncImplantDraftsFromSelectedProducts = () => {
+        const targets = implantVendorTargetsFromUseItems(selectedUseItems());
+        const targetKeys = new Set(targets.map((target) => target.key));
+        let changed = false;
+        for (let index = implantDrafts.length - 1; index >= 0; index -= 1) {
+          const draft = implantDrafts[index];
+          if (draft.autoSource === "product" && !targetKeys.has(draft.autoCompanyKey) && !implantRowHasContent(draft)) {
+            implantDrafts.splice(index, 1);
+            changed = true;
+          }
+        }
+        targets.forEach((target) => {
+          const existing = implantDrafts.find((draft) => (
+            draft.autoCompanyKey === target.key ||
+            implantVendorKey(implantDraftVendorName(draft)) === target.key
+          ));
+          if (existing) {
+            if (!existing.autoCompanyKey) existing.autoCompanyKey = target.key;
+            return;
+          }
+          const reusable = implantDrafts.find((draft) => !draft.autoSource && !implantDraftVendorName(draft) && !implantRowHasContent(draft));
+          if (reusable) {
+            Object.assign(reusable, {
+              vendorId: target.vendorId,
+              customVendor: target.customVendor,
+              vendor: target.vendor,
+              autoSource: "product",
+              autoCompanyKey: target.key
+            });
+            changed = true;
+            return;
+          }
+          implantDrafts.push({
+            id: uid(),
+            vendorId: target.vendorId,
+            customVendor: target.customVendor,
+            vendor: target.vendor,
+            description: "",
+            photos: [],
+            autoSource: "product",
+            autoCompanyKey: target.key
+          });
+          changed = true;
+        });
+        if (targets.length && implantEnabled) {
+          if (!implantEnabled.checked) {
+            implantEnabled.checked = true;
+            changed = true;
+          }
+          if (implantPanel) implantPanel.hidden = false;
+        } else if (!targets.length && implantEnabled?.checked && implantDrafts.length === 0) {
+          implantEnabled.checked = false;
+          if (implantPanel) implantPanel.hidden = true;
+          changed = true;
+        }
+        if (changed) renderImplantDrafts();
       };
       const implantDraftById = (id) => implantDrafts.find((item) => item.id === id);
       const renderImplantDrafts = () => {
@@ -6962,7 +7100,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           return !String(vendor || "").trim() || (!draft.description && !(draft.photos || []).length);
         });
         if (invalidImplant) {
-          alert("임플란트 기록은 업체명을 선택하고, 사용내용 또는 사진 중 하나는 입력해 주세요.");
+          alert("임플란트 장부가 작성되지 않았습니다. 업체명과 사용내용 또는 사진을 확인해 주세요.");
           return;
         }
         setButtonBusy(submitButton, true, "저장 중...");
