@@ -6145,6 +6145,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         const id = document.getElementById("implantVendorId").value || uid();
+        const existingVendor = implantVendorById(id);
         const vendor = {
           id,
           name: document.getElementById("implantVendorName").value.trim(),
@@ -6153,16 +6154,37 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           email: document.getElementById("implantVendorEmail").value.trim(),
           messenger: document.getElementById("implantVendorMessenger").value.trim(),
           memo: document.getElementById("implantVendorMemo").value.trim(),
-          active: implantVendorById(id)?.active !== false,
+          active: existingVendor?.active !== false,
           updatedAt: new Date().toISOString(),
-          ...(implantVendorById(id)?.createdAt ? {} : { createdAt: new Date().toISOString() }),
-          ...(implantVendorById(id)?.createdBy ? auditUpdateFields() : auditCreateFields())
+          ...(existingVendor?.createdAt ? {} : { createdAt: new Date().toISOString() }),
+          ...(existingVendor?.createdBy ? auditUpdateFields() : auditCreateFields())
         };
         if (!vendor.name) {
           alert("업체명을 입력해 주세요.");
           return;
         }
         await setDoc(doc(db, "implantVendors", id), vendor, { merge: true });
+        const oldName = String(existingVendor?.name || "").trim();
+        if (oldName && oldName !== vendor.name) {
+          let changedProducts = 0;
+          state.products = state.products.map((product) => {
+            const linkedById = sameId(product.companyVendorId, id);
+            const linkedByOldName = !product.companyVendorId && normalizedName(product.company) === normalizedName(oldName);
+            if (!linkedById && !linkedByOldName) return product;
+            changedProducts += 1;
+            return {
+              ...product,
+              company: vendor.name,
+              companyVendorId: id
+            };
+          });
+          if (changedProducts) {
+            await saveState("제품 업체명 동기화 완료", {
+              savingMessage: "제품 업체명 동기화 중입니다...",
+              doneMessage: `${changedProducts}개 제품 업체명 동기화 완료`
+            });
+          }
+        }
         resetImplantVendorForm();
       });
       document.getElementById("implantVendorReset")?.addEventListener("click", resetImplantVendorForm);
