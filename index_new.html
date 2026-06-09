@@ -4887,6 +4887,32 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               <button class="secondary" type="button" id="addEditImplantRow">임플란트 업체 추가</button>
             </div>
           </div>
+          <div class="modal-backdrop" id="implantPhotoModal" hidden role="dialog" aria-modal="true" aria-label="&#51076;&#54540;&#46976;&#53944; &#49324;&#51652; &#54869;&#45824;">
+            <div class="search-modal-panel">
+              <div class="search-modal-head">
+                <h3>&#49324;&#51652; &#54869;&#51064;</h3>
+                <button class="search-modal-close" type="button" id="closeImplantPhotoModal" aria-label="&#49324;&#51652; &#45803;&#44592;">&times;</button>
+              </div>
+              <div class="implant-crop-stage" id="implantCropStage">
+                <img class="implant-modal-image" id="implantPhotoModalImage" alt="&#51076;&#54540;&#46976;&#53944; &#49324;&#51652; &#54869;&#45824;">
+                <div class="implant-crop-frame" id="implantCropFrame" hidden>
+                  <span class="implant-crop-handle" data-crop-handle="nw"></span>
+                  <span class="implant-crop-handle" data-crop-handle="n"></span>
+                  <span class="implant-crop-handle" data-crop-handle="ne"></span>
+                  <span class="implant-crop-handle" data-crop-handle="e"></span>
+                  <span class="implant-crop-handle" data-crop-handle="se"></span>
+                  <span class="implant-crop-handle" data-crop-handle="s"></span>
+                  <span class="implant-crop-handle" data-crop-handle="sw"></span>
+                  <span class="implant-crop-handle" data-crop-handle="w"></span>
+                </div>
+              </div>
+              <div class="actions" id="implantPhotoEditTools" hidden>
+                <button class="secondary" type="button" id="implantModalRotate">&#54924;&#51204;</button>
+                <button class="secondary" type="button" id="implantModalCrop">&#51088;&#47476;&#44592;</button>
+                <button type="button" id="implantModalDone">&#50756;&#47308;</button>
+              </div>
+            </div>
+          </div>
           <label>제품 여러 개 선택</label>
           <div class="product-picker">
             ${renderGroupedProducts(false)}
