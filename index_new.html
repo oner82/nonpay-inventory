@@ -2212,6 +2212,17 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       return implantRecordDate(record) === today();
     };
     const implantVendorById = (id) => implantVendors.find((item) => sameId(item.id, id));
+    const findImplantVendorByName = (name = "") => {
+      const key = normalizedName(name);
+      if (!key) return null;
+      const exact = implantVendors.find((vendor) => normalizedName(vendor.name) === key);
+      if (exact) return exact;
+      const loose = implantVendors.filter((vendor) => {
+        const vendorKey = normalizedName(vendor.name);
+        return vendorKey && (vendorKey.includes(key) || key.includes(vendorKey));
+      });
+      return loose.length === 1 ? loose[0] : null;
+    };
     const implantVendorOptions = (selectedId = "") => {
       const vendors = implantVendors.slice().sort((a, b) => alphaFirstCompare(a.name, b.name));
       return `
@@ -2220,14 +2231,20 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         <option value="__custom__" ${selectedId === "__custom__" ? "selected" : ""}>직접 입력</option>
       `;
     };
-    const productCompanyOptions = (selectedName = "") => {
+    const productCompanySelectValue = (selectedName = "", selectedId = "") => {
+      if (selectedId && implantVendorById(selectedId)) return selectedId;
+      const matched = findImplantVendorByName(selectedName);
+      return matched?.id || String(selectedName || "").trim();
+    };
+    const productCompanyOptions = (selectedName = "", selectedId = "") => {
       const selected = String(selectedName || "").trim();
+      const selectedValue = productCompanySelectValue(selected, selectedId);
       const vendors = implantVendors.slice().sort((a, b) => alphaFirstCompare(a.name, b.name));
-      const hasSelected = !selected || vendors.some((vendor) => normalizedName(vendor.name) === normalizedName(selected));
+      const hasSelected = !selected || vendors.some((vendor) => sameId(vendor.id, selectedValue));
       return `
         <option value="">업체 선택</option>
         ${!hasSelected ? `<option value="${escapeHtml(selected)}" selected>${escapeHtml(selected)} · 기존 업체</option>` : ""}
-        ${vendors.map((vendor) => `<option value="${escapeHtml(vendor.name || "")}" ${normalizedName(vendor.name) === normalizedName(selected) ? "selected" : ""}>${escapeHtml(vendor.name || "업체명 없음")}${vendor.active === false ? " · 발송 정지" : ""}</option>`).join("")}
+        ${vendors.map((vendor) => `<option value="${escapeHtml(vendor.id || "")}" ${sameId(vendor.id, selectedValue) ? "selected" : ""}>${escapeHtml(vendor.name || "업체명 없음")}${vendor.active === false ? " · 발송 정지" : ""}</option>`).join("")}
       `;
     };
     const productNeedsImplantLedger = (product) => {
@@ -2235,13 +2252,15 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       return category === "인체조직" || category === "ANCHOR";
     };
     const implantVendorKey = (value) => normalizedName(value);
-    const implantVendorSelectionForCompany = (company = "") => {
-      const name = String(company || "").trim();
+    const implantVendorSelectionForProduct = (product = {}) => {
+      const byId = product.companyVendorId ? implantVendorById(product.companyVendorId) : null;
+      const name = String(byId?.name || product.company || "").trim();
       if (!name || name === "업체 없음") return { key: "", vendorId: "", customVendor: "", vendor: "" };
-      const matched = implantVendors.find((vendor) => implantVendorKey(vendor.name) === implantVendorKey(name));
+      const matched = byId || findImplantVendorByName(name);
       if (matched) return { key: implantVendorKey(name), vendorId: matched.id, customVendor: "", vendor: matched.name || name };
       return { key: implantVendorKey(name), vendorId: "__custom__", customVendor: name, vendor: name };
     };
+    const implantVendorSelectionForCompany = (company = "") => implantVendorSelectionForProduct({ company });
     const implantDraftVendorName = (draft = {}) => draft.vendorId === "__custom__"
       ? (draft.customVendor || draft.vendor || "")
       : (implantVendorById(draft.vendorId)?.name || draft.vendor || draft.customVendor || "");
@@ -2251,7 +2270,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       items.forEach((item) => {
         const product = productById(item.productId);
         if (!productNeedsImplantLedger(product)) return;
-        const target = implantVendorSelectionForCompany(product.company);
+        const target = implantVendorSelectionForProduct(product);
         if (target.key && !targets.has(target.key)) targets.set(target.key, target);
       });
       return [...targets.values()];
@@ -2640,8 +2659,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           document.getElementById("productId").value = item.id;
           document.getElementById("productCategory").value = item.category;
           document.getElementById("productName").value = item.name;
-          document.getElementById("productCompany").innerHTML = productCompanyOptions(item.company || "");
-          document.getElementById("productCompany").value = item.company || "";
+          document.getElementById("productCompany").innerHTML = productCompanyOptions(item.company || "", item.companyVendorId || "");
+          document.getElementById("productCompany").value = productCompanySelectValue(item.company || "", item.companyVendorId || "");
           document.getElementById("productSubcategory").value = item.subcategory || "";
           document.getElementById("productStock").value = num(item.stock);
           document.getElementById("productWarning").value = num(item.warningStock);
@@ -3272,11 +3291,14 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           alert("인체조직/ANCHOR&etc 제품은 임플란트 업체를 선택해 주세요.");
           return;
         }
+        const selectedCompanyValue = document.getElementById("productCompany").value.trim();
+        const selectedCompanyVendor = category === "비급여" ? null : implantVendorById(selectedCompanyValue);
         const next = {
           id,
           category,
           name: document.getElementById("productName").value.trim(),
-          company: category === "비급여" ? "" : document.getElementById("productCompany").value.trim(),
+          company: category === "비급여" ? "" : (selectedCompanyVendor?.name || selectedCompanyValue),
+          companyVendorId: category === "비급여" ? "" : (selectedCompanyVendor?.id || ""),
           subcategory: category === "ANCHOR" ? document.getElementById("productSubcategory").value : "",
           stock: num(document.getElementById("productStock").value),
           warningStock: num(document.getElementById("productWarning").value),
@@ -4453,7 +4475,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     const implantVendorContact = (vendorName = "", vendorId = "") => {
       const byId = vendorId ? implantVendorById(vendorId) : null;
       if (byId) return byId;
-      return implantVendors.find((vendor) => normalizedName(vendor.name) === normalizedName(vendorName)) || {};
+      return findImplantVendorByName(vendorName) || {};
     };
     const isImplantVendorSendPaused = (vendorName = "", vendorId = "") => implantVendorContact(vendorName, vendorId)?.active === false;
 
