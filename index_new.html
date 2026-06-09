@@ -5315,8 +5315,43 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           editImplantRowsWrap.querySelector(`[data-edit-implant-camera-input="${cameraButton.dataset.openEditImplantCamera}"]`)?.click();
           return;
         }
+        const editPhotoButton = event.target.closest("[data-edit-existing-implant-photo]");
+        const editPhotoImage = event.target.closest("img[data-preview-edit-implant-photo]");
+        if ((editPhotoButton || editPhotoImage) && editImplantCanModify) {
+          event.preventDefault();
+          event.stopPropagation();
+          openEditImplantPhotoEditor(editPhotoButton?.dataset.editExistingImplantPhoto || editPhotoImage?.dataset.previewEditImplantPhoto);
+          return;
+        }
+        const cropButton = event.target.closest("[data-crop-edit-implant-photo]");
+        if (cropButton && editImplantCanModify) {
+          event.preventDefault();
+          event.stopPropagation();
+          const pair = cropButton.dataset.cropEditImplantPhoto;
+          const { photo } = parseEditImplantPair(pair);
+          if (photo) {
+            openEditImplantPhotoEditor(pair);
+            requestAnimationFrame(() => enableImplantCropFrame(photo));
+          }
+          return;
+        }
+        const previewButton = event.target.closest("button[data-preview-edit-implant-photo]");
+        if (previewButton) {
+          event.preventDefault();
+          event.stopPropagation();
+          const pair = previewButton.dataset.previewEditImplantPhoto;
+          const { photo } = parseEditImplantPair(pair);
+          const src = photo ? editImplantPhotoSrc(photo) : "";
+          if (src) {
+            showImplantPhotoModal(src);
+            document.getElementById("implantPhotoModalImage")?.classList.toggle("cropped", Boolean(photo?.cropped));
+          }
+          return;
+        }
         const rotateButton = event.target.closest("[data-rotate-edit-implant-photo]");
         if (rotateButton && editImplantCanModify) {
+          event.preventDefault();
+          event.stopPropagation();
           const { photo } = parseEditImplantPair(rotateButton.dataset.rotateEditImplantPhoto);
           if (photo) {
             photo.rotation = ((photo.rotation || 0) + 90) % 360;
@@ -5326,20 +5361,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           }
           return;
         }
-        const cropButton = event.target.closest("[data-crop-edit-implant-photo]");
-        if (cropButton && editImplantCanModify) {
-          const { photo } = parseEditImplantPair(cropButton.dataset.cropEditImplantPhoto);
-          if (photo) {
-            await openImplantCropEditor(photo, async (changedPhoto) => {
-              markEditImplantPhotoChanged(changedPhoto);
-              await refreshEditedImplantPreview(changedPhoto);
-              renderEditImplantRows();
-            });
-          }
-          return;
-        }
         const removePhoto = event.target.closest("[data-remove-edit-implant-photo]");
         if (removePhoto && editImplantCanModify) {
+          event.preventDefault();
+          event.stopPropagation();
           const { row, photo } = parseEditImplantPair(removePhoto.dataset.removeEditImplantPhoto);
           if (row && photo) {
             if (photo.preview) URL.revokeObjectURL(photo.preview);
@@ -5351,6 +5376,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const moveUp = event.target.closest("[data-move-edit-implant-photo-up]");
         const moveDown = event.target.closest("[data-move-edit-implant-photo-down]");
         if ((moveUp || moveDown) && editImplantCanModify) {
+          event.preventDefault();
+          event.stopPropagation();
           const pair = moveUp?.dataset.moveEditImplantPhotoUp || moveDown?.dataset.moveEditImplantPhotoDown;
           const { row, photo } = parseEditImplantPair(pair);
           if (!row || !photo) return;
@@ -5360,23 +5387,6 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           row.photos.splice(index, 1);
           row.photos.splice(nextIndex, 0, photo);
           renderEditImplantRows();
-          return;
-        }
-        const editPhotoButton = event.target.closest("[data-edit-existing-implant-photo]");
-        const editPhotoImage = event.target.closest("img[data-preview-edit-implant-photo]");
-        if ((editPhotoButton || editPhotoImage) && editImplantCanModify) {
-          openEditImplantPhotoEditor(editPhotoButton?.dataset.editExistingImplantPhoto || editPhotoImage?.dataset.previewEditImplantPhoto);
-          return;
-        }
-        const previewButton = event.target.closest("button[data-preview-edit-implant-photo]");
-        if (previewButton) {
-          const pair = previewButton.dataset.previewEditImplantPhoto;
-          const { photo } = parseEditImplantPair(pair);
-          const src = photo ? editImplantPhotoSrc(photo) : "";
-          if (src) {
-            showImplantPhotoModal(src);
-            document.getElementById("implantPhotoModalImage")?.classList.toggle("cropped", Boolean(photo?.cropped));
-          }
           return;
         }
         const removeButton = event.target.closest("[data-remove-edit-implant-row]");
