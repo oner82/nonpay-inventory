@@ -280,6 +280,26 @@
     .settings-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 12px; }
     .settings-tab { flex: 0 0 auto; min-height: 42px; border: 1px solid var(--line); background: #fff; color: var(--ink); }
     .settings-tab.active { border-color: var(--brand); background: var(--brand); color: #fff; }
+    .implant-subtabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .implant-subtab {
+      flex: 0 0 auto;
+      min-height: 42px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+    }
+    .implant-subtab.active {
+      border-color: var(--brand);
+      background: var(--brand);
+      color: #fff;
+    }
 
     .receipt-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 12px; }
     .receipt-tab { flex: 0 0 auto; min-height: 42px; border: 1px solid var(--line); background: #fff; color: var(--ink); box-shadow: none; }
@@ -2036,6 +2056,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     let currentSettingsView = "products";
     let commonHandlersBound = false;
     let currentReceiptView = "nonpay";
+    let currentImplantSubView = "today";
     let pendingEditUsageId = "";
     let db;
     let ref;
@@ -4846,12 +4867,13 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       `;
     };
 
-    const implantRecordCardHtml = (record) => {
+    const implantRecordCardHtml = (record, options = {}) => {
       const vendors = Array.isArray(record.implants) ? record.implants : [];
       const patientNo = implantPatientNoText(record);
       const doctorText = record.surgeonCode || departmentById(record.doctorId)?.name || "-";
       const surgeryText = record.surgeryName || surgeryById(record.surgeryId)?.name || "-";
       const locked = isImplantLedgerClosed(record);
+      const showAdminTools = options.showAdminTools !== false && canEditImplantPatientNo();
       return `
         <div class="card implant-record-card" data-implant-record="${escapeHtml(record.id)}">
           <div class="item-title">
@@ -4865,13 +4887,13 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             ${record.surgeryTime ? `<span>수술시간: ${escapeHtml(record.surgeryTime)}</span>` : ""}
           </div>
           <div class="implant-lock-banner">${escapeHtml(implantLockLabel(record))}${record.editUnlockedAt ? ` · 해제: ${escapeHtml(record.editUnlockedAt.slice(0, 16).replace("T", " "))}` : ""}</div>
-          ${canEditImplantPatientNo() ? `
+          ${showAdminTools ? `
             <div class="actions">
               ${locked ? `<button class="secondary" type="button" data-unlock-implant-record="${escapeHtml(record.id)}">마감 잠금 해제</button>` : (patientNo ? `<button class="secondary" type="button" data-lock-implant-record="${escapeHtml(record.id)}">다시 잠금</button>` : "")}
               <button class="danger" type="button" data-delete-implant-record="${escapeHtml(record.id)}">장부 삭제</button>
             </div>
           ` : ""}
-          ${canEditImplantPatientNo() ? `
+          ${showAdminTools ? `
             <div class="row two">
               <div>
                 <label for="implantPatientNo-${escapeHtml(record.id)}">환자번호 수동 수정</label>
@@ -4902,12 +4924,32 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       `;
     };
 
+    const implantSubViewItems = () => [
+      ["today", "오늘 장부"],
+      ["hospital", "병원 확인용"],
+      ["send", "업체 발송함"],
+      ["photos", "사진 상태"],
+      ["backup", "백업/보관"],
+      ...(canEditImplantPatientNo() ? [["admin", "관리자"]] : [])
+    ];
+    const ensureImplantSubView = () => {
+      const allowed = new Set(implantSubViewItems().map(([key]) => key));
+      if (!allowed.has(currentImplantSubView)) currentImplantSubView = "today";
+      return currentImplantSubView;
+    };
+    const implantPanelVisible = (panelNames = "") => panelNames.split(/\s+/).filter(Boolean).includes(currentImplantSubView);
+
     const renderImplants = () => {
       const date = today();
+      ensureImplantSubView();
+      const subTabs = implantSubViewItems();
       return `
         <section class="grid">
           <div class="card">
             <h2>임플란트 전산장부</h2>
+            <div class="implant-subtabs" role="tablist" aria-label="임플란트 하위 메뉴">
+              ${subTabs.map(([key, label]) => `<button class="implant-subtab ${currentImplantSubView === key ? "active" : ""}" type="button" data-implant-subview="${key}">${label}</button>`).join("")}
+            </div>
             <div class="row four">
               <div>
                 <label for="implantFilterDate">날짜</label>
@@ -4928,17 +4970,23 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             </div>
             <div class="actions">
               <button class="secondary" type="button" id="implantFilterReset">초기화</button>
+            </div>
+            <div class="actions" data-implant-panel="today" ${implantPanelVisible("today") ? "" : "hidden"}>
               ${canAssignImplantPatientNo() ? `<button type="button" id="closeTodayImplants">오늘 사용분 마감하기</button>` : ""}
               ${canAssignImplantPatientNo() ? `<button class="secondary" type="button" id="assignImplantPatientNos">선택 날짜 번호 부여</button>` : ""}
+            </div>
+            <div class="actions" data-implant-panel="hospital" ${implantPanelVisible("hospital") ? "" : "hidden"}>
               <button class="secondary" type="button" id="exportImplantLedger">엑셀 다운로드</button>
+            </div>
+            <div class="actions" data-implant-panel="send" ${implantPanelVisible("send") ? "" : "hidden"}>
               <button type="button" id="prepareImplantVendorSend">업체별 장부 확인하기</button>
             </div>
           </div>
-          <div class="card">
+          <div class="card" data-implant-panel="photos" ${implantPanelVisible("photos") ? "" : "hidden"}>
             <h2>사진 업로드 상태</h2>
             <div id="implantPhotoStatusPanel"></div>
           </div>
-          <div class="card">
+          <div class="card" data-implant-panel="backup" ${implantPanelVisible("backup") ? "" : "hidden"}>
             <h2>월별 백업/보관</h2>
             <div class="row two">
               <div>
@@ -4951,16 +4999,19 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             </div>
             <div class="implant-send-preview">엑셀, 원본 JSON, 사진 URL 목록을 저장하고 가능한 사진은 ZIP에 함께 담습니다.</div>
           </div>
-          <div class="card">
+          <div class="card" data-implant-panel="hospital" ${implantPanelVisible("hospital") ? "" : "hidden"}>
             <h2>병원 확인용 마감 자료</h2>
             <div id="implantCloseSummary"></div>
           </div>
-          <div class="card" id="implantSendPanel" hidden>
+          <div class="card" id="implantSendPanel" data-implant-panel="send" ${implantPanelVisible("send") ? "" : "hidden"}>
             <h2>업체별 장부 확인</h2>
             <div class="implant-send-preview">환자명과 환자ID는 업체 발송자료에서 제외됩니다. 실제 자동 발송은 병원 메일/SMS API 연결 후 같은 자료를 그대로 사용할 수 있습니다.</div>
             <div id="implantSendList"></div>
           </div>
-          <div id="implantLedgerList" class="implant-ledger-list"></div>
+          <div class="card" data-implant-panel="today admin" ${implantPanelVisible("today admin") ? "" : "hidden"}>
+            <h2 id="implantLedgerTitle">${currentImplantSubView === "admin" ? "관리자 도구" : "오늘 장부"}</h2>
+            <div id="implantLedgerList" class="implant-ledger-list"></div>
+          </div>
           <div class="modal-backdrop" id="implantPhotoModal" hidden role="dialog" aria-modal="true" aria-label="임플란트 사진 확대">
             <div class="search-modal-panel">
               <div class="search-modal-head">
@@ -6286,14 +6337,35 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const sendList = document.getElementById("implantSendList");
       const photoStatusPanel = document.getElementById("implantPhotoStatusPanel");
       const backupMonthInput = document.getElementById("implantBackupMonth");
+      const ledgerTitle = document.getElementById("implantLedgerTitle");
+      const applyImplantPanels = () => {
+        app.querySelectorAll("[data-implant-panel]").forEach((panel) => {
+          panel.hidden = !panel.dataset.implantPanel.split(/\s+/).filter(Boolean).includes(currentImplantSubView);
+        });
+        app.querySelectorAll("[data-implant-subview]").forEach((button) => {
+          button.classList.toggle("active", button.dataset.implantSubview === currentImplantSubView);
+        });
+        if (ledgerTitle) ledgerTitle.textContent = currentImplantSubView === "admin" ? "관리자 도구" : "오늘 장부";
+        if (sendList && currentImplantSubView === "send" && !sendList.innerHTML.trim()) {
+          sendList.innerHTML = `<div class="empty">업체별 장부 확인하기를 누르면 선택 날짜의 발송 전 확인 자료가 표시됩니다.</div>`;
+        }
+      };
       const renderList = () => {
         const records = filteredImplantRecords(dateInput.value, nameInput.value, idInput.value, noInput.value).reverse();
         list.innerHTML = records.length
-          ? records.map(implantRecordCardHtml).join("")
+          ? records.map((record) => implantRecordCardHtml(record, { showAdminTools: currentImplantSubView === "admin" })).join("")
           : `<div class="empty">조회 조건에 맞는 임플란트 기록이 없습니다.</div>`;
         if (summary) summary.innerHTML = implantLedgerTableHtml(implantRecordsForDate(dateInput.value));
         if (photoStatusPanel) photoStatusPanel.innerHTML = implantPhotoStatusPanelHtml(dateInput.value);
+        applyImplantPanels();
       };
+      app.querySelectorAll("[data-implant-subview]").forEach((button) => {
+        button.addEventListener("click", () => {
+          currentImplantSubView = button.dataset.implantSubview || "today";
+          ensureImplantSubView();
+          renderList();
+        });
+      });
       dateInput.addEventListener("input", () => {
         if (backupMonthInput && dateInput.value) backupMonthInput.value = dateInput.value.slice(0, 7);
         renderList();
