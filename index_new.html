@@ -1441,6 +1441,46 @@
       border-radius: 10px;
       background: #fbfffd;
     }
+    .implant-status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .implant-status-tile {
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+    .implant-status-tile strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 20px;
+    }
+    .implant-status-list {
+      display: grid;
+      gap: 8px;
+      max-height: 260px;
+      overflow: auto;
+    }
+    .implant-status-row {
+      display: grid;
+      gap: 6px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+    .implant-lock-banner {
+      padding: 8px 10px;
+      border: 1px dashed #9bc6ff;
+      border-radius: 8px;
+      background: #f8fbff;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 850;
+    }
     .implant-send-text {
       max-height: 180px;
       overflow: auto;
@@ -2196,7 +2236,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     const canAssignImplantPatientNo = () => ["admin", "manager"].includes(currentUserRole());
     const canEditImplantPatientNo = () => currentUserRole() === "admin";
     const implantRecordsForUsage = (usageId) => sortImplantRecords(implantRecords.filter((record) => sameId(record.usageId, usageId)));
-    const isImplantLedgerClosed = (record) => Boolean(implantPatientNoText(record) || record?.closedAt || record?.patientNoAssignedAt);
+    const isImplantEditUnlocked = (record) => record?.editUnlocked === true;
+    const isImplantLedgerClosed = (record) => !isImplantEditUnlocked(record) && Boolean(implantPatientNoText(record) || record?.closedAt || record?.patientNoAssignedAt);
+    const implantLockLabel = (record) => isImplantLedgerClosed(record)
+      ? "마감 잠금"
+      : (implantPatientNoText(record) ? "관리자 해제" : "작성 가능");
     const implantEditLockMessage = (record) => {
       if (!record) return "";
       if (isImplantLedgerClosed(record)) return "임플란트 장부가 마감되어 관리자만 임플란트 기록을 수정할 수 있습니다.";
@@ -4390,6 +4434,46 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
     const implantRecordsForDate = (date) => sortImplantRecords(implantRecords.filter((record) => implantRecordDate(record) === date));
     const implantPhotoViewSrc = (photo) => photo?.editedPreview || photo?.preview || photo?.url || photo?.dataUrl || "";
+    const implantPhotoStoredInStorage = (photo) => Boolean(photo?.url && photo?.path && photo?.storageUploadFailed !== true);
+    const implantPhotoNeedsStorageRetry = (photo) => Boolean(photo?.dataUrl && (!photo?.url || photo?.storageUploadFailed || !photo?.path));
+    const implantPhotoStatusStats = (records) => records.reduce((stats, record) => {
+      (record.implants || []).forEach((implant) => {
+        const photos = implant.photos || [];
+        stats.implants += 1;
+        stats.pending += num(implant.pendingPhotoCount);
+        stats.errors += Array.isArray(implant.photoUploadErrors) ? implant.photoUploadErrors.length : 0;
+        photos.forEach((photo) => {
+          stats.photos += 1;
+          if (implantPhotoStoredInStorage(photo)) stats.storage += 1;
+          if (implantPhotoNeedsStorageRetry(photo)) stats.retry += 1;
+          if (photo?.storageUploadFailed) stats.failed += 1;
+          if (!implantPhotoViewSrc(photo)) stats.missing += 1;
+        });
+      });
+      return stats;
+    }, { implants: 0, photos: 0, storage: 0, pending: 0, failed: 0, retry: 0, missing: 0, errors: 0 });
+    const implantPhotoProblemRows = (records) => records.flatMap((record) => (record.implants || []).map((implant) => {
+      const photos = implant.photos || [];
+      const pending = num(implant.pendingPhotoCount);
+      const failed = photos.filter((photo) => photo?.storageUploadFailed).length;
+      const retry = photos.filter(implantPhotoNeedsStorageRetry).length;
+      const missing = photos.filter((photo) => !implantPhotoViewSrc(photo)).length;
+      const errors = Array.isArray(implant.photoUploadErrors) ? implant.photoUploadErrors.length : 0;
+      if (!pending && !failed && !retry && !missing && !errors) return null;
+      return { record, implant, pending, failed, retry, missing, errors };
+    }).filter(Boolean));
+    const implantSendStatusLabels = {
+      pending: "미발송",
+      sent: "발송완료",
+      excluded: "발송제외",
+      resend: "재발송 필요"
+    };
+    const implantSendStatusLabel = (status = "pending") => implantSendStatusLabels[status] || implantSendStatusLabels.pending;
+    const implantSendStatusClass = (status = "pending") => ({
+      sent: "ok",
+      excluded: "low",
+      resend: "low"
+    }[status] || "");
 
     const assignImplantPatientNosForDate = async (date) => {
       if (!canAssignImplantPatientNo()) return 0;
@@ -4408,10 +4492,12 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         record.patientNo = patientNo;
         record.patientNoAssignedAt = new Date().toISOString();
         record.closedAt = record.patientNoAssignedAt;
+        record.editUnlocked = false;
         updates.push(setDoc(doc(db, "implantRecords", record.id), {
           patientNo,
           patientNoAssignedAt: record.patientNoAssignedAt,
           closedAt: record.closedAt,
+          editUnlocked: false,
           updatedAt: new Date().toISOString(),
           ...auditUpdateFields()
         }, { merge: true }));
@@ -4488,6 +4574,82 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       );
     };
 
+    const safeBackupFileName = (value) => String(value || "implant")
+      .replace(/[\\/:*?"<>|]+/g, "_")
+      .replace(/\s+/g, "_")
+      .slice(0, 80);
+    const downloadBytes = (filename, bytes, type = "application/octet-stream") => {
+      const blob = new Blob([bytes], { type });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+        link.remove();
+      }, 0);
+    };
+    const implantRecordsForMonth = (month) => sortImplantRecords(implantRecords.filter((record) => implantRecordDate(record).startsWith(month)));
+    const exportImplantMonthlyBackup = async (month, onProgress) => {
+      if (!month) throw new Error("백업할 월을 선택해 주세요.");
+      const records = implantRecordsForMonth(month);
+      if (!records.length) throw new Error("선택한 월의 임플란트 기록이 없습니다.");
+      const headers = ["날짜", "번호", "환자명", "ID", "수술명", "원장코드", "저장자", "저장시간", "업체", "사용분", "사진수"];
+      const photoRefs = [];
+      records.forEach((record) => {
+        (record.implants || []).forEach((implant) => {
+          (implant.photos || []).forEach((photo, index) => {
+            const src = photo.url || photo.dataUrl || "";
+            if (!src) return;
+            photoRefs.push({ record, implant, photo, index, src });
+          });
+        });
+      });
+      const files = [
+        { name: "implant-ledger.xlsx", content: xlsxWorkbook(headers, implantLedgerRows(records)) },
+        { name: "implant-records.json", content: JSON.stringify(records, null, 2) },
+        { name: "photo-urls.txt", content: photoRefs.map(({ record, implant, src, index }) => [
+          implantRecordDate(record),
+          implantPatientNoText(record) ? `#${implantPatientNoText(record)}` : "미마감",
+          record.patientName || "",
+          record.patientId || "",
+          implant.vendor || "업체 없음",
+          `photo ${index + 1}`,
+          src
+        ].join("\t")).join("\n") }
+      ];
+      const errors = [];
+      let done = 0;
+      onProgress?.({ done, total: photoRefs.length, failed: 0 });
+      for (const item of photoRefs) {
+        try {
+          const response = await fetch(item.src);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const bytes = new Uint8Array(await response.arrayBuffer());
+          const ext = (item.photo.contentType || "image/jpeg").includes("png") ? "png" : "jpg";
+          const photoName = [
+            item.record.surgeryDate || implantRecordDate(item.record),
+            implantPatientNoText(item.record) ? `no-${implantPatientNoText(item.record)}` : "no-pending",
+            item.record.patientName || "patient",
+            item.implant.vendor || "vendor",
+            `photo-${item.index + 1}.${ext}`
+          ].map(safeBackupFileName).join("_");
+          files.push({ name: `photos/${photoName}`, content: bytes });
+        } catch (error) {
+          errors.push(`${implantRecordDate(item.record)} ${item.record.patientName || ""} ${item.implant.vendor || ""} photo ${item.index + 1}: ${error.message}`);
+        } finally {
+          done += 1;
+          onProgress?.({ done, total: photoRefs.length, failed: errors.length });
+        }
+      }
+      if (errors.length) files.push({ name: "photo-download-errors.txt", content: errors.join("\n") });
+      downloadBytes(`임플란트장부_백업_${month}.zip`, zipFiles(files), "application/zip");
+      return { records: records.length, photos: photoRefs.length, failed: errors.length };
+    };
+
     const implantVendorContact = (vendorName = "", vendorId = "") => {
       const byId = vendorId ? implantVendorById(vendorId) : null;
       if (byId) return byId;
@@ -4511,12 +4673,17 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         (record.implants || []).forEach((implant) => {
           const key = implant.vendor || "업체 없음";
           if (isImplantVendorSendPaused(key, implant.vendorId)) return;
-          const current = groups.get(key) || { vendor: key, contact: implantVendorContact(key, implant.vendorId), lines: [] };
+          const current = groups.get(key) || { vendor: key, contact: implantVendorContact(key, implant.vendorId), lines: [], statuses: [] };
           current.lines.push({ record, implant });
+          current.statuses.push(implant.sendStatus || "pending");
           groups.set(key, current);
         });
       });
-      return Array.from(groups.values()).sort((a, b) => alphaFirstCompare(a.vendor, b.vendor));
+      return Array.from(groups.values()).map((group) => {
+        const uniqueStatuses = Array.from(new Set(group.statuses));
+        const status = uniqueStatuses.length === 1 ? uniqueStatuses[0] : "resend";
+        return { ...group, status };
+      }).sort((a, b) => alphaFirstCompare(a.vendor, b.vendor));
     };
 
     const implantSendPanelHtml = (date) => {
@@ -4532,7 +4699,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               <div class="implant-send-card">
                 <div class="item-title">
                   <span>${escapeHtml(group.vendor)}</span>
-                  <span class="pill">${group.lines.length}건</span>
+                  <span class="pill">${group.lines.length}건 · ${escapeHtml(implantSendStatusLabel(group.status))}</span>
                 </div>
                 <div class="meta">
                   ${email ? `<span>이메일: ${escapeHtml(email)}</span>` : ""}
@@ -4544,12 +4711,90 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
                   ${email ? `<button type="button" data-send-implant-email="${escapeHtml(group.vendor)}">메일 작성</button>` : ""}
                   ${phone ? `<button class="secondary" type="button" data-send-implant-sms="${escapeHtml(group.vendor)}">문자 작성</button>` : ""}
                   <button class="secondary" type="button" data-copy-implant-send="${escapeHtml(group.vendor)}">내용 복사</button>
+                  <button class="secondary" type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="pending">미발송</button>
+                  <button type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="sent">발송완료</button>
+                  <button class="secondary" type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="excluded">발송제외</button>
+                  <button class="secondary" type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="resend">재발송</button>
                 </div>
               </div>
             `;
           }).join("")}
         </div>
       `;
+    };
+
+    const retryImplantRecordPhotos = async (recordId, onProgress) => {
+      const record = implantRecords.find((item) => sameId(item.id, recordId));
+      if (!record) throw new Error("임플란트 기록을 찾을 수 없습니다.");
+      let total = 0;
+      let done = 0;
+      let failed = 0;
+      (record.implants || []).forEach((implant) => {
+        total += (implant.photos || []).filter(implantPhotoNeedsStorageRetry).length;
+      });
+      notifyImplantPhotoUpload(onProgress, done, total, failed);
+      const implants = [];
+      for (const implant of record.implants || []) {
+        const photos = [];
+        const photoUploadErrors = [];
+        let retried = 0;
+        for (const photo of implant.photos || []) {
+          if (!implantPhotoNeedsStorageRetry(photo)) {
+            photos.push(cleanImplantPhotoPayload(photo));
+            continue;
+          }
+          retried += 1;
+          try {
+            photos.push(await uploadImplantPhoto(record.id, implant.id || uid(), photo, implantRecordDate(record)));
+          } catch (error) {
+            photos.push(cleanImplantPhotoPayload(photo));
+            photoUploadErrors.push(error.message || "사진 재업로드 실패");
+            failed += 1;
+          } finally {
+            done += 1;
+            notifyImplantPhotoUpload(onProgress, done, total, failed);
+          }
+        }
+        implants.push({
+          ...implant,
+          photos,
+          pendingPhotoCount: Math.max(0, num(implant.pendingPhotoCount) - retried),
+          photoUploadErrors: retried ? (photoUploadErrors.length ? photoUploadErrors : []) : (implant.photoUploadErrors || [])
+        });
+      }
+      await setDoc(doc(db, "implantRecords", record.id), {
+        implants,
+        hasPhotoUploadError: implants.some((implant) => (implant.photoUploadErrors || []).length),
+        updatedAt: new Date().toISOString(),
+        ...auditUpdateFields()
+      }, { merge: true });
+    };
+
+    const updateImplantSendGroupStatus = async (date, vendor, status) => {
+      const allowed = new Set(["pending", "sent", "excluded", "resend"]);
+      if (!allowed.has(status)) throw new Error("알 수 없는 발송 상태입니다.");
+      const updates = implantRecordsForDate(date).map((record) => {
+        let changed = false;
+        const implants = (record.implants || []).map((implant) => {
+          if ((implant.vendor || "업체 없음") !== vendor) return implant;
+          changed = true;
+          return {
+            ...implant,
+            sendStatus: status,
+            sendStatusLabel: implantSendStatusLabel(status),
+            sendStatusUpdatedAt: new Date().toISOString(),
+            sendStatusUpdatedBy: auditUpdateFields().updatedBy
+          };
+        });
+        if (!changed) return null;
+        return setDoc(doc(db, "implantRecords", record.id), {
+          implants,
+          updatedAt: new Date().toISOString(),
+          ...auditUpdateFields()
+        }, { merge: true });
+      }).filter(Boolean);
+      await Promise.all(updates);
+      return updates.length;
     };
 
     const implantPhotoHtml = (photo) => {
@@ -4566,11 +4811,47 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       return `<div class="muted">${pending ? `사진 ${pending}장 업로드 대기${missingPhotoHint}` : ""}${pending && errors.length ? " · " : ""}${errors.length ? `사진 업로드 확인 필요 ${errors.length}건` : ""}</div>`;
     };
 
+    const implantPhotoStatusPanelHtml = (date) => {
+      const records = implantRecordsForDate(date);
+      const stats = implantPhotoStatusStats(records);
+      const rows = implantPhotoProblemRows(records);
+      return `
+        <div class="implant-status-grid">
+          <div class="implant-status-tile"><span>전체 사진</span><strong>${stats.photos}</strong></div>
+          <div class="implant-status-tile"><span>Storage 저장</span><strong>${stats.storage}</strong></div>
+          <div class="implant-status-tile"><span>업로드 대기</span><strong>${stats.pending}</strong></div>
+          <div class="implant-status-tile"><span>재업로드 가능</span><strong>${stats.retry}</strong></div>
+          <div class="implant-status-tile"><span>확인 필요</span><strong>${stats.failed + stats.missing + stats.errors}</strong></div>
+        </div>
+        ${rows.length ? `
+          <div class="implant-status-list">
+            ${rows.map(({ record, implant, pending, failed, retry, missing, errors }) => `
+              <div class="implant-status-row">
+                <div class="item-title">
+                  <span>${escapeHtml(implantPatientNoText(record) ? `#${implantPatientNoText(record)} ` : "")}${escapeHtml(record.patientName || "이름 없음")} · ${escapeHtml(implant.vendor || "업체 없음")}</span>
+                  <span class="pill">${escapeHtml(implantRecordDate(record))}</span>
+                </div>
+                <div class="meta">
+                  ${pending ? `<span>대기 ${pending}장</span>` : ""}
+                  ${retry ? `<span>재업로드 가능 ${retry}장</span>` : ""}
+                  ${failed ? `<span>업로드 실패 ${failed}장</span>` : ""}
+                  ${missing ? `<span>미표시 ${missing}장</span>` : ""}
+                  ${errors ? `<span>오류 ${errors}건</span>` : ""}
+                </div>
+                ${retry ? `<div class="actions"><button class="secondary" type="button" data-retry-implant-photos="${escapeHtml(record.id)}">임시저장 사진 재업로드</button></div>` : ""}
+              </div>
+            `).join("")}
+          </div>
+        ` : `<div class="empty">선택 날짜의 사진 업로드 상태가 정상입니다.</div>`}
+      `;
+    };
+
     const implantRecordCardHtml = (record) => {
       const vendors = Array.isArray(record.implants) ? record.implants : [];
       const patientNo = implantPatientNoText(record);
       const doctorText = record.surgeonCode || departmentById(record.doctorId)?.name || "-";
       const surgeryText = record.surgeryName || surgeryById(record.surgeryId)?.name || "-";
+      const locked = isImplantLedgerClosed(record);
       return `
         <div class="card implant-record-card" data-implant-record="${escapeHtml(record.id)}">
           <div class="item-title">
@@ -4583,8 +4864,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             <span>수술: ${escapeHtml(surgeryText)}</span>
             ${record.surgeryTime ? `<span>수술시간: ${escapeHtml(record.surgeryTime)}</span>` : ""}
           </div>
+          <div class="implant-lock-banner">${escapeHtml(implantLockLabel(record))}${record.editUnlockedAt ? ` · 해제: ${escapeHtml(record.editUnlockedAt.slice(0, 16).replace("T", " "))}` : ""}</div>
           ${canEditImplantPatientNo() ? `
             <div class="actions">
+              ${locked ? `<button class="secondary" type="button" data-unlock-implant-record="${escapeHtml(record.id)}">마감 잠금 해제</button>` : (patientNo ? `<button class="secondary" type="button" data-lock-implant-record="${escapeHtml(record.id)}">다시 잠금</button>` : "")}
               <button class="danger" type="button" data-delete-implant-record="${escapeHtml(record.id)}">장부 삭제</button>
             </div>
           ` : ""}
@@ -4650,6 +4933,23 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               <button class="secondary" type="button" id="exportImplantLedger">엑셀 다운로드</button>
               <button type="button" id="prepareImplantVendorSend">업체별 장부 확인하기</button>
             </div>
+          </div>
+          <div class="card">
+            <h2>사진 업로드 상태</h2>
+            <div id="implantPhotoStatusPanel"></div>
+          </div>
+          <div class="card">
+            <h2>월별 백업/보관</h2>
+            <div class="row two">
+              <div>
+                <label for="implantBackupMonth">백업 월</label>
+                <input id="implantBackupMonth" type="month" value="${escapeHtml(date.slice(0, 7))}">
+              </div>
+              <div class="actions">
+                <button class="secondary" type="button" id="downloadImplantMonthlyBackup">월별 ZIP 백업</button>
+              </div>
+            </div>
+            <div class="implant-send-preview">엑셀, 원본 JSON, 사진 URL 목록을 저장하고 가능한 사진은 ZIP에 함께 담습니다.</div>
           </div>
           <div class="card">
             <h2>병원 확인용 마감 자료</h2>
@@ -5984,16 +6284,24 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const summary = document.getElementById("implantCloseSummary");
       const sendPanel = document.getElementById("implantSendPanel");
       const sendList = document.getElementById("implantSendList");
+      const photoStatusPanel = document.getElementById("implantPhotoStatusPanel");
+      const backupMonthInput = document.getElementById("implantBackupMonth");
       const renderList = () => {
         const records = filteredImplantRecords(dateInput.value, nameInput.value, idInput.value, noInput.value).reverse();
         list.innerHTML = records.length
           ? records.map(implantRecordCardHtml).join("")
           : `<div class="empty">조회 조건에 맞는 임플란트 기록이 없습니다.</div>`;
         if (summary) summary.innerHTML = implantLedgerTableHtml(implantRecordsForDate(dateInput.value));
+        if (photoStatusPanel) photoStatusPanel.innerHTML = implantPhotoStatusPanelHtml(dateInput.value);
       };
-      [dateInput, nameInput, idInput, noInput].forEach((input) => input.addEventListener("input", renderList));
+      dateInput.addEventListener("input", () => {
+        if (backupMonthInput && dateInput.value) backupMonthInput.value = dateInput.value.slice(0, 7);
+        renderList();
+      });
+      [nameInput, idInput, noInput].forEach((input) => input.addEventListener("input", renderList));
       document.getElementById("implantFilterReset")?.addEventListener("click", () => {
         dateInput.value = today();
+        if (backupMonthInput) backupMonthInput.value = today().slice(0, 7);
         nameInput.value = "";
         idInput.value = "";
         noInput.value = "";
@@ -6026,6 +6334,18 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       document.getElementById("exportImplantLedger")?.addEventListener("click", () => {
         exportImplantLedgerExcel(dateInput.value);
       });
+      document.getElementById("downloadImplantMonthlyBackup")?.addEventListener("click", async () => {
+        try {
+          const result = await exportImplantMonthlyBackup(backupMonthInput?.value || dateInput.value.slice(0, 7), ({ done, total, failed }) => {
+            const failText = failed ? ` · 실패 ${failed}` : "";
+            showSaveToast(total ? `월별 백업 사진 수집 중 ${done}/${total}${failText}` : "월별 백업 생성 중입니다...", failed ? "error" : "saving", { hold: done < total });
+          });
+          saveDoneToast(`월별 백업 완료 · 기록 ${result.records}건 · 사진 ${result.photos}장${result.failed ? ` · 실패 ${result.failed}장` : ""}`);
+        } catch (error) {
+          saveErrorToast(`월별 백업 실패: ${error.message}`);
+          alert(error.message);
+        }
+      });
       document.getElementById("prepareImplantVendorSend")?.addEventListener("click", async () => {
         const date = dateInput.value || today();
         const unnumbered = implantRecordsForDate(date).filter((record) => !implantPatientNoText(record));
@@ -6047,6 +6367,22 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         sendPanel.scrollIntoView({ behavior: "smooth", block: "start" });
       });
       sendPanel?.addEventListener("click", async (event) => {
+        const statusButton = event.target.closest("[data-set-implant-send-status]");
+        if (statusButton) {
+          const date = dateInput.value || today();
+          const vendorName = statusButton.dataset.setImplantSendStatus;
+          const status = statusButton.dataset.sendStatus;
+          try {
+            const count = await updateImplantSendGroupStatus(date, vendorName, status);
+            sendList.innerHTML = implantSendPanelHtml(date);
+            renderList();
+            saveDoneToast(`${vendorName} · ${implantSendStatusLabel(status)} 저장 완료 (${count}건)`);
+          } catch (error) {
+            saveErrorToast(`발송 상태 저장 실패: ${error.message}`);
+            alert(error.message);
+          }
+          return;
+        }
         const vendor = event.target.closest("[data-send-implant-email]")?.dataset.sendImplantEmail
           || event.target.closest("[data-send-implant-sms]")?.dataset.sendImplantSms
           || event.target.closest("[data-copy-implant-send]")?.dataset.copyImplantSend;
@@ -6080,10 +6416,70 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         if (!image) return;
         showImplantPhotoModal(image.dataset.implantPhotoView);
       });
+      photoStatusPanel?.addEventListener("click", async (event) => {
+        const retryButton = event.target.closest("[data-retry-implant-photos]");
+        if (!retryButton) return;
+        const recordId = retryButton.dataset.retryImplantPhotos;
+        try {
+          let failedCount = 0;
+          await retryImplantRecordPhotos(recordId, ({ done, total, failed }) => {
+            failedCount = failed;
+            const failText = failed ? ` · 실패 ${failed}` : "";
+            showSaveToast(`사진 재업로드 중 ${done}/${total}${failText}`, failed ? "error" : "saving", { hold: done < total });
+          });
+          saveDoneToast(failedCount ? "사진 재업로드 완료 · 확인 필요" : "사진 재업로드 완료");
+          renderList();
+        } catch (error) {
+          saveErrorToast(`사진 재업로드 실패: ${error.message}`);
+          alert(error.message);
+        }
+      });
       list.addEventListener("click", async (event) => {
         const image = event.target.closest("[data-implant-photo-view]");
         if (image) {
           showImplantPhotoModal(image.dataset.implantPhotoView);
+          return;
+        }
+        const unlockButton = event.target.closest("[data-unlock-implant-record]");
+        if (unlockButton) {
+          if (!canEditImplantPatientNo()) return;
+          const id = unlockButton.dataset.unlockImplantRecord;
+          await setDoc(doc(db, "implantRecords", id), {
+            editUnlocked: true,
+            editUnlockedAt: new Date().toISOString(),
+            closedAt: null,
+            updatedAt: new Date().toISOString(),
+            ...auditUpdateFields()
+          }, { merge: true });
+          const record = implantRecords.find((item) => sameId(item.id, id));
+          if (record) {
+            record.editUnlocked = true;
+            record.editUnlockedAt = new Date().toISOString();
+            record.closedAt = null;
+          }
+          saveDoneToast("마감 잠금 해제 완료");
+          renderList();
+          return;
+        }
+        const lockButton = event.target.closest("[data-lock-implant-record]");
+        if (lockButton) {
+          if (!canEditImplantPatientNo()) return;
+          const id = lockButton.dataset.lockImplantRecord;
+          await setDoc(doc(db, "implantRecords", id), {
+            editUnlocked: false,
+            relockedAt: new Date().toISOString(),
+            closedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            ...auditUpdateFields()
+          }, { merge: true });
+          const record = implantRecords.find((item) => sameId(item.id, id));
+          if (record) {
+            record.editUnlocked = false;
+            record.relockedAt = new Date().toISOString();
+            record.closedAt = record.relockedAt;
+          }
+          saveDoneToast("마감 잠금 완료");
+          renderList();
           return;
         }
         const deleteRecordButton = event.target.closest("[data-delete-implant-record]");
@@ -6121,9 +6517,14 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           await setDoc(doc(db, "implantRecords", id), {
             patientNo: nextNo,
             patientNoManuallyEditedAt: new Date().toISOString(),
+            patientNoAssignedAt: record.patientNoAssignedAt || new Date().toISOString(),
+            closedAt: new Date().toISOString(),
+            editUnlocked: false,
             updatedAt: new Date().toISOString(),
             ...auditUpdateFields()
           }, { merge: true });
+          saveDoneToast("환자번호 저장 및 마감 잠금 완료");
+          renderList();
         }
       });
       document.getElementById("closeImplantPhotoModal")?.addEventListener("click", hideImplantPhotoModal);
