@@ -1513,6 +1513,37 @@
       font-size: 12px;
       color: var(--ink);
     }
+    .implant-send-photo-ledger {
+      display: grid;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+    .implant-send-patient {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid #dbeafe;
+      border-left: 4px solid #2563eb;
+      border-radius: 8px;
+      background: #f8fbff;
+      break-inside: avoid;
+    }
+    .implant-send-photo-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .implant-send-photo-grid img {
+      width: 132px;
+      height: 132px;
+      object-fit: cover;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
     @media (max-width: 720px) {
       .use-content-head { align-items: flex-start; }
       .selected-use-chip { grid-template-columns: 1fr; width: 100%; }
@@ -4707,6 +4738,75 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       }).sort((a, b) => alphaFirstCompare(a.vendor, b.vendor));
     };
 
+    const implantSendPhotoLedgerHtml = (group) => `
+      <div class="implant-send-photo-ledger">
+        ${group.lines.map(({ record, implant }) => {
+          const photos = implant.photos || [];
+          const patientNo = implantPatientNoText(record) || "미마감";
+          const surgeryText = record.surgeryName || surgeryById(record.surgeryId)?.name || "-";
+          const doctorText = record.surgeonCode || departmentById(record.doctorId)?.name || "-";
+          return `
+            <div class="implant-send-patient">
+              <div class="item-title">
+                <span>#${escapeHtml(patientNo)} · ${escapeHtml(doctorText)} · ${escapeHtml(surgeryText)}</span>
+                <span class="pill">${escapeHtml(implantRecordDate(record) || "-")}</span>
+              </div>
+              <div class="implant-description">${escapeHtml(implant.description || `사진 ${photos.length}장 기록`)}</div>
+              ${photos.length ? `
+                <div class="implant-send-photo-grid">
+                  ${photos.map((photo) => {
+                    const src = implantPhotoViewSrc(photo);
+                    return src ? `<img src="${escapeHtml(src)}" alt="임플란트 발송 사진" data-implant-photo-view="${escapeHtml(src)}">` : "";
+                  }).join("")}
+                </div>
+              ` : `<div class="muted">첨부사진 없음</div>`}
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+
+    const implantSendPrintHtml = (date, group) => `<!doctype html>
+      <html lang="ko">
+      <head>
+        <meta charset="utf-8">
+        <title>${escapeHtml(date)} ${escapeHtml(group.vendor)} 임플란트 장부</title>
+        <style>
+          body { margin: 24px; font-family: Arial, sans-serif; color: #111827; }
+          h1 { font-size: 20px; margin: 0 0 6px; }
+          .note { margin: 0 0 18px; color: #64748b; font-size: 12px; }
+          .patient { page-break-inside: avoid; border: 1px solid #dbeafe; border-left: 5px solid #2563eb; border-radius: 8px; padding: 12px; margin: 0 0 12px; }
+          .head { display: flex; justify-content: space-between; gap: 12px; font-weight: 800; margin-bottom: 8px; }
+          .desc { white-space: pre-wrap; font-family: Consolas, monospace; font-size: 13px; line-height: 1.45; margin-bottom: 10px; }
+          .photos { display: flex; flex-wrap: wrap; gap: 8px; }
+          .photos img { width: 180px; height: 180px; object-fit: cover; border: 1px solid #d1d5db; border-radius: 6px; }
+          @media print { body { margin: 14mm; } .patient { break-inside: avoid; } }
+        </style>
+      </head>
+      <body>
+        <h1>${escapeHtml(date)} ${escapeHtml(group.vendor)} 임플란트 장부</h1>
+        <p class="note">환자명/환자ID 제외 · 환자번호, 원장코드, 수술명, 사용내용, 사진 포함</p>
+        ${group.lines.map(({ record, implant }) => {
+          const photos = implant.photos || [];
+          const patientNo = implantPatientNoText(record) || "미마감";
+          const surgeryText = record.surgeryName || surgeryById(record.surgeryId)?.name || "-";
+          const doctorText = record.surgeonCode || departmentById(record.doctorId)?.name || "-";
+          return `
+            <section class="patient">
+              <div class="head"><span>#${escapeHtml(patientNo)} · ${escapeHtml(doctorText)} · ${escapeHtml(surgeryText)}</span><span>${escapeHtml(implantRecordDate(record) || "-")}</span></div>
+              <div class="desc">${escapeHtml(implant.description || `사진 ${photos.length}장 기록`)}</div>
+              <div class="photos">
+                ${photos.map((photo) => {
+                  const src = implantPhotoViewSrc(photo);
+                  return src ? `<img src="${escapeHtml(src)}" alt="임플란트 사진">` : "";
+                }).join("")}
+              </div>
+            </section>
+          `;
+        }).join("")}
+      </body>
+      </html>`;
+
     const implantSendPanelHtml = (date) => {
       const groups = implantSendGroups(date);
       if (!groups.length) return `<div class="empty">업체별로 발송할 임플란트 기록이 없습니다.</div>`;
@@ -4728,10 +4828,12 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
                   ${!email && !phone ? `<span>설정에 연락처가 없습니다.</span>` : ""}
                 </div>
                 <div class="implant-send-text">${escapeHtml(message)}</div>
+                ${implantSendPhotoLedgerHtml(group)}
                 <div class="actions">
                   ${email ? `<button type="button" data-send-implant-email="${escapeHtml(group.vendor)}">메일 작성</button>` : ""}
                   ${phone ? `<button class="secondary" type="button" data-send-implant-sms="${escapeHtml(group.vendor)}">문자 작성</button>` : ""}
                   <button class="secondary" type="button" data-copy-implant-send="${escapeHtml(group.vendor)}">내용 복사</button>
+                  <button type="button" data-print-implant-send="${escapeHtml(group.vendor)}">사진 포함 장부 인쇄/PDF</button>
                   <button class="secondary" type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="pending">미발송</button>
                   <button type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="sent">발송완료</button>
                   <button class="secondary" type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="excluded">발송제외</button>
@@ -6439,6 +6541,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         sendPanel.scrollIntoView({ behavior: "smooth", block: "start" });
       });
       sendPanel?.addEventListener("click", async (event) => {
+        const photoImage = event.target.closest("[data-implant-photo-view]");
+        if (photoImage) {
+          showImplantPhotoModal(photoImage.dataset.implantPhotoView);
+          return;
+        }
         const statusButton = event.target.closest("[data-set-implant-send-status]");
         if (statusButton) {
           const date = dateInput.value || today();
@@ -6453,6 +6560,24 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             saveErrorToast(`발송 상태 저장 실패: ${error.message}`);
             alert(error.message);
           }
+          return;
+        }
+        const printButton = event.target.closest("[data-print-implant-send]");
+        if (printButton) {
+          const date = dateInput.value || today();
+          const vendorName = printButton.dataset.printImplantSend;
+          const group = implantSendGroups(date).find((item) => item.vendor === vendorName);
+          if (!group) return;
+          const printWindow = window.open("", "_blank");
+          if (!printWindow) {
+            alert("팝업이 차단되어 장부 창을 열 수 없습니다.");
+            return;
+          }
+          printWindow.document.open();
+          printWindow.document.write(implantSendPrintHtml(date, group));
+          printWindow.document.close();
+          printWindow.focus();
+          setTimeout(() => printWindow.print(), 400);
           return;
         }
         const vendor = event.target.closest("[data-send-implant-email]")?.dataset.sendImplantEmail
