@@ -1544,6 +1544,201 @@
       border-radius: 8px;
       background: #fff;
     }
+    .implant-send-summary {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      background: #eff6ff;
+    }
+    .implant-send-summary-title {
+      font-size: 13px;
+      font-weight: 950;
+      color: #1d4ed8;
+    }
+    .implant-send-section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+      font-size: 13px;
+      font-weight: 950;
+      color: var(--ink);
+    }
+    .implant-send-section-title::before {
+      content: "";
+      width: 4px;
+      height: 16px;
+      border-radius: 999px;
+      background: #2563eb;
+    }
+    .implant-send-photo-ledger.paper-ledger { padding: 0; overflow-x: auto; }
+    .implant-send-ledger-table {
+      width: 100%;
+      min-width: 860px;
+      border-collapse: collapse;
+      table-layout: fixed;
+      background: #fff;
+    }
+    .implant-send-ledger-table th,
+    .implant-send-ledger-table td {
+      border: 2px solid #111827;
+      padding: 9px;
+      vertical-align: top;
+    }
+    .implant-send-ledger-table th {
+      background: #e5e7eb;
+      color: #111827;
+      text-align: center;
+      font-size: 16px;
+      font-weight: 950;
+    }
+    .implant-send-ledger-table td {
+      color: #111827;
+      font-size: 17px;
+      font-weight: 850;
+    }
+    .implant-send-ledger-table .date { width: 9%; text-align: center; }
+    .implant-send-ledger-table .no { width: 8%; text-align: center; font-size: 22px; }
+    .implant-send-ledger-table .op { width: 20%; }
+    .implant-send-ledger-table .vendor { width: 12%; text-align: center; }
+    .implant-send-ledger-table .implant { width: 51%; }
+    .implant-ledger-desc {
+      white-space: pre-wrap;
+      margin-bottom: 8px;
+      font-size: 20px;
+      line-height: 1.35;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+    .implant-send-photo-grid img.ledger-photo {
+      width: 220px;
+      height: 150px;
+      object-fit: contain;
+      border: 2px solid #111827;
+    }
+    .implant-send-statement-list {
+      display: grid;
+      gap: 14px;
+    }
+    .implant-send-statement {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border: 2px solid #111827;
+      border-radius: 8px;
+      background: #fff;
+      break-inside: avoid;
+    }
+    .implant-statement-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: start;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #111827;
+    }
+    .implant-statement-title {
+      font-size: 24px;
+      font-weight: 950;
+      color: #111827;
+    }
+    .implant-statement-no {
+      min-width: 96px;
+      padding: 8px 12px;
+      border: 2px solid #111827;
+      border-radius: 8px;
+      text-align: center;
+      font-size: 30px;
+      font-weight: 950;
+      color: #111827;
+      background: #f8fafc;
+    }
+    .implant-statement-meta {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      border: 2px solid #111827;
+      border-bottom: 0;
+    }
+    .implant-statement-meta div {
+      min-height: 54px;
+      padding: 7px 9px;
+      border-right: 2px solid #111827;
+      border-bottom: 2px solid #111827;
+      background: #fff;
+    }
+    .implant-statement-meta div:nth-child(4n) { border-right: 0; }
+    .implant-statement-meta span {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 12px;
+      font-weight: 950;
+      color: #475569;
+    }
+    .implant-statement-meta strong {
+      font-size: 18px;
+      font-weight: 950;
+      color: #111827;
+    }
+    .implant-statement-desc {
+      min-height: 86px;
+      padding: 12px;
+      border: 2px solid #111827;
+      white-space: pre-wrap;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 22px;
+      line-height: 1.35;
+      font-weight: 850;
+      color: #111827;
+      background: #fff;
+    }
+    .implant-statement-photos {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .implant-statement-photos img {
+      width: 100%;
+      height: 260px;
+      object-fit: contain;
+      border: 2px solid #111827;
+      border-radius: 6px;
+      background: #fff;
+    }
+    .implant-statement-footer {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0;
+      border: 2px solid #111827;
+      border-right: 0;
+      border-bottom: 0;
+      background: #fff;
+    }
+    .implant-statement-footer div {
+      min-height: 48px;
+      padding: 7px 9px;
+      border-right: 2px solid #111827;
+      border-bottom: 2px solid #111827;
+    }
+    .implant-statement-footer span {
+      display: block;
+      margin-bottom: 3px;
+      font-size: 12px;
+      font-weight: 950;
+      color: #475569;
+    }
+    .implant-statement-footer strong {
+      font-size: 16px;
+      font-weight: 950;
+      color: #111827;
+    }
+    @media (max-width: 720px) {
+      .implant-statement-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .implant-statement-meta div:nth-child(2n) { border-right: 0; }
+      .implant-statement-photos { grid-template-columns: 1fr; }
+      .implant-statement-photos img { height: 220px; }
+      .implant-statement-footer { grid-template-columns: 1fr; }
+    }
     @media (max-width: 720px) {
       .use-content-head { align-items: flex-start; }
       .selected-use-chip { grid-template-columns: 1fr; width: 100%; }
@@ -4738,6 +4933,23 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       }).sort((a, b) => alphaFirstCompare(a.vendor, b.vendor));
     };
 
+    const implantSendGroupStats = (group) => {
+      const patientNos = new Set();
+      let photoCount = 0;
+      let unnumbered = 0;
+      group.lines.forEach(({ record, implant }) => {
+        const patientNo = implantPatientNoText(record);
+        if (patientNo) patientNos.add(patientNo);
+        else unnumbered += 1;
+        photoCount += (implant.photos || []).length;
+      });
+      return {
+        patients: patientNos.size + unnumbered,
+        photos: photoCount,
+        unnumbered
+      };
+    };
+
     const implantSendPhotoLedgerHtml = (group) => `
       <div class="implant-send-photo-ledger">
         ${group.lines.map(({ record, implant }) => {
@@ -4807,6 +5019,310 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       </body>
       </html>`;
 
+    const implantSendLedgerTableRowsHtml = (group, options = {}) => group.lines.map(({ record, implant }) => {
+      const photos = implant.photos || [];
+      const patientNo = implantPatientNoText(record) || "미마감";
+      const surgeryText = record.surgeryName || surgeryById(record.surgeryId)?.name || "-";
+      const doctorText = record.surgeonCode || departmentById(record.doctorId)?.name || "-";
+      const opText = [doctorText, surgeryText].filter(Boolean).join(" / ");
+      const imageClass = options.print ? "ledger-photo-print" : "ledger-photo";
+      return `
+        <tr>
+          <td class="date">${escapeHtml(implantRecordDate(record) || "-")}</td>
+          <td class="no">#${escapeHtml(patientNo)}</td>
+          <td class="op">${escapeHtml(opText)}</td>
+          <td class="vendor">${escapeHtml(group.vendor)}</td>
+          <td class="implant">
+            <div class="implant-ledger-desc">${escapeHtml(implant.description || `사진 ${photos.length}장 기록`)}</div>
+            ${photos.length ? `
+              <div class="implant-send-photo-grid">
+                ${photos.map((photo) => {
+                  const src = implantPhotoViewSrc(photo);
+                  return src ? `<img class="${imageClass}" src="${escapeHtml(src)}" alt="임플란트 사진" data-implant-photo-view="${escapeHtml(src)}">` : "";
+                }).join("")}
+              </div>
+            ` : `<div class="muted">첨부사진 없음</div>`}
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    const implantSendPhotoLedgerTableHtml = (group) => `
+      <div class="implant-send-photo-ledger paper-ledger">
+        <table class="implant-send-ledger-table">
+          <thead>
+            <tr>
+              <th>DATE</th>
+              <th>No.</th>
+              <th>OP</th>
+              <th>업체명</th>
+              <th>IMPLANT / 사진</th>
+            </tr>
+          </thead>
+          <tbody>${implantSendLedgerTableRowsHtml(group)}</tbody>
+        </table>
+      </div>
+    `;
+
+    const implantSendPrintTableHtml = (date, group) => `<!doctype html>
+      <html lang="ko">
+      <head>
+        <meta charset="utf-8">
+        <title>${escapeHtml(date)} ${escapeHtml(group.vendor)} 임플란트 장부</title>
+        <style>
+          @page { size: A4 landscape; margin: 10mm; }
+          body { margin: 0; font-family: Arial, sans-serif; color: #111827; }
+          h1 { font-size: 28px; margin: 0 0 8px; }
+          .note { margin: 0 0 12px; color: #374151; font-size: 16px; font-weight: 700; }
+          table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+          th, td { border: 2px solid #111827; padding: 8px; vertical-align: top; }
+          th { background: #e5e7eb; font-size: 18px; font-weight: 900; text-align: center; }
+          td { font-size: 18px; font-weight: 800; }
+          td.date { width: 9%; text-align: center; }
+          td.no { width: 8%; text-align: center; font-size: 24px; }
+          td.op { width: 20%; }
+          td.vendor { width: 12%; text-align: center; }
+          td.implant { width: 51%; }
+          .implant-ledger-desc { white-space: pre-wrap; font-family: Consolas, monospace; font-size: 21px; line-height: 1.35; margin-bottom: 8px; }
+          .implant-send-photo-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+          .implant-send-photo-grid img { width: 240px; height: 160px; object-fit: contain; border: 2px solid #111827; background: #fff; }
+          tr { break-inside: avoid; page-break-inside: avoid; }
+        </style>
+      </head>
+      <body>
+        <h1>${escapeHtml(date)} ${escapeHtml(group.vendor)} 임플란트 장부</h1>
+        <p class="note">환자명/환자ID 제외 · 환자번호, 원장코드, 수술명, 사용내용, 사진 포함</p>
+        <table>
+          <thead>
+            <tr>
+              <th>DATE</th>
+              <th>No.</th>
+              <th>OP</th>
+              <th>업체명</th>
+              <th>IMPLANT / 사진</th>
+            </tr>
+          </thead>
+          <tbody>${implantSendLedgerTableRowsHtml(group, { print: true })}</tbody>
+        </table>
+      </body>
+      </html>`;
+
+    const implantStatementPhotoChunks = (photos = [], size = 4) => {
+      if (!photos.length) return [[]];
+      const chunks = [];
+      for (let index = 0; index < photos.length; index += size) {
+        chunks.push(photos.slice(index, index + size));
+      }
+      return chunks;
+    };
+
+    const implantStatementFooterHtml = (record = {}) => {
+      const user = auditUserText(record) || currentAuditUser()?.name || currentAuditUser()?.loginId || "-";
+      return `
+        <div class="implant-statement-footer">
+          <div><span>발송일</span><strong>${escapeHtml(today())}</strong></div>
+          <div><span>발송자</span><strong>${escapeHtml(user)}</strong></div>
+          <div><span>확인처</span><strong>윌스기념병원 수술실</strong></div>
+        </div>
+      `;
+    };
+
+    const implantSendStatementCardsHtml = (group) => `
+      <div class="implant-send-statement-list">
+        ${group.lines.map(({ record, implant }) => {
+          const photos = implant.photos || [];
+          const patientNo = implantPatientNoText(record) || "미마감";
+          const surgeryText = record.surgeryName || surgeryById(record.surgeryId)?.name || "-";
+          const doctorText = record.surgeonCode || departmentById(record.doctorId)?.name || "-";
+          return `
+            <section class="implant-send-statement">
+              <div class="implant-statement-head">
+                <div>
+                  <div class="implant-statement-title">임플란트 사용 명세서</div>
+                  <div class="muted">환자명/환자ID 제외 · 환자번호 기준</div>
+                </div>
+                <div class="implant-statement-no">#${escapeHtml(patientNo)}</div>
+              </div>
+              <div class="implant-statement-meta">
+                <div><span>DATE</span><strong>${escapeHtml(implantRecordDate(record) || "-")}</strong></div>
+                <div><span>업체명</span><strong>${escapeHtml(group.vendor)}</strong></div>
+                <div><span>원장코드</span><strong>${escapeHtml(doctorText)}</strong></div>
+                <div><span>OP</span><strong>${escapeHtml(surgeryText)}</strong></div>
+              </div>
+              <div>
+                <div class="implant-send-section-title">IMPLANT</div>
+                <div class="implant-statement-desc">${escapeHtml(implant.description || `사진 ${photos.length}장 기록`)}</div>
+              </div>
+              <div>
+                <div class="implant-send-section-title">사진</div>
+                ${photos.length ? `
+                  <div class="implant-statement-photos">
+                    ${photos.map((photo) => {
+                      const src = implantPhotoViewSrc(photo);
+                      return src ? `<img src="${escapeHtml(src)}" alt="임플란트 사진" data-implant-photo-view="${escapeHtml(src)}">` : "";
+                    }).join("")}
+                  </div>
+                ` : `<div class="empty">첨부사진 없음</div>`}
+              </div>
+              ${implantStatementFooterHtml(record)}
+            </section>
+          `;
+        }).join("")}
+      </div>
+    `;
+
+    const implantSendStatementPrintHtml = (date, group) => `<!doctype html>
+      <html lang="ko">
+      <head>
+        <meta charset="utf-8">
+        <title>${escapeHtml(date)} ${escapeHtml(group.vendor)} 임플란트 명세서</title>
+        <style>
+          @page { size: A4 portrait; margin: 10mm; }
+          * { box-sizing: border-box; }
+          body { margin: 0; font-family: Arial, sans-serif; color: #111827; }
+          .statement { min-height: 277mm; page-break-after: always; display: grid; gap: 10px; }
+          .statement:last-child { page-break-after: auto; }
+          .head { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start; padding-bottom: 8px; border-bottom: 3px solid #111827; }
+          .title { font-size: 28px; font-weight: 900; }
+          .note { margin-top: 4px; font-size: 13px; font-weight: 700; color: #374151; }
+          .no { min-width: 105px; padding: 8px 12px; border: 3px solid #111827; border-radius: 6px; text-align: center; font-size: 34px; font-weight: 900; }
+          .meta { display: grid; grid-template-columns: repeat(4, 1fr); border: 2px solid #111827; border-bottom: 0; }
+          .meta div { min-height: 58px; padding: 7px 9px; border-right: 2px solid #111827; border-bottom: 2px solid #111827; }
+          .meta div:nth-child(4n) { border-right: 0; }
+          .meta span { display: block; margin-bottom: 4px; color: #475569; font-size: 12px; font-weight: 900; }
+          .meta strong { font-size: 18px; font-weight: 900; }
+          .section-title { margin: 4px 0 5px; font-size: 15px; font-weight: 900; }
+          .desc { min-height: 92px; padding: 10px; border: 2px solid #111827; white-space: pre-wrap; font-family: Consolas, monospace; font-size: 22px; line-height: 1.35; font-weight: 800; }
+          .photos { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+          .photos img { width: 100%; height: 86mm; object-fit: contain; border: 2px solid #111827; border-radius: 4px; background: #fff; }
+        </style>
+      </head>
+      <body>
+        ${group.lines.map(({ record, implant }) => {
+          const photos = implant.photos || [];
+          const patientNo = implantPatientNoText(record) || "미마감";
+          const surgeryText = record.surgeryName || surgeryById(record.surgeryId)?.name || "-";
+          const doctorText = record.surgeonCode || departmentById(record.doctorId)?.name || "-";
+          return `
+            <section class="statement">
+              <div class="head">
+                <div>
+                  <div class="title">임플란트 사용 명세서</div>
+                  <div class="note">${escapeHtml(date)} · ${escapeHtml(group.vendor)} · 환자명/환자ID 제외</div>
+                </div>
+                <div class="no">#${escapeHtml(patientNo)}</div>
+              </div>
+              <div class="meta">
+                <div><span>DATE</span><strong>${escapeHtml(implantRecordDate(record) || "-")}</strong></div>
+                <div><span>업체명</span><strong>${escapeHtml(group.vendor)}</strong></div>
+                <div><span>원장코드</span><strong>${escapeHtml(doctorText)}</strong></div>
+                <div><span>OP</span><strong>${escapeHtml(surgeryText)}</strong></div>
+              </div>
+              <div>
+                <div class="section-title">IMPLANT</div>
+                <div class="desc">${escapeHtml(implant.description || `사진 ${photos.length}장 기록`)}</div>
+              </div>
+              <div>
+                <div class="section-title">사진</div>
+                <div class="photos">
+                  ${photos.map((photo) => {
+                    const src = implantPhotoViewSrc(photo);
+                    return src ? `<img src="${escapeHtml(src)}" alt="임플란트 사진">` : "";
+                  }).join("")}
+                </div>
+              </div>
+            </section>
+          `;
+        }).join("")}
+      </body>
+      </html>`;
+
+    const implantSendStatementPrintHtmlV2 = (date, group) => `<!doctype html>
+      <html lang="ko">
+      <head>
+        <meta charset="utf-8">
+        <title>${escapeHtml(date)} ${escapeHtml(group.vendor)} 임플란트 사용 명세서</title>
+        <style>
+          @page { size: A4 portrait; margin: 10mm; }
+          * { box-sizing: border-box; }
+          body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #111827; }
+          .statement { min-height: 277mm; page-break-after: always; display: grid; gap: 10px; align-content: start; }
+          .statement:last-child { page-break-after: auto; }
+          .head { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start; padding-bottom: 8px; border-bottom: 3px solid #111827; }
+          .title { font-size: 30px; font-weight: 900; letter-spacing: 0; }
+          .note { margin-top: 4px; font-size: 14px; font-weight: 800; color: #374151; }
+          .no { min-width: 112px; padding: 8px 12px; border: 3px solid #111827; border-radius: 6px; text-align: center; font-size: 36px; font-weight: 900; }
+          .meta { display: grid; grid-template-columns: repeat(4, 1fr); border: 2px solid #111827; border-bottom: 0; }
+          .meta div { min-height: 60px; padding: 8px 9px; border-right: 2px solid #111827; border-bottom: 2px solid #111827; }
+          .meta div:nth-child(4n) { border-right: 0; }
+          .meta span { display: block; margin-bottom: 4px; color: #475569; font-size: 12px; font-weight: 900; }
+          .meta strong { font-size: 19px; font-weight: 900; word-break: keep-all; }
+          .section-title { margin: 4px 0 5px; font-size: 16px; font-weight: 900; }
+          .desc { min-height: 96px; padding: 12px; border: 2px solid #111827; white-space: pre-wrap; font-family: Consolas, "Malgun Gothic", monospace; font-size: 23px; line-height: 1.35; font-weight: 800; }
+          .photos { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+          .photos img { width: 100%; height: 80mm; object-fit: contain; border: 2px solid #111827; border-radius: 4px; background: #fff; }
+          .empty-photo { min-height: 80mm; display: grid; place-items: center; border: 2px dashed #94a3b8; color: #64748b; font-size: 18px; font-weight: 800; }
+          .footer { display: grid; grid-template-columns: repeat(3, 1fr); border: 2px solid #111827; border-right: 0; border-bottom: 0; }
+          .footer div { min-height: 52px; padding: 8px 9px; border-right: 2px solid #111827; border-bottom: 2px solid #111827; }
+          .footer span { display: block; margin-bottom: 4px; color: #475569; font-size: 12px; font-weight: 900; }
+          .footer strong { font-size: 18px; font-weight: 900; }
+        </style>
+      </head>
+      <body>
+        ${group.lines.map(({ record, implant }) => {
+          const photos = implant.photos || [];
+          const chunks = implantStatementPhotoChunks(photos, 4);
+          const patientNo = implantPatientNoText(record) || "미마감";
+          const surgeryText = record.surgeryName || surgeryById(record.surgeryId)?.name || "-";
+          const doctorText = record.surgeonCode || departmentById(record.doctorId)?.name || "-";
+          const user = auditUserText(record) || currentAuditUser()?.name || currentAuditUser()?.loginId || "-";
+          return chunks.map((chunk, chunkIndex) => {
+            const pageLabel = chunks.length > 1 ? ` ${chunkIndex + 1}/${chunks.length}` : "";
+            const desc = chunkIndex
+              ? `사진 계속 (${chunkIndex + 1}/${chunks.length})`
+              : (implant.description || `사진 ${photos.length}장 기록`);
+            return `
+              <section class="statement">
+                <div class="head">
+                  <div>
+                    <div class="title">임플란트 사용 명세서</div>
+                    <div class="note">${escapeHtml(date)} · ${escapeHtml(group.vendor)} · 환자명/환자ID 제외</div>
+                  </div>
+                  <div class="no">#${escapeHtml(patientNo)}${escapeHtml(pageLabel)}</div>
+                </div>
+                <div class="meta">
+                  <div><span>DATE</span><strong>${escapeHtml(implantRecordDate(record) || "-")}</strong></div>
+                  <div><span>업체명</span><strong>${escapeHtml(group.vendor)}</strong></div>
+                  <div><span>원장코드</span><strong>${escapeHtml(doctorText)}</strong></div>
+                  <div><span>OP</span><strong>${escapeHtml(surgeryText)}</strong></div>
+                </div>
+                <div>
+                  <div class="section-title">IMPLANT</div>
+                  <div class="desc">${escapeHtml(desc)}</div>
+                </div>
+                <div>
+                  <div class="section-title">사진</div>
+                  ${chunk.length ? `
+                    <div class="photos">
+                      ${chunk.map((photo) => {
+                        const src = implantPhotoViewSrc(photo);
+                        return src ? `<img src="${escapeHtml(src)}" alt="임플란트 사진">` : "";
+                      }).join("")}
+                    </div>
+                  ` : `<div class="empty-photo">첨부 사진 없음</div>`}
+                </div>
+                <div class="footer">
+                  <div><span>발송일</span><strong>${escapeHtml(today())}</strong></div>
+                  <div><span>발송자</span><strong>${escapeHtml(user)}</strong></div>
+                  <div><span>확인처</span><strong>윌스기념병원 수술실</strong></div>
+                </div>
+              </section>
+            `;
+          }).join("");
+        }).join("")}
+      </body>
+      </html>`;
+
     const implantSendPanelHtml = (date) => {
       const groups = implantSendGroups(date);
       if (!groups.length) return `<div class="empty">업체별로 발송할 임플란트 기록이 없습니다.</div>`;
@@ -4828,7 +5344,62 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
                   ${!email && !phone ? `<span>설정에 연락처가 없습니다.</span>` : ""}
                 </div>
                 <div class="implant-send-text">${escapeHtml(message)}</div>
-                ${implantSendPhotoLedgerHtml(group)}
+                ${implantSendStatementCardsHtml(group)}
+                <div class="actions">
+                  ${email ? `<button type="button" data-send-implant-email="${escapeHtml(group.vendor)}">메일 작성</button>` : ""}
+                  ${phone ? `<button class="secondary" type="button" data-send-implant-sms="${escapeHtml(group.vendor)}">문자 작성</button>` : ""}
+                  <button class="secondary" type="button" data-copy-implant-send="${escapeHtml(group.vendor)}">내용 복사</button>
+                  <button type="button" data-print-implant-send="${escapeHtml(group.vendor)}">사진 포함 장부 인쇄/PDF</button>
+                  <button class="secondary" type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="pending">미발송</button>
+                  <button type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="sent">발송완료</button>
+                  <button class="secondary" type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="excluded">발송제외</button>
+                  <button class="secondary" type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="resend">재발송</button>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    };
+
+    const implantSendPanelOrganizedHtml = (date) => {
+      const groups = implantSendGroups(date);
+      if (!groups.length) return `<div class="empty">업체별로 발송할 임플란트 기록이 없습니다.</div>`;
+      const unnumberedTotal = implantRecordsForDate(date).filter((record) => !implantPatientNoText(record)).length;
+      return `
+        ${unnumberedTotal ? `<div class="implant-send-preview">선택 날짜에 환자번호가 없는 기록 ${unnumberedTotal}건이 있습니다. 업체 발송 전 마감 또는 번호 부여가 필요합니다.</div>` : ""}
+        <div class="implant-send-list">
+          ${groups.map((group) => {
+            const message = implantSendMessage(date, group.vendor, group.lines);
+            const email = group.contact?.email || "";
+            const phone = group.contact?.phone || "";
+            const stats = implantSendGroupStats(group);
+            return `
+              <div class="implant-send-card">
+                <div class="item-title">
+                  <span>${escapeHtml(group.vendor)}</span>
+                  <span class="pill">${escapeHtml(implantSendStatusLabel(group.status))}</span>
+                </div>
+                <div class="implant-send-summary">
+                  <div class="implant-send-summary-title">업체에 보낼 자료 요약</div>
+                  <div class="meta">
+                    <span>날짜: ${escapeHtml(date)}</span>
+                    <span>환자: ${stats.patients}명</span>
+                    <span>기록: ${group.lines.length}건</span>
+                    <span>사진: ${stats.photos}장</span>
+                    ${stats.unnumbered ? `<span>미마감: ${stats.unnumbered}건</span>` : ""}
+                  </div>
+                  <div class="meta">
+                    ${email ? `<span>이메일: ${escapeHtml(email)}</span>` : ""}
+                    ${phone ? `<span>연락처: ${escapeHtml(phone)}</span>` : ""}
+                    ${!email && !phone ? `<span>설정된 연락처가 없습니다.</span>` : ""}
+                  </div>
+                </div>
+                <div class="implant-send-section-title">문자/메일 본문</div>
+                <div class="implant-send-text">${escapeHtml(message)}</div>
+                <div class="implant-send-section-title">사진 포함 A4 명세서</div>
+                <div class="implant-send-preview">환자 1명당 A4 1장 기준입니다. 사진이 4장을 넘으면 인쇄/PDF에서 다음 장으로 자동 분리됩니다.</div>
+                ${implantSendStatementCardsHtml(group)}
                 <div class="actions">
                   ${email ? `<button type="button" data-send-implant-email="${escapeHtml(group.vendor)}">메일 작성</button>` : ""}
                   ${phone ? `<button class="secondary" type="button" data-send-implant-sms="${escapeHtml(group.vendor)}">문자 작성</button>` : ""}
@@ -5081,7 +5652,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               <button class="secondary" type="button" id="exportImplantLedger">엑셀 다운로드</button>
             </div>
             <div class="actions" data-implant-panel="send" ${implantPanelVisible("send") ? "" : "hidden"}>
-              <button type="button" id="prepareImplantVendorSend">업체별 장부 확인하기</button>
+              <button type="button" id="prepareImplantVendorSend">마감 확인 후 발송자료 갱신</button>
             </div>
           </div>
           <div class="card" data-implant-panel="photos" ${implantPanelVisible("photos") ? "" : "hidden"}>
@@ -6449,7 +7020,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         });
         if (ledgerTitle) ledgerTitle.textContent = currentImplantSubView === "admin" ? "관리자 도구" : "오늘 장부";
         if (sendList && currentImplantSubView === "send" && !sendList.innerHTML.trim()) {
-          sendList.innerHTML = `<div class="empty">업체별 장부 확인하기를 누르면 선택 날짜의 발송 전 확인 자료가 표시됩니다.</div>`;
+          sendList.innerHTML = implantSendPanelOrganizedHtml(dateInput.value || today());
         }
       };
       const renderList = () => {
@@ -6459,6 +7030,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           : `<div class="empty">조회 조건에 맞는 임플란트 기록이 없습니다.</div>`;
         if (summary) summary.innerHTML = implantLedgerTableHtml(implantRecordsForDate(dateInput.value));
         if (photoStatusPanel) photoStatusPanel.innerHTML = implantPhotoStatusPanelHtml(dateInput.value);
+        if (sendList && currentImplantSubView === "send") sendList.innerHTML = implantSendPanelOrganizedHtml(dateInput.value || today());
         applyImplantPanels();
       };
       app.querySelectorAll("[data-implant-subview]").forEach((button) => {
@@ -6537,7 +7109,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           }
         }
         sendPanel.hidden = false;
-        sendList.innerHTML = implantSendPanelHtml(date);
+        sendList.innerHTML = implantSendPanelOrganizedHtml(date);
         sendPanel.scrollIntoView({ behavior: "smooth", block: "start" });
       });
       sendPanel?.addEventListener("click", async (event) => {
@@ -6553,7 +7125,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           const status = statusButton.dataset.sendStatus;
           try {
             const count = await updateImplantSendGroupStatus(date, vendorName, status);
-            sendList.innerHTML = implantSendPanelHtml(date);
+            sendList.innerHTML = implantSendPanelOrganizedHtml(date);
             renderList();
             saveDoneToast(`${vendorName} · ${implantSendStatusLabel(status)} 저장 완료 (${count}건)`);
           } catch (error) {
@@ -6574,7 +7146,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             return;
           }
           printWindow.document.open();
-          printWindow.document.write(implantSendPrintHtml(date, group));
+          printWindow.document.write(implantSendStatementPrintHtmlV2(date, group));
           printWindow.document.close();
           printWindow.focus();
           setTimeout(() => printWindow.print(), 400);
