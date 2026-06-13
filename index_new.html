@@ -1557,6 +1557,83 @@
       font-weight: 950;
       color: #1d4ed8;
     }
+    .implant-send-clean-card {
+      gap: 12px;
+    }
+    .implant-send-clean-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: start;
+    }
+    .implant-send-clean-title {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      font-size: 18px;
+      font-weight: 950;
+      color: var(--ink);
+    }
+    .implant-send-compact-meta,
+    .implant-send-contact-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .implant-send-compact-meta span,
+    .implant-send-contact-row span {
+      padding: 5px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #f8fafc;
+    }
+    .implant-send-status-control {
+      display: grid;
+      gap: 5px;
+      min-width: 140px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+    .implant-send-status-control select {
+      height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0 10px;
+      background: #fff;
+      color: var(--ink);
+      font-weight: 900;
+    }
+    .implant-send-primary-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .implant-send-details {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .implant-send-details summary {
+      cursor: pointer;
+      padding: 12px;
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 950;
+      background: #f8fafc;
+    }
+    .implant-send-details-body {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border-top: 1px solid var(--line);
+    }
     .implant-send-section-title {
       display: flex;
       align-items: center;
@@ -1738,6 +1815,9 @@
       .implant-statement-photos { grid-template-columns: 1fr; }
       .implant-statement-photos img { height: 220px; }
       .implant-statement-footer { grid-template-columns: 1fr; }
+      .implant-send-clean-head { grid-template-columns: 1fr; }
+      .implant-send-status-control { min-width: 0; }
+      .implant-send-primary-actions button { flex: 1 1 130px; }
     }
     @media (max-width: 720px) {
       .use-content-head { align-items: flex-start; }
@@ -5248,10 +5328,15 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           body { margin: 0; font-family: Arial, "Malgun Gothic", sans-serif; color: #111827; }
           .statement { min-height: 277mm; page-break-after: always; display: grid; gap: 10px; align-content: start; }
           .statement:last-child { page-break-after: auto; }
-          .head { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start; padding-bottom: 8px; border-bottom: 3px solid #111827; }
+          .head { display: grid; gap: 6px; padding-bottom: 8px; border-bottom: 3px solid #111827; }
+          .title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
           .title { font-size: 30px; font-weight: 900; letter-spacing: 0; }
           .note { margin-top: 4px; font-size: 14px; font-weight: 800; color: #374151; }
           .no { min-width: 112px; padding: 8px 12px; border: 3px solid #111827; border-radius: 6px; text-align: center; font-size: 36px; font-weight: 900; }
+          .patient-no-badge { display: inline-flex; align-items: baseline; gap: 8px; padding: 6px 10px; border: 3px solid #111827; border-radius: 6px; background: #f8fafc; }
+          .patient-no-badge span { font-size: 14px; font-weight: 900; color: #475569; }
+          .patient-no-badge strong { font-size: 30px; font-weight: 900; color: #111827; }
+          .patient-no-badge small { font-size: 13px; font-weight: 900; color: #64748b; }
           .meta { display: grid; grid-template-columns: repeat(4, 1fr); border: 2px solid #111827; border-bottom: 0; }
           .meta div { min-height: 60px; padding: 8px 9px; border-right: 2px solid #111827; border-bottom: 2px solid #111827; }
           .meta div:nth-child(4n) { border-right: 0; }
@@ -5285,10 +5370,16 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               <section class="statement">
                 <div class="head">
                   <div>
-                    <div class="title">임플란트 사용 명세서</div>
+                    <div class="title-row">
+                      <div class="title">임플란트 사용 명세서</div>
+                      <div class="patient-no-badge">
+                        <span>환자번호</span>
+                        <strong>#${escapeHtml(patientNo)}</strong>
+                        ${pageLabel ? `<small>사진 ${escapeHtml(pageLabel.trim())}</small>` : ""}
+                      </div>
+                    </div>
                     <div class="note">${escapeHtml(date)} · ${escapeHtml(group.vendor)} · 환자명/환자ID 제외</div>
                   </div>
-                  <div class="no">#${escapeHtml(patientNo)}${escapeHtml(pageLabel)}</div>
                 </div>
                 <div class="meta">
                   <div><span>DATE</span><strong>${escapeHtml(implantRecordDate(record) || "-")}</strong></div>
@@ -5409,43 +5500,60 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             const phone = group.contact?.phone || "";
             const stats = implantSendGroupStats(group);
             return `
-              <div class="implant-send-card">
-                <div class="item-title">
-                  <span>${escapeHtml(group.vendor)}</span>
-                  <span class="pill">${escapeHtml(implantSendStatusLabel(group.status))}</span>
-                </div>
-                <div class="implant-send-summary">
-                  <div class="implant-send-summary-title">업체에 보낼 자료 요약</div>
-                  <div class="meta">
-                    <span>날짜: ${escapeHtml(date)}</span>
-                    <span>환자: ${stats.patients}명</span>
-                    <span>기록: ${group.lines.length}건</span>
-                    <span>사진: ${stats.photos}장</span>
-                    ${stats.unnumbered ? `<span>미마감: ${stats.unnumbered}건</span>` : ""}
+              <div class="implant-send-card implant-send-clean-card">
+                <div class="implant-send-clean-head">
+                  <div>
+                    <div class="implant-send-clean-title">
+                      <span>${escapeHtml(group.vendor)}</span>
+                      <span class="pill">${escapeHtml(implantSendStatusLabel(group.status))}</span>
+                    </div>
+                    <div class="implant-send-compact-meta">
+                      <span>${escapeHtml(date)}</span>
+                      <span>환자 ${stats.patients}명</span>
+                      <span>기록 ${group.lines.length}건</span>
+                      <span>사진 ${stats.photos}장</span>
+                      ${stats.unnumbered ? `<span>미마감 ${stats.unnumbered}건</span>` : ""}
+                    </div>
+                    <div class="implant-send-contact-row">
+                      ${email ? `<span>메일 ${escapeHtml(email)}</span>` : ""}
+                      ${phone ? `<span>연락처 ${escapeHtml(phone)}</span>` : ""}
+                      ${!email && !phone ? `<span>설정된 연락처 없음</span>` : ""}
+                    </div>
                   </div>
-                  <div class="meta">
-                    ${email ? `<span>이메일: ${escapeHtml(email)}</span>` : ""}
-                    ${phone ? `<span>연락처: ${escapeHtml(phone)}</span>` : ""}
-                    ${!email && !phone ? `<span>설정된 연락처가 없습니다.</span>` : ""}
-                  </div>
+                  <label class="implant-send-status-control">
+                    <span>발송상태</span>
+                    <select data-change-implant-send-status="${escapeHtml(group.vendor)}">
+                      <option value="pending" ${group.status === "pending" ? "selected" : ""}>미발송</option>
+                      <option value="sent" ${group.status === "sent" ? "selected" : ""}>발송완료</option>
+                      <option value="resend" ${group.status === "resend" ? "selected" : ""}>재발송</option>
+                      <option value="excluded" ${group.status === "excluded" ? "selected" : ""}>발송제외</option>
+                    </select>
+                  </label>
                 </div>
-                <div class="implant-send-section-title">문자/메일 본문</div>
-                <div class="implant-send-text">${escapeHtml(message)}</div>
-                <div class="implant-send-section-title">사진 포함 A4 명세서</div>
-                <div class="implant-send-preview">환자 1명당 A4 1장 기준입니다. 사진이 4장을 넘으면 인쇄/PDF에서 다음 장으로 자동 분리됩니다. PDF는 인쇄창에서 "PDF로 저장"을 선택하세요.</div>
-                ${implantSendStatementCardsHtml(group)}
-                <div class="actions">
-                  ${email ? `<button type="button" data-send-implant-email="${escapeHtml(group.vendor)}">메일 작성</button>` : ""}
-                  ${phone ? `<button class="secondary" type="button" data-send-implant-sms="${escapeHtml(group.vendor)}">문자 작성</button>` : ""}
-                  <button class="secondary" type="button" data-copy-implant-send="${escapeHtml(group.vendor)}">내용 복사</button>
+                <div class="implant-send-primary-actions">
                   <button type="button" data-print-implant-send="${escapeHtml(group.vendor)}">PDF 만들기</button>
                   <button class="secondary" type="button" data-share-implant-send="${escapeHtml(group.vendor)}">공유하기</button>
-                  <button class="secondary" type="button" data-download-implant-send="${escapeHtml(group.vendor)}">명세서 다운로드</button>
-                  <button class="secondary" type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="pending">미발송</button>
                   <button type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="sent">발송완료</button>
-                  <button class="secondary" type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="excluded">발송제외</button>
-                  <button class="secondary" type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="resend">재발송</button>
                 </div>
+                <details class="implant-send-details">
+                  <summary>사진 포함 A4 명세서 미리보기</summary>
+                  <div class="implant-send-details-body">
+                    <div class="implant-send-preview">환자 1명당 A4 1장 기준입니다. 사진이 4장을 넘으면 인쇄/PDF에서 다음 장으로 자동 분리됩니다. PDF는 인쇄창에서 "PDF로 저장"을 선택하세요.</div>
+                    ${implantSendStatementCardsHtml(group)}
+                  </div>
+                </details>
+                <details class="implant-send-details">
+                  <summary>문자/메일 본문 및 기타 작업</summary>
+                  <div class="implant-send-details-body">
+                    <div class="implant-send-text">${escapeHtml(message)}</div>
+                    <div class="actions">
+                      ${email ? `<button type="button" data-send-implant-email="${escapeHtml(group.vendor)}">메일 작성</button>` : ""}
+                      ${phone ? `<button class="secondary" type="button" data-send-implant-sms="${escapeHtml(group.vendor)}">문자 작성</button>` : ""}
+                      <button class="secondary" type="button" data-copy-implant-send="${escapeHtml(group.vendor)}">내용 복사</button>
+                      <button class="secondary" type="button" data-download-implant-send="${escapeHtml(group.vendor)}">명세서 다운로드</button>
+                    </div>
+                  </div>
+                </details>
               </div>
             `;
           }).join("")}
@@ -7247,6 +7355,22 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           alert("업체 발송자료를 복사했습니다.");
         } catch (error) {
           alert(message);
+        }
+      });
+      sendPanel?.addEventListener("change", async (event) => {
+        const statusSelect = event.target.closest("[data-change-implant-send-status]");
+        if (!statusSelect) return;
+        const date = dateInput.value || today();
+        const vendorName = statusSelect.dataset.changeImplantSendStatus;
+        const status = statusSelect.value;
+        try {
+          const count = await updateImplantSendGroupStatus(date, vendorName, status);
+          sendList.innerHTML = implantSendPanelOrganizedHtml(date);
+          renderList();
+          saveDoneToast(`${vendorName} · ${implantSendStatusLabel(status)} 저장 완료 (${count}건)`);
+        } catch (error) {
+          saveErrorToast(`발송 상태 저장 실패: ${error.message}`);
+          alert(error.message);
         }
       });
       summary?.addEventListener("click", (event) => {
