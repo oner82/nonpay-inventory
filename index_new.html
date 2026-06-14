@@ -1709,7 +1709,7 @@
     }
     .implant-statement-head {
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: 1fr;
       gap: 10px;
       align-items: start;
       padding-bottom: 10px;
@@ -5219,12 +5219,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               <div class="implant-statement-head">
                 <div>
                   <div class="implant-statement-title">임플란트 사용 명세서</div>
-                  <div class="muted">환자명/환자ID 제외 · 환자번호 기준</div>
+                  <div class="muted">환자명/환자ID 제외</div>
                 </div>
-                <div class="implant-statement-no">#${escapeHtml(patientNo)}</div>
               </div>
               <div class="implant-statement-meta">
-                <div><span>DATE</span><strong>${escapeHtml(implantRecordDate(record) || "-")}</strong></div>
+                <div><span>DATE / 환자번호</span><strong>${escapeHtml(implantRecordDate(record) || "-")} · 환자번호 #${escapeHtml(patientNo)}</strong></div>
                 <div><span>업체명</span><strong>${escapeHtml(group.vendor)}</strong></div>
                 <div><span>원장코드</span><strong>${escapeHtml(doctorText)}</strong></div>
                 <div><span>OP</span><strong>${escapeHtml(surgeryText)}</strong></div>
@@ -5329,14 +5328,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           .statement { min-height: 277mm; page-break-after: always; display: grid; gap: 10px; align-content: start; }
           .statement:last-child { page-break-after: auto; }
           .head { display: grid; gap: 6px; padding-bottom: 8px; border-bottom: 3px solid #111827; }
-          .title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
           .title { font-size: 30px; font-weight: 900; letter-spacing: 0; }
           .note { margin-top: 4px; font-size: 14px; font-weight: 800; color: #374151; }
           .no { min-width: 112px; padding: 8px 12px; border: 3px solid #111827; border-radius: 6px; text-align: center; font-size: 36px; font-weight: 900; }
-          .patient-no-badge { display: inline-flex; align-items: baseline; gap: 8px; padding: 6px 10px; border: 3px solid #111827; border-radius: 6px; background: #f8fafc; }
-          .patient-no-badge span { font-size: 14px; font-weight: 900; color: #475569; }
-          .patient-no-badge strong { font-size: 30px; font-weight: 900; color: #111827; }
-          .patient-no-badge small { font-size: 13px; font-weight: 900; color: #64748b; }
           .meta { display: grid; grid-template-columns: repeat(4, 1fr); border: 2px solid #111827; border-bottom: 0; }
           .meta div { min-height: 60px; padding: 8px 9px; border-right: 2px solid #111827; border-bottom: 2px solid #111827; }
           .meta div:nth-child(4n) { border-right: 0; }
@@ -5370,19 +5364,12 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               <section class="statement">
                 <div class="head">
                   <div>
-                    <div class="title-row">
-                      <div class="title">임플란트 사용 명세서</div>
-                      <div class="patient-no-badge">
-                        <span>환자번호</span>
-                        <strong>#${escapeHtml(patientNo)}</strong>
-                        ${pageLabel ? `<small>사진 ${escapeHtml(pageLabel.trim())}</small>` : ""}
-                      </div>
-                    </div>
+                    <div class="title">임플란트 사용 명세서</div>
                     <div class="note">${escapeHtml(date)} · ${escapeHtml(group.vendor)} · 환자명/환자ID 제외</div>
                   </div>
                 </div>
                 <div class="meta">
-                  <div><span>DATE</span><strong>${escapeHtml(implantRecordDate(record) || "-")}</strong></div>
+                  <div><span>DATE / 환자번호</span><strong>${escapeHtml(implantRecordDate(record) || "-")} · 환자번호 #${escapeHtml(patientNo)}${pageLabel ? ` · 사진 ${escapeHtml(pageLabel.trim())}` : ""}</strong></div>
                   <div><span>업체명</span><strong>${escapeHtml(group.vendor)}</strong></div>
                   <div><span>원장코드</span><strong>${escapeHtml(doctorText)}</strong></div>
                   <div><span>OP</span><strong>${escapeHtml(surgeryText)}</strong></div>
@@ -5540,18 +5527,6 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
                   <div class="implant-send-details-body">
                     <div class="implant-send-preview">환자 1명당 A4 1장 기준입니다. 사진이 4장을 넘으면 인쇄/PDF에서 다음 장으로 자동 분리됩니다. PDF는 인쇄창에서 "PDF로 저장"을 선택하세요.</div>
                     ${implantSendStatementCardsHtml(group)}
-                  </div>
-                </details>
-                <details class="implant-send-details">
-                  <summary>문자/메일 본문 및 기타 작업</summary>
-                  <div class="implant-send-details-body">
-                    <div class="implant-send-text">${escapeHtml(message)}</div>
-                    <div class="actions">
-                      ${email ? `<button type="button" data-send-implant-email="${escapeHtml(group.vendor)}">메일 작성</button>` : ""}
-                      ${phone ? `<button class="secondary" type="button" data-send-implant-sms="${escapeHtml(group.vendor)}">문자 작성</button>` : ""}
-                      <button class="secondary" type="button" data-copy-implant-send="${escapeHtml(group.vendor)}">내용 복사</button>
-                      <button class="secondary" type="button" data-download-implant-send="${escapeHtml(group.vendor)}">명세서 다운로드</button>
-                    </div>
                   </div>
                 </details>
               </div>
