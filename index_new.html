@@ -1477,7 +1477,7 @@
     }
     .implant-crop-frame {
       position: absolute;
-      border: 3px solid rgba(35,196,131,.95);
+      border: 4px solid rgba(35,196,131,.95);
       box-shadow: 0 0 0 999px rgba(0, 0, 0, .28);
       cursor: move;
       touch-action: none;
@@ -1486,22 +1486,22 @@
     .implant-crop-frame[hidden] { display: none !important; }
     .implant-crop-handle {
       position: absolute;
-      width: 18px;
-      height: 18px;
+      width: 28px;
+      height: 28px;
       border: 2px solid #fff;
       border-radius: 999px;
       background: #23c483;
       box-shadow: 0 1px 4px rgba(0,0,0,.35);
       touch-action: none;
     }
-    .implant-crop-handle[data-crop-handle="nw"] { left: -10px; top: -10px; cursor: nwse-resize; }
-    .implant-crop-handle[data-crop-handle="n"] { left: 50%; top: -10px; transform: translateX(-50%); cursor: ns-resize; }
-    .implant-crop-handle[data-crop-handle="ne"] { right: -10px; top: -10px; cursor: nesw-resize; }
-    .implant-crop-handle[data-crop-handle="e"] { right: -10px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
-    .implant-crop-handle[data-crop-handle="se"] { right: -10px; bottom: -10px; cursor: nwse-resize; }
-    .implant-crop-handle[data-crop-handle="s"] { left: 50%; bottom: -10px; transform: translateX(-50%); cursor: ns-resize; }
-    .implant-crop-handle[data-crop-handle="sw"] { left: -10px; bottom: -10px; cursor: nesw-resize; }
-    .implant-crop-handle[data-crop-handle="w"] { left: -10px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+    .implant-crop-handle[data-crop-handle="nw"] { left: -15px; top: -15px; cursor: nwse-resize; }
+    .implant-crop-handle[data-crop-handle="n"] { left: 50%; top: -15px; transform: translateX(-50%); cursor: ns-resize; }
+    .implant-crop-handle[data-crop-handle="ne"] { right: -15px; top: -15px; cursor: nesw-resize; }
+    .implant-crop-handle[data-crop-handle="e"] { right: -15px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+    .implant-crop-handle[data-crop-handle="se"] { right: -15px; bottom: -15px; cursor: nwse-resize; }
+    .implant-crop-handle[data-crop-handle="s"] { left: 50%; bottom: -15px; transform: translateX(-50%); cursor: ns-resize; }
+    .implant-crop-handle[data-crop-handle="sw"] { left: -15px; bottom: -15px; cursor: nesw-resize; }
+    .implant-crop-handle[data-crop-handle="w"] { left: -15px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
     .implant-modal-image.cropped {
       outline: 4px solid rgba(35,196,131,.85);
       outline-offset: -4px;
@@ -4855,6 +4855,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
     const implantRecordsForDate = (date) => sortImplantRecords(implantRecords.filter((record) => implantRecordDate(record) === date));
     const implantPhotoViewSrc = (photo) => photo?.editedPreview || photo?.preview || photo?.url || photo?.dataUrl || "";
+    const implantPhotoRotationStyle = (photo) => {
+      const rotation = photo?.editedPreview ? 0 : num(photo?.rotation);
+      return rotation ? `transform:rotate(${rotation}deg);` : "";
+    };
     const implantPhotoStoredInStorage = (photo) => Boolean(photo?.url && photo?.path && photo?.storageUploadFailed !== true);
     const implantPhotoNeedsStorageRetry = (photo) => Boolean(photo?.dataUrl && (!photo?.url || photo?.storageUploadFailed || !photo?.path));
     const implantPhotoStatusStats = (records) => records.reduce((stats, record) => {
@@ -6516,12 +6520,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
                 const src = editImplantPhotoSrc(photo);
                 return src ? `
                 <div class="implant-photo" data-edit-implant-photo="${escapeHtml(photo.id)}">
-                  <img class="${photo.cropped ? "cropped" : ""}" src="${escapeHtml(src)}" alt="임플란트 ${photo.file ? "신규" : "기존"} 사진" data-preview-edit-implant-photo="${escapeHtml(row.id)}::${escapeHtml(photo.id)}" style="transform:rotate(${num(photo.rotation)}deg); cursor:pointer;">
+                  <img class="${photo.cropped ? "cropped" : ""}" src="${escapeHtml(src)}" alt="임플란트 ${photo.file ? "신규" : "기존"} 사진" data-preview-edit-implant-photo="${escapeHtml(row.id)}::${escapeHtml(photo.id)}" style="${implantPhotoRotationStyle(photo)} cursor:pointer;">
                   <div class="implant-photo-actions">
                     <button class="secondary" type="button" data-preview-edit-implant-photo="${escapeHtml(row.id)}::${escapeHtml(photo.id)}">확대</button>
                     <button class="secondary" type="button" data-edit-existing-implant-photo="${escapeHtml(row.id)}::${escapeHtml(photo.id)}" ${editImplantCanModify ? "" : "disabled"}>편집</button>
                     <button class="secondary" type="button" data-rotate-edit-implant-photo="${escapeHtml(row.id)}::${escapeHtml(photo.id)}" ${editImplantCanModify ? "" : "disabled"}>회전</button>
-                    <button class="secondary" type="button" data-crop-edit-implant-photo="${escapeHtml(row.id)}::${escapeHtml(photo.id)}" ${editImplantCanModify ? "" : "disabled"}>${photo.cropped ? "원본" : "자르기"}</button>
                     <button class="secondary" type="button" data-move-edit-implant-photo-up="${escapeHtml(row.id)}::${escapeHtml(photo.id)}" ${!editImplantCanModify || photoIndex === 0 ? "disabled" : ""}>앞</button>
                     <button class="secondary" type="button" data-move-edit-implant-photo-down="${escapeHtml(row.id)}::${escapeHtml(photo.id)}" ${!editImplantCanModify || photoIndex === photos.length - 1 ? "disabled" : ""}>뒤</button>
                     <button class="danger" type="button" data-remove-edit-implant-photo="${escapeHtml(row.id)}::${escapeHtml(photo.id)}" ${editImplantCanModify ? "" : "disabled"}>삭제</button>
@@ -6646,7 +6649,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const cropButton = document.getElementById("implantModalCrop");
         if (!photo || !image || !tools) return;
         image.src = implantPhotoViewSrc(photo);
-        image.style.transform = `rotate(${num(photo.rotation)}deg)`;
+        image.style.transform = implantPhotoRotationStyle(photo).replace("transform:", "").replace(";", "");
         image.classList.toggle("cropped", Boolean(photo.cropped));
         tools.hidden = false;
         if (cropButton) cropButton.textContent = photo.cropped ? "자르기 수정" : "자르기";
@@ -6874,18 +6877,6 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           event.preventDefault();
           event.stopPropagation();
           openEditImplantPhotoEditor(editPhotoButton?.dataset.editExistingImplantPhoto || editPhotoImage?.dataset.previewEditImplantPhoto);
-          return;
-        }
-        const cropButton = event.target.closest("[data-crop-edit-implant-photo]");
-        if (cropButton && editImplantCanModify) {
-          event.preventDefault();
-          event.stopPropagation();
-          const pair = cropButton.dataset.cropEditImplantPhoto;
-          const { photo } = parseEditImplantPair(pair);
-          if (photo) {
-            openEditImplantPhotoEditor(pair);
-            requestAnimationFrame(() => enableImplantCropFrame(photo));
-          }
           return;
         }
         const previewButton = event.target.closest("button[data-preview-edit-implant-photo]");
@@ -7202,20 +7193,24 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       activeImplantCropPhoto = photo;
       bindImplantCropFrame();
       frame.hidden = false;
+      image.style.transform = "";
+      image.classList.remove("cropped");
       setImplantCropButtonText("자르기 적용");
       try {
         if (image.decode) await image.decode();
       } catch (_) {}
       requestAnimationFrame(() => positionImplantCropFrame(photo));
+      setTimeout(() => positionImplantCropFrame(photo), 120);
     };
     const currentImplantCropRect = () => {
       const { frame } = implantCropElements();
       const bounds = implantImageBoundsInStage();
-      if (!frame || !bounds || frame.hidden) return null;
+      if (!frame || !bounds || frame.hidden || !bounds.width || !bounds.height) return defaultImplantCropRect();
       const left = implantCropNumber(frame.style.left);
       const top = implantCropNumber(frame.style.top);
       const width = implantCropNumber(frame.style.width);
       const height = implantCropNumber(frame.style.height);
+      if (!width || !height) return defaultImplantCropRect();
       return normalizeImplantCropRect({
         x: (left - bounds.left) / bounds.width,
         y: (top - bounds.top) / bounds.height,
@@ -7225,15 +7220,28 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
     const applyActiveImplantCrop = async () => {
       if (!activeImplantCropPhoto) return;
-      const rect = currentImplantCropRect();
-      if (rect) {
-        activeImplantCropPhoto.cropped = true;
-        activeImplantCropPhoto.cropRect = rect;
+      try {
+        const rect = currentImplantCropRect();
+        if (rect) {
+          activeImplantCropPhoto.cropped = true;
+          activeImplantCropPhoto.cropRect = rect;
+        }
+        if (typeof activeImplantCropApply === "function") await activeImplantCropApply(activeImplantCropPhoto);
+        const { frame } = implantCropElements();
+        if (frame) frame.hidden = true;
+        const { image } = implantCropElements();
+        if (image) {
+          image.src = implantPhotoViewSrc(activeImplantCropPhoto);
+          image.style.transform = "";
+          image.classList.toggle("cropped", Boolean(activeImplantCropPhoto.cropped));
+        }
+        saveDoneToast("자르기 적용 완료");
+        setImplantCropButtonText("자르기 수정");
+      } catch (error) {
+        console.error(error);
+        saveErrorToast(`자르기 적용 실패: ${error.message}`);
+        alert(`자르기 적용에 실패했습니다: ${error.message}`);
       }
-      if (typeof activeImplantCropApply === "function") await activeImplantCropApply(activeImplantCropPhoto);
-      const { frame } = implantCropElements();
-      if (frame) frame.hidden = true;
-      setImplantCropButtonText("자르기 수정");
     };
     const openImplantCropEditor = async (photo, onApply) => {
       if (!photo) return;
@@ -7740,7 +7748,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
       const loadImageFromImplantPhoto = (photo) => photo.file
       ? loadImageFromFile(photo.file)
-      : loadImageFromUrl(photo.preview || photo.url || photo.dataUrl || "");
+      : loadImageFromUrl(photo.preview || photo.url || photo.dataUrl || photo.editedPreview || "");
 
     const implantCropNumber = (value, fallback = 0) => {
       const parsed = Number.parseFloat(value);
@@ -7844,6 +7852,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       if (photo.editedPreview) URL.revokeObjectURL(photo.editedPreview);
       const blob = await renderImplantPhotoBlob(photo, 1200, 0.86);
       photo.editedPreview = URL.createObjectURL(blob);
+      photo.needsReupload = true;
     };
 
     const initialImplantPhotoPayload = async (photo) => {
@@ -8330,12 +8339,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             <div class="implant-photo-grid">
               ${(draft.photos || []).map((photo, photoIndex) => `
                 <div class="implant-photo" data-implant-photo="${escapeHtml(photo.id)}">
-                  <img class="${photo.cropped ? "cropped" : ""}" src="${escapeHtml(implantPhotoViewSrc(photo))}" alt="임플란트 사진 미리보기" data-preview-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}" style="transform:rotate(${num(photo.rotation)}deg); cursor:pointer;">
+                  <img class="${photo.cropped ? "cropped" : ""}" src="${escapeHtml(implantPhotoViewSrc(photo))}" alt="임플란트 사진 미리보기" data-preview-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}" style="${implantPhotoRotationStyle(photo)} cursor:pointer;">
                   <div class="implant-photo-actions">
                     <button class="secondary" type="button" data-preview-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}">확대</button>
                     <button class="secondary" type="button" data-edit-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}">편집</button>
                     <button class="secondary" type="button" data-rotate-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}">회전</button>
-                    <button class="secondary" type="button" data-crop-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}">${photo.cropped ? "원본" : "자르기"}</button>
                     <button class="secondary" type="button" data-move-implant-photo-up="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}" ${photoIndex === 0 ? "disabled" : ""}>앞</button>
                     <button class="secondary" type="button" data-move-implant-photo-down="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}" ${photoIndex === draft.photos.length - 1 ? "disabled" : ""}>뒤</button>
                     <button class="danger" type="button" data-remove-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}">삭제</button>
@@ -8547,7 +8555,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const cropButton = document.getElementById("implantModalCrop");
         if (!photo || !image || !tools) return;
         image.src = implantPhotoViewSrc(photo);
-        image.style.transform = `rotate(${num(photo.rotation)}deg)`;
+        image.style.transform = implantPhotoRotationStyle(photo).replace("transform:", "").replace(";", "");
         image.classList.toggle("cropped", Boolean(photo.cropped));
         tools.hidden = false;
         if (cropButton) cropButton.textContent = photo.cropped ? "자르기 수정" : "자르기";
@@ -8865,17 +8873,6 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             photo.rotation = ((photo.rotation || 0) + 90) % 360;
             await refreshEditedImplantPreview(photo);
             renderImplantDrafts();
-          }
-          return;
-        }
-        const cropButton = event.target.closest("[data-crop-implant-photo]");
-        if (cropButton) {
-          const { photo } = parseImplantPair(cropButton.dataset.cropImplantPhoto);
-          if (photo) {
-            await openImplantCropEditor(photo, async (changedPhoto) => {
-              await refreshEditedImplantPreview(changedPhoto);
-              renderImplantDrafts();
-            });
           }
           return;
         }
