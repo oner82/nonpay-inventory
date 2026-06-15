@@ -5131,6 +5131,24 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       };
     };
 
+    const implantSendPatientGroups = (group) => {
+      const patients = new Map();
+      group.lines.forEach(({ record, implant }) => {
+        const key = record.id || `${implantRecordDate(record)}-${implantPatientNoText(record)}-${record.surgeryId}`;
+        const current = patients.get(key) || { record, implants: [], photos: [], descriptions: [] };
+        current.implants.push(implant);
+        current.photos.push(...(implant.photos || []));
+        if (String(implant.description || "").trim()) current.descriptions.push(String(implant.description || "").trim());
+        patients.set(key, current);
+      });
+      return Array.from(patients.values()).sort((a, b) => {
+        const noA = num(implantPatientNoText(a.record));
+        const noB = num(implantPatientNoText(b.record));
+        if (noA || noB) return noA - noB;
+        return String(a.record.createdAt || "").localeCompare(String(b.record.createdAt || ""));
+      });
+    };
+
     const implantSendPhotoLedgerHtml = (group) => `
       <div class="implant-send-photo-ledger">
         ${group.lines.map(({ record, implant }) => {
@@ -5449,8 +5467,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         </style>
       </head>
       <body>
-        ${group.lines.map(({ record, implant }) => {
-          const photos = implant.photos || [];
+        ${implantSendPatientGroups(group).map(({ record, photos, descriptions }) => {
           const chunks = implantStatementPhotoChunks(photos, 4);
           const patientNo = implantPatientNoText(record) || "미마감";
           const surgeryText = record.surgeryName || surgeryById(record.surgeryId)?.name || "-";
@@ -5460,7 +5477,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             const pageLabel = chunks.length > 1 ? ` ${chunkIndex + 1}/${chunks.length}` : "";
             const desc = chunkIndex
               ? `사진 계속 (${chunkIndex + 1}/${chunks.length})`
-              : (implant.description || `사진 ${photos.length}장 기록`);
+              : (descriptions.length ? descriptions.join("\n\n") : `사진 ${photos.length}장 기록`);
             return `
               <section class="statement">
                 <div class="head">
@@ -5592,6 +5609,30 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       downloadBlob(implantVendorStatementFileName(date, group.vendor, "pdf"), blob);
     };
 
+    const implantVendorStatementPdfFile = async (date, group) => {
+      const blob = await renderImplantStatementPdfBlob(date, group);
+      return new File([blob], implantVendorStatementFileName(date, group.vendor, "pdf"), {
+        type: "application/pdf"
+      });
+    };
+
+    const saveAndShareImplantVendorStatementPdf = async (date, group) => {
+      const file = await implantVendorStatementPdfFile(date, group);
+      downloadBlob(file.name, file);
+      const title = `${date} ${group.vendor} 임플란트 명세서`;
+      const text = `${date} ${group.vendor} 임플란트 명세서 PDF`;
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ title, text, files: [file] });
+          return "shared";
+        } catch (error) {
+          if (error?.name === "AbortError") return "cancelled";
+          throw error;
+        }
+      }
+      return "saved-only";
+    };
+
     const downloadImplantVendorStatementHtml = (date, group) => {
       downloadBytes(
         implantVendorStatementFileName(date, group.vendor, "html"),
@@ -5601,21 +5642,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
 
     const shareImplantVendorStatement = async (date, group) => {
-      const message = implantSendMessage(date, group.vendor, group.lines);
-      const title = `${date} ${group.vendor} 임플란트 명세서`;
-      const file = new File([implantVendorStatementHtmlBlob(date, group)], implantVendorStatementFileName(date, group.vendor, "html"), {
-        type: "text/html"
-      });
-      if (navigator.share) {
-        if (navigator.canShare?.({ files: [file] })) {
-          await navigator.share({ title, text: message, files: [file] });
-          return "file";
-        }
-        await navigator.share({ title, text: message });
-        return "text";
-      }
-      await navigator.clipboard.writeText(message);
-      return "copy";
+      return saveAndShareImplantVendorStatementPdf(date, group);
     };
 
     const implantSendPanelHtml = (date) => {
@@ -5644,8 +5671,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
                   ${email ? `<button type="button" data-send-implant-email="${escapeHtml(group.vendor)}">메일 작성</button>` : ""}
                   ${phone ? `<button class="secondary" type="button" data-send-implant-sms="${escapeHtml(group.vendor)}">문자 작성</button>` : ""}
                   <button class="secondary" type="button" data-copy-implant-send="${escapeHtml(group.vendor)}">내용 복사</button>
-                  <button type="button" data-print-implant-send="${escapeHtml(group.vendor)}">PDF 만들기</button>
-                  <button class="secondary" type="button" data-share-implant-send="${escapeHtml(group.vendor)}">공유하기</button>
+                  <button type="button" data-print-implant-send="${escapeHtml(group.vendor)}">PDF 저장/공유</button>
+                  <button class="secondary" type="button" data-share-implant-send="${escapeHtml(group.vendor)}">PDF 공유</button>
                   <button class="secondary" type="button" data-download-implant-send="${escapeHtml(group.vendor)}">명세서 다운로드</button>
                   <button class="secondary" type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="pending">미발송</button>
                   <button type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="sent">발송완료</button>
@@ -5703,8 +5730,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
                   </label>
                 </div>
                 <div class="implant-send-primary-actions">
-                  <button type="button" data-print-implant-send="${escapeHtml(group.vendor)}">PDF 만들기</button>
-                  <button class="secondary" type="button" data-share-implant-send="${escapeHtml(group.vendor)}">공유하기</button>
+                  <button type="button" data-print-implant-send="${escapeHtml(group.vendor)}">PDF 저장/공유</button>
+                  <button class="secondary" type="button" data-share-implant-send="${escapeHtml(group.vendor)}">PDF 공유</button>
                   <button type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="sent">발송완료</button>
                 </div>
                 <details class="implant-send-details">
@@ -7519,8 +7546,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           setButtonBusy(printButton, true, "PDF 생성 중...");
           showSaveToast("PDF 파일 생성 중입니다...", "saving", { hold: true });
           try {
-            await downloadImplantVendorStatementPdf(date, group);
-            saveDoneToast(`${vendorName} PDF 파일을 만들었습니다.`);
+            const result = await saveAndShareImplantVendorStatementPdf(date, group);
+            if (result === "shared") saveDoneToast(`${vendorName} PDF 저장 및 공유 완료`);
+            else if (result === "cancelled") saveDoneToast(`${vendorName} PDF 저장 완료`);
+            else saveDoneToast(`${vendorName} PDF 저장 완료 · 이 기기는 파일 공유 미지원`);
           } catch (error) {
             console.error(error);
             downloadImplantVendorStatementHtml(date, group);
@@ -7546,20 +7575,20 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           const vendorName = shareButton.dataset.shareImplantSend;
           const group = implantSendGroups(date).find((item) => item.vendor === vendorName);
           if (!group) return;
+          setButtonBusy(shareButton, true, "PDF 공유 중...");
+          showSaveToast("PDF 파일 생성 중입니다...", "saving", { hold: true });
           try {
             const result = await shareImplantVendorStatement(date, group);
-            if (result === "file") saveDoneToast(`${vendorName} 명세서 공유창을 열었습니다.`);
-            else if (result === "text") saveDoneToast(`${vendorName} 발송 본문 공유창을 열었습니다.`);
-            else saveDoneToast(`${vendorName} 발송 본문을 복사했습니다.`);
+            if (result === "shared") saveDoneToast(`${vendorName} PDF 공유 완료`);
+            else if (result === "cancelled") saveDoneToast(`${vendorName} PDF 저장 완료`);
+            else saveDoneToast(`${vendorName} PDF 저장 완료 · 이 기기는 파일 공유 미지원`);
           } catch (error) {
             if (error?.name !== "AbortError") {
-              try {
-                await navigator.clipboard.writeText(implantSendMessage(date, group.vendor, group.lines));
-                saveDoneToast(`${vendorName} 공유가 제한되어 발송 본문을 복사했습니다.`);
-              } catch (copyError) {
-                alert(`공유를 실행할 수 없습니다: ${error.message || error}`);
-              }
+              console.error(error);
+              saveErrorToast(`PDF 공유 실패: ${error.message || error}`);
             }
+          } finally {
+            setButtonBusy(shareButton, false);
           }
           return;
         }
