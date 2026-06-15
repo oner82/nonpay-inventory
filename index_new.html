@@ -7809,6 +7809,16 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
+    const promiseWithTimeout = (promise, timeoutMs, message) => new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+      promise.then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      }).catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+    });
     const implantPhotoFallbackPayload = async (photo, errorMessage = "") => {
       const blob = await renderImplantPhotoBlob(photo, 1200, 0.82);
       return {
@@ -7823,6 +7833,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         cropped: Boolean(photo.cropped),
         cropRect: photo.cropped && photo.cropRect ? normalizeImplantCropRect(photo.cropRect) : null,
         uploadedAt: new Date().toISOString(),
+        needsReupload: true,
         storageUploadFailed: true,
         storageUploadError: errorMessage
       };
@@ -7853,8 +7864,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       for (const bucket of candidates) {
         try {
           const refPath = storageRef(bucket, path);
-          await uploadBytes(refPath, blob, { contentType: "image/jpeg" });
-          const url = await getDownloadURL(refPath);
+          await promiseWithTimeout(uploadBytes(refPath, blob, { contentType: "image/jpeg" }), 30000, "사진 업로드 시간이 초과되었습니다.");
+          const url = await promiseWithTimeout(getDownloadURL(refPath), 15000, "사진 주소 확인 시간이 초과되었습니다.");
           return {
             id: photo.id,
             url,
@@ -7902,7 +7913,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       rotation: num(photo.rotation),
       cropped: Boolean(photo.cropped),
       cropRect: photo.cropped && photo.cropRect ? normalizeImplantCropRect(photo.cropRect) : null,
-      uploadedAt: photo.uploadedAt || ""
+      uploadedAt: photo.uploadedAt || "",
+      needsReupload: Boolean(photo.needsReupload),
+      storageUploadFailed: Boolean(photo.storageUploadFailed),
+      storageUploadError: photo.storageUploadError || ""
     });
 
     const countImplantPhotosToUpload = (implants = []) => implants.reduce((sum, implant) => (
@@ -8362,15 +8376,18 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         };
       };
       const pendingUsagePhotoPayload = async (pendingId, draft, photo, date, index, onProgress) => {
-        if (photo.url || photo.dataUrl) return cleanImplantPhotoPayload(photo);
+        if (photo.url && photo.path && !photo.needsReupload) return cleanImplantPhotoPayload(photo);
+        if (photo.dataUrl && !photo.file && !photo.preview && !photo.editedPreview) {
+          return { ...cleanImplantPhotoPayload(photo), needsReupload: true };
+        }
         try {
-          const uploaded = await uploadImplantPhoto(`pending-${pendingId}`, draft.id || uid(), photo, date || today());
+          const uploaded = await implantPhotoFallbackPayload(photo, "Storage upload pending");
           if (typeof onProgress === "function") onProgress();
-          return uploaded;
+          return { ...uploaded, needsReupload: true };
         } catch (error) {
           console.error(error);
           if (typeof onProgress === "function") onProgress(true);
-          return implantPhotoFallbackPayload(photo, error.message || "임시저장 사진 업로드 실패");
+          throw error;
         }
       };
       const buildPendingUsagePayload = async (snapshot, pendingId, onProgress) => {
@@ -8713,17 +8730,6 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         try {
           const saved = await savePendingUsageDraft(snapshot);
           if (!saved) return;
-          implantDrafts.splice(0, implantDrafts.length, ...(saved.implantDrafts || []).map((draft) => ({
-            id: draft.id || uid(),
-            vendorId: draft.vendorId || "",
-            customVendor: draft.customVendor || "",
-            vendor: draft.vendor || "",
-            description: draft.description || "",
-            photos: (draft.photos || []).map(cleanImplantPhotoPayload)
-          })));
-          if (implantEnabled) implantEnabled.checked = implantDrafts.length > 0;
-          if (implantPanel) implantPanel.hidden = !implantDrafts.length;
-          renderImplantDrafts();
           useDraftSnapshot = {
             ...snapshot,
             enteredBy: saved.draftSavedBy || snapshot.enteredBy,
