@@ -1268,6 +1268,91 @@
     .implant-toggle input { width: 22px; min-height: 22px; margin: 0; }
     .implant-panel { display: grid; gap: 12px; margin-top: 12px; }
     .implant-panel[hidden] { display: none !important; }
+    .use-draft-panel {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+      padding: 13px;
+      border: 1px solid #bfdbfe;
+      border-left: 5px solid #2563eb;
+      border-radius: 12px;
+      background: #eff6ff;
+    }
+    .use-draft-panel[hidden] { display: none !important; }
+    .use-draft-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .use-draft-head strong {
+      color: var(--ink);
+      font-size: 16px;
+      font-weight: 950;
+    }
+    .use-draft-status {
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: #dbeafe;
+      color: #1d4ed8;
+      font-size: 12px;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+    .use-draft-status.dirty {
+      background: #fff7ed;
+      color: #c2410c;
+    }
+    .use-draft-summary {
+      display: grid;
+      gap: 7px;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .use-draft-summary span {
+      color: var(--muted);
+      font-weight: 850;
+    }
+    .pending-usage-list {
+      display: grid;
+      gap: 9px;
+      margin: 10px 0 14px;
+    }
+    .pending-usage-card {
+      display: grid;
+      gap: 8px;
+      padding: 11px;
+      border: 1px solid #fed7aa;
+      border-left: 5px solid #f97316;
+      border-radius: 12px;
+      background: #fff7ed;
+    }
+    .pending-usage-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .pending-usage-head strong {
+      color: var(--ink);
+      font-size: 15px;
+      font-weight: 950;
+    }
+    .pending-usage-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+    }
+    .pending-usage-meta span {
+      padding: 5px 8px;
+      border: 1px solid #fed7aa;
+      border-radius: 999px;
+      background: #fff;
+    }
     .implant-vendor-card {
       display: grid;
       gap: 10px;
@@ -2371,10 +2456,13 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     let unsubscribe;
     let implantRecordsUnsubscribe;
     let implantVendorsUnsubscribe;
+    let pendingUsagesUnsubscribe;
     let hydrated = false;
     let saving = false;
     let implantRecords = [];
     let implantVendors = [];
+    let pendingUsages = [];
+    let suppressPendingUsagesRender = false;
 
     const uid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
     const today = () => {
@@ -2563,6 +2651,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     const canAssignImplantPatientNo = () => ["admin", "manager"].includes(currentUserRole());
     const canEditImplantPatientNo = () => currentUserRole() === "admin";
     const implantRecordsForUsage = (usageId) => sortImplantRecords(implantRecords.filter((record) => sameId(record.usageId, usageId)));
+    const pendingUsagesOpen = () => pendingUsages
+      .filter((item) => (item.status || "pending") === "pending")
+      .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
+    const pendingUsageById = (id) => pendingUsages.find((item) => sameId(item.id, id));
     const isImplantEditUnlocked = (record) => record?.editUnlocked === true;
     const isImplantLedgerClosed = (record) => !isImplantEditUnlocked(record) && Boolean(implantPatientNoText(record) || record?.closedAt || record?.patientNoAssignedAt);
     const implantLockLabel = (record) => isImplantLedgerClosed(record)
@@ -3284,6 +3376,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       });
       const todayProductCount = todayUsages.reduce((sum, item) => sum + (item.productIds || []).length, 0);
       const pendingLandingLines = landingUsageLines(false);
+      const openPendingUsageItems = pendingUsagesOpen();
       const totalStock = state.products.reduce((sum, item) => sum + num(item.stock), 0);
 
       const todayCategoryCounts = ["비급여", "인체조직", "ANCHOR"].map((category) => ({
@@ -3321,6 +3414,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           <div class="stats">
             ${statCard("오늘 사용 환자", todayUsages.length.toLocaleString(), "P")}
             ${statCard("오늘 사용 제품", todayProductCount.toLocaleString(), "✓")}
+            ${statCard("스크럽 확인 대기", openPendingUsageItems.length.toLocaleString(), "확인")}
             ${statCard("랜딩 입고 대기", pendingLandingLines.length.toLocaleString(), "↙")}
             ${statCard("재고 부족 확인", lowProducts.length.toLocaleString(), "!")}
           </div>
@@ -5897,8 +5991,59 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       </section>
     `;
 
+    const pendingUsageSummary = (item) => {
+      const productCount = (item.productItems || []).reduce((sum, product) => sum + Math.max(1, num(product.qty)), 0);
+      const implantCount = (item.implantDrafts || []).length;
+      const photoCount = (item.implantDrafts || []).reduce((sum, implant) => sum + (implant.photos || []).length, 0);
+      return { productCount, implantCount, photoCount };
+    };
+
+    const renderPendingUsageList = () => {
+      const items = pendingUsagesOpen();
+      if (!items.length) return "";
+      return `
+        <div class="card">
+          <div class="use-draft-head">
+            <div>
+              <h3 style="margin:0;">스크럽 확인 대기</h3>
+              <div class="muted">임시저장된 기록은 새로고침 후에도 남아 있습니다. 확인할 환자를 불러와 최종저장하세요.</div>
+            </div>
+            <span class="use-draft-status">${items.length}건</span>
+          </div>
+          <div class="pending-usage-list">
+            ${items.map((item) => {
+              const summary = pendingUsageSummary(item);
+              const doctor = departmentById(item.doctorId);
+              const surgery = surgeryById(item.surgeryId);
+              return `
+                <div class="pending-usage-card">
+                  <div class="pending-usage-head">
+                    <strong>${escapeHtml(patientDisplayName(item) || "환자 정보 없음")}</strong>
+                    <span class="pill">${escapeHtml(item.date || today())}</span>
+                  </div>
+                  <div class="pending-usage-meta">
+                    <span>${escapeHtml(doctor?.name || "-")}</span>
+                    <span>${escapeHtml(surgery?.name || "-")}</span>
+                    <span>제품 ${summary.productCount}개</span>
+                    <span>임플란트 ${summary.implantCount}업체 · 사진 ${summary.photoCount}장</span>
+                    <span>입력 ${escapeHtml(item.enteredBy?.name || item.enteredBy?.loginId || item.draftSavedBy || "-")}</span>
+                    <span>${escapeHtml(formatDateTime(item.updatedAt || item.createdAt || ""))}</span>
+                  </div>
+                  <div class="actions">
+                    <button type="button" data-load-pending-usage="${escapeHtml(item.id)}">불러오기</button>
+                    <button class="danger" type="button" data-delete-pending-usage="${escapeHtml(item.id)}">대기삭제</button>
+                  </div>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </div>
+      `;
+    };
+
     const renderUse = () => `
       <section class="grid">
+        ${renderPendingUsageList()}
         <form class="card" id="useForm">
           <h2>사용입력</h2>
           <div class="row three">
@@ -6002,7 +6147,24 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               <button class="secondary" type="button" id="addImplantVendorEntry">임플란트 업체 추가</button>
             </div>
           </div>
-          <div class="actions"><button type="submit">사용내역 저장</button></div>
+          <div class="actions">
+            <button type="button" id="saveUseDraft">임시저장</button>
+          </div>
+          <div class="use-draft-panel" id="useDraftPanel" hidden>
+            <div class="use-draft-head">
+              <div>
+                <strong>스크럽 확인 대기</strong>
+                <div class="muted">임시저장 단계에서는 재고차감과 사용내역 저장을 하지 않습니다.</div>
+              </div>
+              <span class="use-draft-status" id="useDraftStatus">임시저장 완료</span>
+            </div>
+            <div class="use-draft-summary" id="useDraftSummary"></div>
+            <div class="actions">
+              <button class="secondary" type="button" id="editUseDraft">수정</button>
+              <button type="submit" id="finalSaveUseDraft">최종저장</button>
+              <button class="danger" type="button" id="cancelUseDraft">임시저장 취소</button>
+            </div>
+          </div>
         </form>
       </section>
     `;
@@ -7895,7 +8057,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const photoUploadErrors = [];
         for (const photo of draft.photos || []) {
           try {
-            photos.push(await uploadImplantPhoto(recordId, implantId, photo, surgeryDate));
+            if ((photo.url || photo.dataUrl) && !photo.file && !photo.needsReupload) {
+              photos.push(cleanImplantPhotoPayload(photo));
+            } else {
+              photos.push(await uploadImplantPhoto(recordId, implantId, photo, surgeryDate));
+            }
           } catch (error) {
             console.error(error);
             photos.push(await implantPhotoFallbackPayload(photo, error.message || "사진 업로드 실패"));
@@ -7936,9 +8102,19 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const implantPanel = document.getElementById("implantUsePanel");
       const implantEntriesWrap = document.getElementById("implantVendorEntries");
       const addImplantVendorEntry = document.getElementById("addImplantVendorEntry");
+      const saveUseDraftButton = document.getElementById("saveUseDraft");
+      const useDraftPanel = document.getElementById("useDraftPanel");
+      const useDraftStatus = document.getElementById("useDraftStatus");
+      const useDraftSummary = document.getElementById("useDraftSummary");
+      const editUseDraftButton = document.getElementById("editUseDraft");
+      const finalSaveUseDraftButton = document.getElementById("finalSaveUseDraft");
+      const cancelUseDraftButton = document.getElementById("cancelUseDraft");
       const implantDrafts = [];
       let activeImplantEditPair = "";
       let manualRestrictNonpay = false;
+      let useDraftSnapshot = null;
+      let useDraftDirty = false;
+      let loadedPendingUsageId = "";
       const setRestrictButton = (value) => {
         manualRestrictNonpay = Boolean(value);
         useRestrictNonpay.dataset.restrict = value ? "true" : "false";
@@ -8092,6 +8268,22 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         if (changed) renderImplantDrafts();
       };
       const implantDraftById = (id) => implantDrafts.find((item) => item.id === id);
+      const currentImplantDraftPayload = () => {
+        const implantWillSave = implantEnabled?.checked;
+        return implantWillSave ? implantDrafts.map((draft) => ({
+          ...draft,
+          vendorId: draft.vendorId || "",
+          customVendor: String(draft.customVendor || "").trim(),
+          description: String(draft.description || "").trim()
+        })).filter((draft) => {
+          const vendor = draft.vendorId === "__custom__" ? draft.customVendor : implantVendorById(draft.vendorId)?.name;
+          return String(vendor || "").trim() || draft.description || (draft.photos || []).length;
+        }) : [];
+      };
+      const invalidImplantDraft = (payload) => payload.find((draft) => {
+        const vendor = draft.vendorId === "__custom__" ? draft.customVendor : implantVendorById(draft.vendorId)?.name;
+        return !String(vendor || "").trim() || (!draft.description && !(draft.photos || []).length);
+      });
       const renderImplantDrafts = () => {
         implantEntriesWrap.innerHTML = implantDrafts.map((draft, index) => `
           <div class="implant-vendor-card" data-implant-draft="${escapeHtml(draft.id)}">
@@ -8139,6 +8331,177 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             </div>
           </div>
         `).join("") || `<div class="empty">임플란트 업체를 추가해 주세요.</div>`;
+      };
+      const draftUserText = () => currentAuditUser()?.name || currentAuditUser()?.loginId || "현재 사용자";
+      const collectUseDraftSnapshot = () => {
+        if (!form.reportValidity()) return null;
+        const useItems = selectedUseItems();
+        if (!useItems.length) {
+          alert("제품을 하나 이상 선택해 주세요.");
+          return null;
+        }
+        const unavailable = useItems.find((item) => num(productById(item.productId)?.stock) < item.qty);
+        if (unavailable) {
+          alert("재고가 부족한 제품이 있습니다.");
+          return null;
+        }
+        const implantDraftPayload = currentImplantDraftPayload();
+        if (invalidImplantDraft(implantDraftPayload)) {
+          alert("임플란트 장부가 작성되지 않았습니다. 업체명과 사용내용 또는 사진을 확인해 주세요.");
+          return null;
+        }
+        return {
+          patientName: document.getElementById("patientName").value.trim(),
+          patientId: document.getElementById("patientId").value.trim(),
+          doctorText: departmentSelect.selectedOptions[0]?.textContent || "-",
+          surgeryText: surgerySelect.selectedOptions[0]?.textContent || "-",
+          enteredBy: draftUserText(),
+          enteredAt: new Date().toISOString(),
+          useItems,
+          implantDraftPayload
+        };
+      };
+      const pendingUsagePhotoPayload = async (pendingId, draft, photo, date, index, onProgress) => {
+        if (photo.url || photo.dataUrl) return cleanImplantPhotoPayload(photo);
+        try {
+          const uploaded = await uploadImplantPhoto(`pending-${pendingId}`, draft.id || uid(), photo, date || today());
+          if (typeof onProgress === "function") onProgress();
+          return uploaded;
+        } catch (error) {
+          console.error(error);
+          if (typeof onProgress === "function") onProgress(true);
+          return implantPhotoFallbackPayload(photo, error.message || "임시저장 사진 업로드 실패");
+        }
+      };
+      const buildPendingUsagePayload = async (snapshot, pendingId, onProgress) => {
+        const existingPending = loadedPendingUsageId ? pendingUsageById(loadedPendingUsageId) : null;
+        const implantDraftsPayload = [];
+        for (const draft of snapshot.implantDraftPayload) {
+          const photos = [];
+          for (let index = 0; index < (draft.photos || []).length; index += 1) {
+            photos.push(await pendingUsagePhotoPayload(pendingId, draft, draft.photos[index], today(), index, onProgress));
+          }
+          const vendor = draft.vendorId === "__custom__"
+            ? draft.customVendor
+            : (implantVendorById(draft.vendorId)?.name || draft.customVendor || draft.vendor || "");
+          implantDraftsPayload.push({
+            id: draft.id || uid(),
+            vendorId: draft.vendorId || "",
+            customVendor: draft.customVendor || "",
+            vendor,
+            description: draft.description || "",
+            photos: photos.filter((photo) => photo.url || photo.dataUrl)
+          });
+        }
+        return {
+          id: pendingId,
+          status: "pending",
+          patientName: snapshot.patientName,
+          patientId: snapshot.patientId,
+          doctorId: departmentSelect.value,
+          surgeryId: surgerySelect.value,
+          date: today(),
+          productItems: snapshot.useItems.map((item) => ({ productId: item.productId, qty: Math.max(1, num(item.qty)) })),
+          implantDrafts: implantDraftsPayload,
+          draftSavedBy: snapshot.enteredBy,
+          enteredBy: currentAuditUser(),
+          createdAt: existingPending?.createdAt || snapshot.enteredAt,
+          updatedAt: new Date().toISOString(),
+          ...(existingPending ? auditUpdateFields() : auditCreateFields())
+        };
+      };
+      const savePendingUsageDraft = async (snapshot) => {
+        if (!db) {
+          alert("Firebase 연결 후 임시저장을 사용할 수 있습니다.");
+          return null;
+        }
+        const pendingId = loadedPendingUsageId || uid();
+        const totalPhotos = snapshot.implantDraftPayload.reduce((sum, draft) => sum + (draft.photos || []).filter((photo) => !(photo.url || photo.dataUrl)).length, 0);
+        let donePhotos = 0;
+        let failedPhotos = 0;
+        const payload = await buildPendingUsagePayload(snapshot, pendingId, (failed) => {
+          donePhotos += 1;
+          if (failed) failedPhotos += 1;
+          const failText = failedPhotos ? ` · 실패 ${failedPhotos}장` : "";
+          showSaveToast(`임시저장 사진 처리 중 ${donePhotos}/${totalPhotos}${failText}`, failedPhotos ? "error" : "saving", { hold: donePhotos < totalPhotos });
+        });
+        suppressPendingUsagesRender = true;
+        await setDoc(doc(db, "pendingUsages", pendingId), payload, { merge: true });
+        loadedPendingUsageId = pendingId;
+        return payload;
+      };
+      const renderUseDraftPanel = () => {
+        if (!useDraftPanel || !useDraftSummary || !useDraftSnapshot) {
+          if (useDraftPanel) useDraftPanel.hidden = true;
+          return;
+        }
+        const productLines = useDraftSnapshot.useItems.map((item) => {
+          const product = productById(item.productId);
+          return `${product?.name || "삭제된 제품"} ${item.qty}개`;
+        });
+        const implantPhotoCount = useDraftSnapshot.implantDraftPayload.reduce((sum, draft) => sum + (draft.photos || []).length, 0);
+        useDraftPanel.hidden = false;
+        if (useDraftStatus) {
+          useDraftStatus.textContent = useDraftDirty ? "수정 중 · 임시저장 갱신 필요" : "임시저장 완료";
+          useDraftStatus.classList.toggle("dirty", useDraftDirty);
+        }
+        if (finalSaveUseDraftButton) finalSaveUseDraftButton.disabled = useDraftDirty;
+        if (saveUseDraftButton) saveUseDraftButton.textContent = useDraftSnapshot ? "임시저장 갱신" : "임시저장";
+        useDraftSummary.innerHTML = `
+          <div><span>환자</span> ${escapeHtml(useDraftSnapshot.patientName || "-")} ${useDraftSnapshot.patientId ? `(${escapeHtml(useDraftSnapshot.patientId)})` : ""}</div>
+          <div><span>수술</span> ${escapeHtml(useDraftSnapshot.doctorText)} · ${escapeHtml(useDraftSnapshot.surgeryText)}</div>
+          <div><span>사용제품</span> ${escapeHtml(productLines.join(", ") || "-")}</div>
+          <div><span>임플란트</span> ${useDraftSnapshot.implantDraftPayload.length ? `${useDraftSnapshot.implantDraftPayload.length}개 업체 · 사진 ${implantPhotoCount}장` : "기록 없음"}</div>
+          <div><span>임시저장</span> ${escapeHtml(useDraftSnapshot.enteredBy)} · ${escapeHtml(formatDateTime(useDraftSnapshot.enteredAt))}</div>
+        `;
+      };
+      const markUseDraftDirty = () => {
+        if (!useDraftSnapshot || useDraftDirty) return;
+        useDraftDirty = true;
+        renderUseDraftPanel();
+      };
+      const loadPendingUsageIntoForm = (pending) => {
+        if (!pending) return;
+        document.getElementById("patientName").value = pending.patientName || "";
+        document.getElementById("patientId").value = pending.patientId || "";
+        const doctor = departmentById(pending.doctorId);
+        if (doctor) {
+          useDepartment.value = departmentCode(doctor.name);
+          filterUseOptions();
+          departmentSelect.value = pending.doctorId || "";
+          filterUseOptions();
+        }
+        surgerySelect.value = pending.surgeryId || "";
+        renderUseRecommendation();
+        form.querySelectorAll("[data-use-product]").forEach((input) => { input.checked = false; });
+        form.querySelectorAll("[data-use-qty]").forEach((input) => { input.value = 1; });
+        (pending.productItems || []).forEach((item) => {
+          const checkbox = form.querySelector(`[data-use-product="${item.productId}"]`);
+          const qtyInput = form.querySelector(`[data-use-qty="${item.productId}"]`);
+          if (checkbox) checkbox.checked = true;
+          if (qtyInput) qtyInput.value = Math.max(1, num(item.qty));
+        });
+        renderSelectedUseList();
+        implantDrafts.splice(0, implantDrafts.length, ...(pending.implantDrafts || []).map((draft) => ({
+          id: draft.id || uid(),
+          vendorId: draft.vendorId || "",
+          customVendor: draft.customVendor || "",
+          vendor: draft.vendor || "",
+          description: draft.description || "",
+          photos: (draft.photos || []).map(cleanImplantPhotoPayload)
+        })));
+        if (implantEnabled) implantEnabled.checked = implantDrafts.length > 0;
+        if (implantPanel) implantPanel.hidden = !implantDrafts.length;
+        loadedPendingUsageId = pending.id || "";
+        renderImplantDrafts();
+        useDraftSnapshot = collectUseDraftSnapshot();
+        if (useDraftSnapshot) {
+          useDraftSnapshot.enteredBy = pending.draftSavedBy || pending.enteredBy?.name || pending.enteredBy?.loginId || useDraftSnapshot.enteredBy;
+          useDraftSnapshot.enteredAt = pending.updatedAt || pending.createdAt || useDraftSnapshot.enteredAt;
+        }
+        useDraftDirty = false;
+        renderUseDraftPanel();
+        useDraftPanel?.scrollIntoView({ behavior: "smooth", block: "center" });
       };
       const updateImplantDraftFromInput = (target) => {
         const vendorSelect = target.closest("[data-implant-draft]")?.querySelector("[data-implant-vendor-select]");
@@ -8305,6 +8668,107 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         input.addEventListener("change", renderSelectedUseList);
         input.addEventListener("input", renderSelectedUseList);
       });
+      app.querySelectorAll("[data-load-pending-usage]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const pending = pendingUsageById(button.dataset.loadPendingUsage);
+          if (!pending) {
+            alert("대기 기록을 찾을 수 없습니다. 화면을 새로고침해 주세요.");
+            return;
+          }
+          loadPendingUsageIntoForm(pending);
+          saveDoneToast("임시저장 기록을 불러왔습니다.");
+        });
+      });
+      app.querySelectorAll("[data-delete-pending-usage]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const pending = pendingUsageById(button.dataset.deletePendingUsage);
+          if (!pending) {
+            alert("대기 기록을 찾을 수 없습니다. 화면을 새로고침해 주세요.");
+            return;
+          }
+          if (!confirm("이 임시저장 대기 기록을 삭제할까요? 기존 사용내역과 재고에는 영향이 없습니다.")) return;
+          try {
+            await deleteDoc(doc(db, "pendingUsages", pending.id));
+            if (sameId(loadedPendingUsageId, pending.id)) {
+              loadedPendingUsageId = "";
+              useDraftSnapshot = null;
+              useDraftDirty = false;
+              if (useDraftPanel) useDraftPanel.hidden = true;
+            }
+            saveDoneToast("임시저장 대기 기록을 삭제했습니다.");
+          } catch (error) {
+            console.error(error);
+            saveErrorToast(`대기 기록 삭제 실패: ${error.message}`);
+            alert(`대기 기록 삭제에 실패했습니다: ${error.message}`);
+          }
+        });
+      });
+      form.addEventListener("input", markUseDraftDirty, true);
+      form.addEventListener("change", markUseDraftDirty, true);
+      saveUseDraftButton?.addEventListener("click", async () => {
+        const snapshot = collectUseDraftSnapshot();
+        if (!snapshot) return;
+        setButtonBusy(saveUseDraftButton, true, "임시저장 중...");
+        showSaveToast("임시저장 중입니다...", "saving", { hold: true });
+        try {
+          const saved = await savePendingUsageDraft(snapshot);
+          if (!saved) return;
+          implantDrafts.splice(0, implantDrafts.length, ...(saved.implantDrafts || []).map((draft) => ({
+            id: draft.id || uid(),
+            vendorId: draft.vendorId || "",
+            customVendor: draft.customVendor || "",
+            vendor: draft.vendor || "",
+            description: draft.description || "",
+            photos: (draft.photos || []).map(cleanImplantPhotoPayload)
+          })));
+          if (implantEnabled) implantEnabled.checked = implantDrafts.length > 0;
+          if (implantPanel) implantPanel.hidden = !implantDrafts.length;
+          renderImplantDrafts();
+          useDraftSnapshot = {
+            ...snapshot,
+            enteredBy: saved.draftSavedBy || snapshot.enteredBy,
+            enteredAt: saved.updatedAt || saved.createdAt || snapshot.enteredAt,
+            implantDraftPayload: saved.implantDrafts || []
+          };
+          useDraftDirty = false;
+          renderUseDraftPanel();
+          useDraftPanel?.scrollIntoView({ behavior: "smooth", block: "center" });
+          saveDoneToast("임시저장 완료 · 스크럽 확인 대기");
+        } catch (error) {
+          console.error(error);
+          suppressPendingUsagesRender = false;
+          saveErrorToast(`임시저장 실패: ${error.message}`);
+          alert(`임시저장에 실패했습니다: ${error.message}`);
+        } finally {
+          setButtonBusy(saveUseDraftButton, false);
+          renderUseDraftPanel();
+        }
+      });
+      editUseDraftButton?.addEventListener("click", () => {
+        if (!useDraftSnapshot) return;
+        useDraftDirty = true;
+        renderUseDraftPanel();
+        form.scrollIntoView({ behavior: "smooth", block: "start" });
+        saveDoneToast("수정 후 임시저장을 다시 눌러 주세요.");
+      });
+      cancelUseDraftButton?.addEventListener("click", async () => {
+        if (!confirm("임시저장을 취소할까요? 입력 내용은 화면에 남아 있습니다.")) return;
+        if (loadedPendingUsageId && db) {
+          try {
+            await deleteDoc(doc(db, "pendingUsages", loadedPendingUsageId));
+            loadedPendingUsageId = "";
+          } catch (error) {
+            console.error(error);
+            saveErrorToast(`임시저장 취소 실패: ${error.message}`);
+            return;
+          }
+        }
+        useDraftSnapshot = null;
+        useDraftDirty = false;
+        if (useDraftPanel) useDraftPanel.hidden = true;
+        if (saveUseDraftButton) saveUseDraftButton.textContent = "임시저장";
+        saveDoneToast("임시저장을 취소했습니다.");
+      });
       const showProductSearchModal = () => {
         productSearchModal.hidden = false;
         renderProductSearchResults();
@@ -8464,6 +8928,14 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       document.getElementById("useForm").addEventListener("submit", async (event) => {
         event.preventDefault();
         const submitButton = event.submitter || event.currentTarget.querySelector("button[type='submit']");
+        if (!useDraftSnapshot) {
+          alert("먼저 임시저장을 눌러 스크럽 확인 대기 상태로 만들어 주세요.");
+          return;
+        }
+        if (useDraftDirty) {
+          alert("임시저장 후 입력 내용이 수정되었습니다. 임시저장 갱신 후 최종저장해 주세요.");
+          return;
+        }
         const rule = currentUseRule();
         const restrictActive = isRestrictOn();
         const useItems = selectedUseItems();
@@ -8508,20 +8980,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           alert("재고가 부족한 제품이 있습니다.");
           return;
         }
-        const implantWillSave = implantEnabled?.checked;
-        const implantDraftPayload = implantWillSave ? implantDrafts.map((draft) => ({
-          ...draft,
-          vendorId: draft.vendorId || "",
-          customVendor: String(draft.customVendor || "").trim(),
-          description: String(draft.description || "").trim()
-        })).filter((draft) => {
-          const vendor = draft.vendorId === "__custom__" ? draft.customVendor : implantVendorById(draft.vendorId)?.name;
-          return String(vendor || "").trim() || draft.description || (draft.photos || []).length;
-        }) : [];
-        const invalidImplant = implantDraftPayload.find((draft) => {
-          const vendor = draft.vendorId === "__custom__" ? draft.customVendor : implantVendorById(draft.vendorId)?.name;
-          return !String(vendor || "").trim() || (!draft.description && !(draft.photos || []).length);
-        });
+        const implantDraftPayload = currentImplantDraftPayload();
+        const invalidImplant = invalidImplantDraft(implantDraftPayload);
         if (invalidImplant) {
           alert("임플란트 장부가 작성되지 않았습니다. 업체명과 사용내용 또는 사진을 확인해 주세요.");
           return;
@@ -8531,6 +8991,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           const product = productById(item.productId);
           product.stock = num(product.stock) - item.qty;
         });
+        const finalSavedAt = new Date().toISOString();
         const usageRecord = {
           id: uid(),
           patientName: document.getElementById("patientName").value.trim(),
@@ -8539,7 +9000,15 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           surgeryId: document.getElementById("useSurgery").value,
           productIds,
           date: today(),
-          createdAt: new Date().toISOString(),
+          createdAt: finalSavedAt,
+          doubleCheck: {
+            mode: "circulatorDraftScrubFinal",
+            status: "finalSaved",
+            draftSavedBy: useDraftSnapshot.enteredBy,
+            draftSavedAt: useDraftSnapshot.enteredAt,
+            finalSavedBy: draftUserText(),
+            finalSavedAt
+          },
           ...auditCreateFields()
         };
         state.usages.push(usageRecord);
@@ -8566,6 +9035,21 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             console.error(error);
             saveErrorToast(`임플란트 기록 저장 실패: ${error.message}`);
             alert(`사용내역은 저장됐지만 임플란트 기록 저장에 실패했습니다: ${error.message}`);
+          }
+        }
+        if (loadedPendingUsageId && db) {
+          try {
+            await setDoc(doc(db, "pendingUsages", loadedPendingUsageId), {
+              status: "confirmed",
+              confirmedUsageId: usageRecord.id,
+              confirmedAt: finalSavedAt,
+              confirmedBy: currentAuditUser(),
+              updatedAt: new Date().toISOString(),
+              ...auditUpdateFields()
+            }, { merge: true });
+          } catch (error) {
+            console.error(error);
+            saveErrorToast(`임시저장 확정 처리 실패: ${error.message}`);
           }
         }
         setButtonBusy(submitButton, false);
@@ -8857,6 +9341,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         .map(([id, qty]) => ({ id, qty, product: productById(id) }))
         .filter((item) => !item.product);
       const groupClass = (category) => category === "비급여" ? "nonpay" : category === "인체조직" ? "tissue" : "anchor";
+      const doubleCheck = usage.doubleCheck || {};
+      const doubleCheckText = doubleCheck.status === "finalSaved"
+        ? `더블체크: 임시저장 ${doubleCheck.draftSavedBy || "-"}${doubleCheck.draftSavedAt ? ` (${formatDateTime(doubleCheck.draftSavedAt)})` : ""} · 최종저장 ${doubleCheck.finalSavedBy || "-"}${doubleCheck.finalSavedAt ? ` (${formatDateTime(doubleCheck.finalSavedAt)})` : ""}`
+        : "";
       return `
         <div class="item">
           <div class="item-title">
@@ -8865,6 +9353,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           </div>
           <div class="meta">
             ${auditMetaHtml(usage, "입력")}
+            ${doubleCheckText ? `<span>${escapeHtml(doubleCheckText)}</span>` : ""}
             <span>과/원장 코드: ${escapeHtml(doctor?.name || "-")} · 수술: ${escapeHtml(surgeryDepartment)} - ${escapeHtml(surgery?.name || "-")}</span>
             <div class="usage-products">
               ${groupedProducts.map((group) => `
@@ -9346,6 +9835,21 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           setStatus(`임플란트 업체 연결 오류: ${error.message}`, "error");
         });
       }
+      if (!pendingUsagesUnsubscribe) {
+        pendingUsagesUnsubscribe = onSnapshot(collection(db, "pendingUsages"), (snapshot) => {
+          pendingUsages = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+          if (hydrated && currentView === "use") {
+            if (suppressPendingUsagesRender) {
+              suppressPendingUsagesRender = false;
+            } else {
+              render();
+            }
+          }
+        }, (error) => {
+          console.error(error);
+          setStatus(`임시저장 대기목록 연결 오류: ${error.message}`, "error");
+        });
+      }
     };
 
     const boot = async () => {
@@ -9400,6 +9904,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       if (unsubscribe) unsubscribe();
       if (implantRecordsUnsubscribe) implantRecordsUnsubscribe();
       if (implantVendorsUnsubscribe) implantVendorsUnsubscribe();
+      if (pendingUsagesUnsubscribe) pendingUsagesUnsubscribe();
     });
 
     const loadFirebaseAndBoot = async () => {
