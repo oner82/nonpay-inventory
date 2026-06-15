@@ -5530,10 +5530,14 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         resolve();
         return;
       }
+      const resolveWhenReady = () => {
+        if (globalCheck()) resolve();
+        else reject(new Error("PDF 생성 라이브러리 확인에 실패했습니다."));
+      };
       const existing = document.querySelector(`script[src="${src}"]`);
       if (existing) {
         if (existing.dataset.loadState === "loaded") {
-          globalCheck() ? resolve() : reject(new Error("PDF 생성 라이브러리 확인에 실패했습니다."));
+          resolveWhenReady();
           return;
         }
         if (existing.dataset.loadState === "error") {
@@ -5541,10 +5545,12 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         } else {
           const timer = window.setTimeout(() => reject(new Error("PDF 생성 라이브러리 로딩 시간이 초과되었습니다.")), 12000);
           existing.addEventListener("load", () => {
+            existing.dataset.loadState = "loaded";
             window.clearTimeout(timer);
-            resolve();
+            resolveWhenReady();
           }, { once: true });
           existing.addEventListener("error", () => {
+            existing.dataset.loadState = "error";
             window.clearTimeout(timer);
             reject(new Error("PDF 생성 라이브러리를 불러오지 못했습니다."));
           }, { once: true });
@@ -5559,7 +5565,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       script.onload = () => {
         script.dataset.loadState = "loaded";
         window.clearTimeout(timer);
-        resolve();
+        resolveWhenReady();
       };
       script.onerror = () => {
         script.dataset.loadState = "error";
@@ -5775,13 +5781,12 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
                 </div>
                 <div class="implant-send-primary-actions">
                   <button type="button" data-print-implant-send="${escapeHtml(group.vendor)}">PDF 저장/공유</button>
-                  <button class="secondary" type="button" data-share-implant-send="${escapeHtml(group.vendor)}">PDF 공유</button>
                   <button type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="sent">발송완료</button>
                 </div>
                 <details class="implant-send-details">
                   <summary>사진 포함 A4 명세서 미리보기</summary>
                   <div class="implant-send-details-body">
-                    <div class="implant-send-preview">환자 1명당 A4 1장 기준입니다. 사진이 4장을 넘으면 인쇄/PDF에서 다음 장으로 자동 분리됩니다. PDF는 인쇄창에서 "PDF로 저장"을 선택하세요.</div>
+                    <div class="implant-send-preview">환자 1명당 A4 1장 기준입니다. 사진이 4장을 넘으면 다음 장으로 자동 분리됩니다. PDF 저장/공유를 누르면 파일 저장 후 지원 기기에서 공유창이 열립니다.</div>
                     ${implantSendStatementCardsHtml(group)}
                   </div>
                 </details>
