@@ -1038,7 +1038,13 @@
       .row.three {
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
       }
+      .row.four {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      }
       .row.three > div {
+        min-width: 0 !important;
+      }
+      .row.four > div {
         min-width: 0 !important;
       }
       .row.three > div:nth-child(3) {
@@ -1047,6 +1053,12 @@
       .row.three input,
       .row.three select,
       .row.three button {
+        width: 100% !important;
+        min-width: 0 !important;
+      }
+      .row.four input,
+      .row.four select,
+      .row.four button {
         width: 100% !important;
         min-width: 0 !important;
       }
@@ -6470,7 +6482,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         ${renderPendingUsageList()}
         <form class="card" id="useForm">
           <h2>사용입력</h2>
-          <div class="row three">
+          <div class="row four">
+            <div>
+              <label for="useDate">사용일</label>
+              <input id="useDate" type="date" value="${today()}" required>
+            </div>
             <div>
               <label for="patientName">환자명</label>
               <input id="patientName" required autocomplete="off">
@@ -8577,6 +8593,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const productSearch = document.getElementById("useProductSearch");
       const productSearchResults = document.getElementById("useProductSearchResults");
       const form = document.getElementById("useForm");
+      const useDate = document.getElementById("useDate");
       const openProductSearch = document.getElementById("openUseProductSearch");
       const closeProductSearch = document.getElementById("closeUseProductSearch");
       const productSearchModal = document.getElementById("useProductSearchModal");
@@ -8603,6 +8620,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       let useDraftSnapshot = null;
       let useDraftDirty = false;
       let loadedPendingUsageId = "";
+      if (useDate && !useDate.value) useDate.value = today();
+      const selectedUseDate = () => useDate?.value || today();
       const setRestrictButton = (value) => {
         manualRestrictNonpay = Boolean(value);
         useRestrictNonpay.dataset.restrict = value ? "true" : "false";
@@ -8947,6 +8966,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           return null;
         }
         return {
+          date: selectedUseDate(),
           patientName: document.getElementById("patientName").value.trim(),
           patientId: document.getElementById("patientId").value.trim(),
           doctorText: departmentSelect.selectedOptions[0]?.textContent || "-",
@@ -8978,7 +8998,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         for (const draft of snapshot.implantDraftPayload) {
           const photos = [];
           for (let index = 0; index < (draft.photos || []).length; index += 1) {
-            photos.push(await pendingUsagePhotoPayload(pendingId, draft, draft.photos[index], today(), index, onProgress));
+            photos.push(await pendingUsagePhotoPayload(pendingId, draft, draft.photos[index], snapshot.date || today(), index, onProgress));
           }
           const vendor = draft.vendorId === "__custom__"
             ? draft.customVendor
@@ -8999,7 +9019,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           patientId: snapshot.patientId,
           doctorId: departmentSelect.value,
           surgeryId: surgerySelect.value,
-          date: today(),
+          date: snapshot.date || today(),
           productItems: snapshot.useItems.map((item) => ({ productId: item.productId, qty: Math.max(1, num(item.qty)) })),
           implantDrafts: implantDraftsPayload,
           draftSavedBy: snapshot.enteredBy,
@@ -9048,6 +9068,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         if (saveUseDraftButton) saveUseDraftButton.textContent = useDraftSnapshot ? "임시저장 갱신" : "임시저장";
         useDraftSummary.innerHTML = `
           <div><span>환자</span> ${escapeHtml(useDraftSnapshot.patientName || "-")} ${useDraftSnapshot.patientId ? `(${escapeHtml(useDraftSnapshot.patientId)})` : ""}</div>
+          <div><span>사용일</span> ${escapeHtml(useDraftSnapshot.date || today())}</div>
           <div><span>수술</span> ${escapeHtml(useDraftSnapshot.doctorText)} · ${escapeHtml(useDraftSnapshot.surgeryText)}</div>
           <div><span>사용제품</span> ${escapeHtml(productLines.join(", ") || "-")}</div>
           <div><span>임플란트</span> ${useDraftSnapshot.implantDraftPayload.length ? `${useDraftSnapshot.implantDraftPayload.length}개 업체 · 사진 ${implantPhotoCount}장` : "기록 없음"}</div>
@@ -9061,6 +9082,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       };
       const loadPendingUsageIntoForm = (pending) => {
         if (!pending) return;
+        if (useDate) useDate.value = pending.date || today();
         document.getElementById("patientName").value = pending.patientName || "";
         document.getElementById("patientId").value = pending.patientId || "";
         const doctor = departmentById(pending.doctorId);
@@ -9567,6 +9589,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const restrictActive = isRestrictOn();
         const useItems = selectedUseItems();
         const implantDraftPayload = currentImplantDraftPayload();
+        const usageDate = useDraftSnapshot.date || selectedUseDate();
+        if (usageDate !== today() && !confirm(`${usageDate} 사용분으로 저장합니다. 계속할까요?`)) {
+          return;
+        }
         const productIds = useItems.flatMap((item) => Array.from({ length: item.qty }, () => item.productId));
         const uniqueProductIds = useItems.map((item) => item.productId);
         const selectedNonpayIds = uniqueProductIds.filter((id) => productCategory(productById(id)?.category) === "비급여");
@@ -9626,7 +9652,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           doctorId: document.getElementById("useDoctor").value,
           surgeryId: document.getElementById("useSurgery").value,
           productIds,
-          date: today(),
+          date: usageDate,
           createdAt: finalSavedAt,
           doubleCheck: {
             mode: "circulatorDraftScrubFinal",
