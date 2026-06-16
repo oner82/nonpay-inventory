@@ -8613,6 +8613,51 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         implantDrafts.push({ id: uid(), vendorId: "", customVendor: "", description: "", photos: [] });
         renderImplantDrafts();
       };
+      const mergeImplantDescription = (left = "", right = "") => {
+        const lines = [];
+        String(left || "").split(/\r?\n/).forEach((line) => {
+          const text = line.trim();
+          if (text && !lines.includes(text)) lines.push(text);
+        });
+        String(right || "").split(/\r?\n/).forEach((line) => {
+          const text = line.trim();
+          if (text && !lines.includes(text)) lines.push(text);
+        });
+        return lines.join("\n");
+      };
+      const mergeDuplicateImplantDrafts = () => {
+        const byVendor = new Map();
+        let changed = false;
+        for (let index = 0; index < implantDrafts.length; index += 1) {
+          const draft = implantDrafts[index];
+          const key = draft.autoCompanyKey || implantVendorKey(implantDraftVendorName(draft));
+          if (!key) continue;
+          const existing = byVendor.get(key);
+          if (!existing) {
+            byVendor.set(key, draft);
+            continue;
+          }
+          existing.vendorId = existing.vendorId || draft.vendorId || "";
+          existing.customVendor = existing.customVendor || draft.customVendor || "";
+          existing.vendor = existing.vendor || draft.vendor || "";
+          existing.autoSource = existing.autoSource || draft.autoSource;
+          existing.autoCompanyKey = existing.autoCompanyKey || draft.autoCompanyKey || key;
+          existing.description = mergeImplantDescription(existing.description, draft.description);
+          existing.autoDescription = mergeImplantDescription(existing.autoDescription, draft.autoDescription);
+          const existingPhotoIds = new Set((existing.photos || []).map((photo) => photo.id));
+          (draft.photos || []).forEach((photo) => {
+            if (!existingPhotoIds.has(photo.id)) {
+              existing.photos = existing.photos || [];
+              existing.photos.push(photo);
+              existingPhotoIds.add(photo.id);
+            }
+          });
+          implantDrafts.splice(index, 1);
+          index -= 1;
+          changed = true;
+        }
+        return changed;
+      };
       const syncImplantDraftsFromSelectedProducts = () => {
         const targets = implantVendorTargetsFromUseItems(selectedUseItems());
         const targetKeys = new Set(targets.map((target) => target.key));
@@ -8624,6 +8669,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             changed = true;
           }
         }
+        if (mergeDuplicateImplantDrafts()) changed = true;
         targets.forEach((target) => {
           const existing = implantDrafts.find((draft) => (
             draft.autoCompanyKey === target.key ||
@@ -8689,6 +8735,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const implantDraftById = (id) => implantDrafts.find((item) => item.id === id);
       const currentImplantDraftPayload = () => {
         const implantWillSave = implantEnabled?.checked;
+        if (implantWillSave) mergeDuplicateImplantDrafts();
         return implantWillSave ? implantDrafts.map((draft) => ({
           ...draft,
           vendorId: draft.vendorId || "",
@@ -8754,8 +8801,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const collectUseDraftSnapshot = () => {
         if (!form.reportValidity()) return null;
         const useItems = selectedUseItems();
-        if (!useItems.length) {
-          alert("제품을 하나 이상 선택해 주세요.");
+        const implantDraftPayload = currentImplantDraftPayload();
+        if (!useItems.length && !implantDraftPayload.length) {
+          alert("제품을 선택하거나 임플란트 장부를 작성해 주세요.");
           return null;
         }
         const unavailable = useItems.find((item) => num(productById(item.productId)?.stock) < item.qty);
@@ -8763,7 +8811,6 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           alert("재고가 부족한 제품이 있습니다.");
           return null;
         }
-        const implantDraftPayload = currentImplantDraftPayload();
         if (invalidImplantDraft(implantDraftPayload)) {
           alert("임플란트 장부가 작성되지 않았습니다. 업체명과 사용내용 또는 사진을 확인해 주세요.");
           return null;
@@ -9338,13 +9385,14 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const rule = currentUseRule();
         const restrictActive = isRestrictOn();
         const useItems = selectedUseItems();
+        const implantDraftPayload = currentImplantDraftPayload();
         const productIds = useItems.flatMap((item) => Array.from({ length: item.qty }, () => item.productId));
         const uniqueProductIds = useItems.map((item) => item.productId);
         const selectedNonpayIds = uniqueProductIds.filter((id) => productCategory(productById(id)?.category) === "비급여");
         if (restrictActive && selectedNonpayIds.length && !confirm("비급여 제한으로 설정된 수술입니다. 그래도 비급여를 사용할까요?")) {
           return;
         }
-        const expectedRecommendations = rule
+        const expectedRecommendations = productIds.length && rule
           ? ruleItems(rule).filter((item) => !(restrictActive && productCategory(productById(item.productId)?.category) === "비급여"))
           : [];
         const missingRecommended = expectedRecommendations
@@ -9370,8 +9418,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             return;
           }
         }
-        if (!productIds.length) {
-          alert("제품을 하나 이상 선택해 주세요.");
+        if (!productIds.length && !implantDraftPayload.length) {
+          alert("제품을 선택하거나 임플란트 장부를 작성해 주세요.");
           return;
         }
         const unavailable = useItems.find((item) => num(productById(item.productId)?.stock) < item.qty);
@@ -9379,7 +9427,6 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           alert("재고가 부족한 제품이 있습니다.");
           return;
         }
-        const implantDraftPayload = currentImplantDraftPayload();
         const invalidImplant = invalidImplantDraft(implantDraftPayload);
         if (invalidImplant) {
           alert("임플란트 장부가 작성되지 않았습니다. 업체명과 사용내용 또는 사진을 확인해 주세요.");
