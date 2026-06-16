@@ -1268,6 +1268,62 @@
     .implant-toggle input { width: 22px; min-height: 22px; margin: 0; }
     .implant-panel { display: grid; gap: 12px; margin-top: 12px; }
     .implant-panel[hidden] { display: none !important; }
+    .implant-common-photos {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px dashed #93c5fd;
+      border-radius: 10px;
+      background: #eff6ff;
+    }
+    .implant-common-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .implant-common-head strong {
+      color: var(--ink);
+      font-size: 15px;
+      font-weight: 950;
+    }
+    .implant-common-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .implant-common-photos input[type="file"] {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+    .implant-common-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+      gap: 8px;
+    }
+    .implant-common-photo {
+      display: grid;
+      gap: 6px;
+      padding: 7px;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      background: #fff;
+    }
+    .implant-common-photo img {
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: cover;
+      border-radius: 8px;
+      background: #eef4ff;
+    }
     .use-draft-panel {
       display: grid;
       gap: 10px;
@@ -1624,7 +1680,7 @@
     .implant-send-photo-grid img {
       width: 132px;
       height: 132px;
-      object-fit: cover;
+      object-fit: contain;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fff;
@@ -1861,7 +1917,8 @@
     }
     .implant-statement-photos img {
       width: 100%;
-      height: 260px;
+      max-height: 260px;
+      height: auto;
       object-fit: contain;
       border: 2px solid #111827;
       border-radius: 6px;
@@ -1898,7 +1955,7 @@
       .implant-statement-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .implant-statement-meta div:nth-child(2n) { border-right: 0; }
       .implant-statement-photos { grid-template-columns: 1fr; }
-      .implant-statement-photos img { height: 220px; }
+      .implant-statement-photos img { max-height: 220px; height: auto; }
       .implant-statement-footer { grid-template-columns: 1fr; }
       .implant-send-clean-head { grid-template-columns: 1fr; }
       .implant-send-status-control { min-width: 0; }
@@ -4885,7 +4942,13 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
 
     const implantRecordsForDate = (date) => sortImplantRecords(implantRecords.filter((record) => implantRecordDate(record) === date));
-    const implantPhotoViewSrc = (photo) => photo?.editedPreview || photo?.preview || photo?.url || photo?.dataUrl || "";
+    const implantPhotoViewSrc = (photo) => {
+      if (!photo) return "";
+      if (photo.editedPreview) return photo.editedPreview;
+      if (photo.preview) return photo.preview;
+      if ((photo.needsReupload || photo.storageUploadFailed) && photo.dataUrl) return photo.dataUrl;
+      return photo.url || photo.dataUrl || "";
+    };
     const implantPhotoRotationStyle = (photo) => {
       const rotation = photo?.editedPreview ? 0 : num(photo?.rotation);
       return rotation ? `transform:rotate(${rotation}deg);` : "";
@@ -5221,7 +5284,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           .head { display: flex; justify-content: space-between; gap: 12px; font-weight: 800; margin-bottom: 8px; }
           .desc { white-space: pre-wrap; font-family: Consolas, monospace; font-size: 13px; line-height: 1.45; margin-bottom: 10px; }
           .photos { display: flex; flex-wrap: wrap; gap: 8px; }
-          .photos img { width: 180px; height: 180px; object-fit: cover; border: 1px solid #d1d5db; border-radius: 6px; }
+          .photos img { max-width: 260px; max-height: 190px; width: auto; height: auto; object-fit: contain; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; }
           @media print { body { margin: 14mm; } .patient { break-inside: avoid; } }
         </style>
       </head>
@@ -5315,7 +5378,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           td.implant { width: 51%; }
           .implant-ledger-desc { white-space: pre-wrap; font-family: Consolas, monospace; font-size: 21px; line-height: 1.35; margin-bottom: 8px; }
           .implant-send-photo-grid { display: flex; flex-wrap: wrap; gap: 8px; }
-          .implant-send-photo-grid img { width: 240px; height: 160px; object-fit: contain; border: 2px solid #111827; background: #fff; }
+          .implant-send-photo-grid img { max-width: 310px; max-height: 220px; width: auto; height: auto; object-fit: contain; border: 2px solid #111827; background: #fff; }
           tr { break-inside: avoid; page-break-inside: avoid; }
         </style>
       </head>
@@ -5784,11 +5847,14 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const photoGap = 22;
       const photoX = margin;
       const photoY = 595;
-      const cellW = (contentWidth - photoGap) / 2;
-      const cellH = 430;
-      for (let index = 0; index < 4; index += 1) {
-        const col = index % 2;
-        const row = Math.floor(index / 2);
+      const slotCount = chunk.length ? chunk.length : 1;
+      const columns = slotCount === 1 ? 1 : 2;
+      const rows = Math.ceil(slotCount / columns);
+      const cellW = (contentWidth - (photoGap * (columns - 1))) / columns;
+      const cellH = rows === 1 ? 884 : 430;
+      for (let index = 0; index < slotCount; index += 1) {
+        const col = index % columns;
+        const row = Math.floor(index / columns);
         const x = photoX + (col * (cellW + photoGap));
         const y = photoY + (row * (cellH + photoGap));
         ctx.strokeStyle = "#111827";
@@ -6500,6 +6566,19 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           </label>
           <div id="implantUsePanel" class="implant-panel" hidden>
             <div class="implant-send-preview">환자명, 환자ID, 과, 원장코드, 수술명, 수술일은 위 사용입력 정보로 자동 저장됩니다.</div>
+            <div class="implant-common-photos">
+              <div class="implant-common-head">
+                <strong>공용 사진함</strong>
+                <div class="implant-common-actions">
+                  <button class="secondary" type="button" id="openCommonImplantGallery">파일 선택</button>
+                  <button type="button" id="openCommonImplantCamera">공용 사진 찍기</button>
+                  <input id="commonImplantGallery" type="file" accept="image/*" multiple>
+                  <input id="commonImplantCamera" type="file" accept="image/*" capture="environment">
+                </div>
+              </div>
+              <div class="muted">한 번 찍은 사진을 여러 업체에 복사한 뒤, 업체별로 따로 자르기/회전할 수 있습니다.</div>
+              <div id="commonImplantPhotoList" class="implant-common-grid"></div>
+            </div>
             <div id="implantVendorEntries"></div>
             <div class="actions">
               <button class="secondary" type="button" id="addImplantVendorEntry">임플란트 업체 추가</button>
@@ -8505,6 +8584,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const implantPanel = document.getElementById("implantUsePanel");
       const implantEntriesWrap = document.getElementById("implantVendorEntries");
       const addImplantVendorEntry = document.getElementById("addImplantVendorEntry");
+      const commonImplantPhotoList = document.getElementById("commonImplantPhotoList");
+      const openCommonImplantGallery = document.getElementById("openCommonImplantGallery");
+      const openCommonImplantCamera = document.getElementById("openCommonImplantCamera");
+      const commonImplantGallery = document.getElementById("commonImplantGallery");
+      const commonImplantCamera = document.getElementById("commonImplantCamera");
       const saveUseDraftButton = document.getElementById("saveUseDraft");
       const useDraftPanel = document.getElementById("useDraftPanel");
       const useDraftStatus = document.getElementById("useDraftStatus");
@@ -8513,6 +8597,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const finalSaveUseDraftButton = document.getElementById("finalSaveUseDraft");
       const cancelUseDraftButton = document.getElementById("cancelUseDraft");
       const implantDrafts = [];
+      const commonImplantPhotos = [];
       let activeImplantEditPair = "";
       let manualRestrictNonpay = false;
       let useDraftSnapshot = null;
@@ -8613,6 +8698,51 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         implantDrafts.push({ id: uid(), vendorId: "", customVendor: "", description: "", photos: [] });
         renderImplantDrafts();
       };
+      const cloneCommonImplantPhoto = (photo) => ({
+        id: uid(),
+        file: photo.file || null,
+        preview: photo.file ? URL.createObjectURL(photo.file) : (photo.preview || ""),
+        url: photo.url || "",
+        dataUrl: photo.dataUrl || "",
+        name: photo.name || photo.file?.name || "",
+        size: num(photo.size || photo.file?.size),
+        contentType: photo.contentType || photo.file?.type || "image/jpeg",
+        rotation: 0,
+        cropped: false,
+        cropRect: null,
+        sourceCommonPhotoId: photo.id
+      });
+      const renderCommonImplantPhotos = () => {
+        if (!commonImplantPhotoList) return;
+        commonImplantPhotoList.innerHTML = commonImplantPhotos.map((photo, index) => {
+          const src = implantPhotoViewSrc(photo);
+          return `
+            <div class="implant-common-photo" data-common-implant-photo="${escapeHtml(photo.id)}">
+              ${src ? `<img src="${escapeHtml(src)}" alt="공용 임플란트 사진 ${index + 1}" data-preview-common-implant-photo="${escapeHtml(photo.id)}">` : ""}
+              <div class="implant-photo-actions">
+                <button class="secondary" type="button" data-preview-common-implant-photo="${escapeHtml(photo.id)}">확대</button>
+                <button class="danger" type="button" data-remove-common-implant-photo="${escapeHtml(photo.id)}">삭제</button>
+              </div>
+            </div>
+          `;
+        }).join("") || `<div class="empty">공용 사진을 먼저 촬영하거나 선택해 주세요.</div>`;
+      };
+      const addCommonImplantPhotos = (files = []) => {
+        files.filter((file) => file.type.startsWith("image/")).forEach((file) => {
+          commonImplantPhotos.push({
+            id: uid(),
+            file,
+            preview: URL.createObjectURL(file),
+            name: file.name || "implant.jpg",
+            size: file.size,
+            contentType: file.type || "image/jpeg",
+            rotation: 0,
+            cropped: false
+          });
+        });
+        renderCommonImplantPhotos();
+      };
+      const commonImplantPhotoById = (id) => commonImplantPhotos.find((photo) => photo.id === id);
       const mergeImplantDescription = (left = "", right = "") => {
         const lines = [];
         String(left || "").split(/\r?\n/).forEach((line) => {
@@ -8775,6 +8905,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             <div class="implant-photo-pickers">
               <button class="secondary" type="button" data-open-implant-gallery="${escapeHtml(draft.id)}">파일 선택</button>
               <button type="button" data-open-implant-camera="${escapeHtml(draft.id)}">사진 찍기</button>
+              <button class="secondary" type="button" data-use-common-implant-photo="${escapeHtml(draft.id)}" ${commonImplantPhotos.length ? "" : "disabled"}>공용 사진 사용</button>
               <span class="muted">Android/iPad 카메라와 갤러리를 지원합니다.</span>
               <input id="implantGallery-${escapeHtml(draft.id)}" type="file" accept="image/*" multiple data-implant-photo-input="${escapeHtml(draft.id)}">
               <input id="implantCamera-${escapeHtml(draft.id)}" type="file" accept="image/*" capture="environment" data-implant-camera-input="${escapeHtml(draft.id)}">
@@ -9243,6 +9374,43 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         if (event.key === "Escape" && productSearchModal && !productSearchModal.hidden) hideProductSearchModal();
       }, { once: false });
       productSearch.addEventListener("input", renderProductSearchResults);
+      openCommonImplantGallery?.addEventListener("click", () => commonImplantGallery?.click());
+      openCommonImplantCamera?.addEventListener("click", () => commonImplantCamera?.click());
+      [commonImplantGallery, commonImplantCamera].forEach((input) => {
+        input?.addEventListener("change", () => {
+          addCommonImplantPhotos(Array.from(input.files || []));
+          input.value = "";
+          if (implantEnabled && !implantEnabled.checked) implantEnabled.checked = true;
+          if (implantPanel) implantPanel.hidden = false;
+          if (!implantDrafts.length) addImplantDraft();
+          renderImplantDrafts();
+        });
+      });
+      commonImplantPhotoList?.addEventListener("click", (event) => {
+        const preview = event.target.closest("[data-preview-common-implant-photo]");
+        if (preview) {
+          const photo = commonImplantPhotoById(preview.dataset.previewCommonImplantPhoto);
+          if (photo) {
+            activeImplantEditPair = "";
+            const tools = document.getElementById("implantPhotoEditTools");
+            const image = document.getElementById("implantPhotoModalImage");
+            if (tools) tools.hidden = true;
+            if (image) image.style.transform = "";
+            showImplantPhotoModal(implantPhotoViewSrc(photo));
+          }
+          return;
+        }
+        const remove = event.target.closest("[data-remove-common-implant-photo]");
+        if (remove) {
+          const index = commonImplantPhotos.findIndex((photo) => photo.id === remove.dataset.removeCommonImplantPhoto);
+          if (index >= 0) {
+            URL.revokeObjectURL(commonImplantPhotos[index].preview);
+            commonImplantPhotos.splice(index, 1);
+            renderCommonImplantPhotos();
+            renderImplantDrafts();
+          }
+        }
+      });
       implantEnabled?.addEventListener("change", () => {
         implantPanel.hidden = !implantEnabled.checked;
         if (implantEnabled.checked && !implantDrafts.length) addImplantDraft();
@@ -9278,6 +9446,18 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const cameraButton = event.target.closest("[data-open-implant-camera]");
         if (cameraButton) {
           implantEntriesWrap.querySelector(`[data-implant-camera-input="${cameraButton.dataset.openImplantCamera}"]`)?.click();
+          return;
+        }
+        const useCommon = event.target.closest("[data-use-common-implant-photo]");
+        if (useCommon) {
+          const draft = implantDraftById(useCommon.dataset.useCommonImplantPhoto);
+          if (!draft || !commonImplantPhotos.length) return;
+          const addedPhotos = commonImplantPhotos.map(cloneCommonImplantPhoto);
+          draft.photos.push(...addedPhotos);
+          renderImplantDrafts();
+          if (addedPhotos.length === 1) {
+            openImplantPhotoEditor(`${draft.id}::${addedPhotos[0].id}`);
+          }
           return;
         }
         const removeDraft = event.target.closest("[data-remove-implant-draft]");
@@ -9369,6 +9549,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         activeImplantEditPair = "";
         hideImplantPhotoModal();
       });
+      renderCommonImplantPhotos();
       renderProductSearchResults();
       filterUseOptions();
       document.getElementById("useForm").addEventListener("submit", async (event) => {
