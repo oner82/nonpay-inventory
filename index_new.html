@@ -2642,8 +2642,19 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
     const normalizedName = (value) => String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
     const departmentCode = (value) => String(value || "").trim().replace(/[0-9]+$/g, "").toUpperCase();
-    const productCategory = (value) => String(value || "").trim() === "Anchor&etc" ? "ANCHOR" : String(value || "").trim();
-    const productCategoryLabel = (value) => productCategory(value) === "ANCHOR" ? "ANCHOR&etc" : productCategory(value);
+    const PRODUCT_CATEGORIES = ["비급여", "인체조직", "ANCHOR", "URO_LANDING", "GS_LANDING", "IMPLANT"];
+    const productCategory = (value) => {
+      const raw = String(value || "").trim();
+      if (raw === "Anchor&etc") return "ANCHOR";
+      if (raw === "URO 랜딩제품" || raw === "URO 랜딩" || raw === "URO") return "URO_LANDING";
+      if (raw === "GS 랜딩제품" || raw === "GS 랜딩" || raw === "GS") return "GS_LANDING";
+      return raw;
+    };
+    const productCategoryLabel = (value) => ({
+      ANCHOR: "ANCHOR&etc",
+      URO_LANDING: "URO 랜딩",
+      GS_LANDING: "GS 랜딩"
+    }[productCategory(value)] || productCategory(value));
     const patientIdText = (usage) => String(usage?.patientId || "").trim();
     const patientDisplayName = (usage) => patientIdText(usage)
       ? `${usage.patientName || ""} (${patientIdText(usage)})`
@@ -2728,7 +2739,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     };
     const productNeedsImplantLedger = (product) => {
       const category = productCategory(product?.category);
-      return category === "인체조직" || category === "ANCHOR";
+      return ["인체조직", "ANCHOR", "URO_LANDING", "GS_LANDING", "IMPLANT"].includes(category);
     };
     const implantVendorKey = (value) => normalizedName(value);
     const implantVendorSelectionForProduct = (product = {}) => {
@@ -3396,7 +3407,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const openPendingUsageItems = pendingUsagesOpen();
       const totalStock = state.products.reduce((sum, item) => sum + num(item.stock), 0);
 
-      const todayCategoryCounts = ["비급여", "인체조직", "ANCHOR"].map((category) => ({
+      const todayCategoryCounts = PRODUCT_CATEGORIES.map((category) => ({
         category,
         count: todayUsages.reduce((sum, usage) => sum + (usage.productIds || []).filter((id) => productCategory(productById(id)?.category) === category).length, 0)
       }));
@@ -3507,7 +3518,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               <div class="card">
                 <h2>분류별 현재 재고</h2>
                 <div class="summary-table">
-                  ${["비급여", "인체조직", "ANCHOR"].map((category) => {
+                  ${PRODUCT_CATEGORIES.map((category) => {
                     const items = state.products.filter((item) => productCategory(item.category) === category);
                     const stock = items.reduce((sum, item) => sum + num(item.stock), 0);
                     const low = items.filter((item) => num(item.stock) <= num(item.warningStock)).length;
@@ -3559,6 +3570,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             <option>비급여</option>
             <option>인체조직</option>
             <option value="ANCHOR">ANCHOR&etc</option>
+            <option value="URO_LANDING">URO 랜딩</option>
+            <option value="GS_LANDING">GS 랜딩</option>
+            <option value="IMPLANT">IMPLANT</option>
           </select>
           <label for="productName">제품명</label>
           <input id="productName" required autocomplete="off">
@@ -3567,7 +3581,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             <select id="productCompany">
               ${productCompanyOptions()}
             </select>
-            <div class="helper" id="productCompanyHelp">인체조직/ANCHOR&etc 제품은 설정의 임플란트 업체를 먼저 등록한 뒤 선택합니다.</div>
+            <div class="helper" id="productCompanyHelp">비급여 외 제품은 설정의 임플란트 업체를 먼저 등록한 뒤 선택합니다.</div>
           </div>
           <div id="productSubcategoryWrap">
             <label for="productSubcategory">세부 분류</label>
@@ -3656,7 +3670,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
     const renderGroupedProducts = (withActions) => {
       if (!state.products.length) return `<div class="empty">제품을 추가해 주세요.</div>`;
-      const categories = ["비급여", "인체조직", "ANCHOR"];
+      const categories = PRODUCT_CATEGORIES;
       return categories.map((category) => {
         const categoryItems = state.products.filter((item) => productCategory(item.category) === category).sort(byName);
         if (!categoryItems.length) return "";
@@ -3766,8 +3780,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         companySelect.required = category !== "비급여";
         companySelect.disabled = category !== "비급여" && !implantVendors.length;
         if (companyHelp) companyHelp.textContent = implantVendors.length
-          ? "인체조직/ANCHOR&etc 제품은 등록된 임플란트 업체 중에서 선택합니다."
-          : "인체조직/ANCHOR&etc 제품을 등록하려면 먼저 설정 > 임플란트 업체에서 업체를 등록해 주세요.";
+          ? "비급여 외 제품은 등록된 임플란트 업체 중에서 선택합니다."
+          : "비급여 외 제품을 등록하려면 먼저 설정 > 임플란트 업체에서 업체를 등록해 주세요.";
       };
       document.getElementById("productCategory").addEventListener("change", syncProductFields);
       document.getElementById("productReset").addEventListener("click", () => {
@@ -3782,11 +3796,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const id = document.getElementById("productId").value || uid();
         const category = document.getElementById("productCategory").value;
         if (category !== "비급여" && !implantVendors.length) {
-          alert("인체조직/ANCHOR&etc 제품은 임플란트 업체를 먼저 등록해야 제품등록 할 수 있습니다.");
+          alert("비급여 외 제품은 임플란트 업체를 먼저 등록해야 제품등록 할 수 있습니다.");
           return;
         }
         if (category !== "비급여" && !document.getElementById("productCompany").value.trim()) {
-          alert("인체조직/ANCHOR&etc 제품은 임플란트 업체를 선택해 주세요.");
+          alert("비급여 외 제품은 임플란트 업체를 선택해 주세요.");
           return;
         }
         const selectedCompanyValue = document.getElementById("productCompany").value.trim();
@@ -4312,7 +4326,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
     const renderRuleProductSelector = () => {
       if (!state.products.length) return `<div class="empty">제품이 없습니다.</div>`;
-      const categories = ["비급여", "인체조직", "ANCHOR"];
+      const categories = PRODUCT_CATEGORIES;
       return categories.map((category) => {
         const items = state.products.filter((item) => productCategory(item.category) === category).sort(byName);
         if (!items.length) return "";
@@ -6527,7 +6541,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const key = productCategory(category);
         if (key === "비급여") return "nonpay";
         if (key === "인체조직") return "tissue";
-        if (key === "ANCHOR") return "anchor";
+        if (["ANCHOR", "URO_LANDING", "GS_LANDING", "IMPLANT"].includes(key)) return "anchor";
         return "";
       };
       const safeItems = items
@@ -8529,10 +8543,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           return;
         }
         const chipClass = (category) => {
-          const label = productCategoryLabel(category);
-          if (label === "비급여") return "nonpay";
-          if (label === "인체조직") return "tissue";
-          if (label === "ANCHOR") return "anchor";
+          const key = productCategory(category);
+          if (key === "비급여") return "nonpay";
+          if (key === "인체조직") return "tissue";
+          if (["ANCHOR", "URO_LANDING", "GS_LANDING", "IMPLANT"].includes(key)) return "anchor";
           return "";
         };
         selectedUseList.innerHTML = `
@@ -9600,7 +9614,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
 
     const productUsageSummaryHtml = (start = "", end = "", query = "") => {
       const periodText = historyPeriodText(start, end);
-      const categories = ["비급여", "인체조직", "ANCHOR"];
+      const categories = PRODUCT_CATEGORIES;
       const groups = categories.map((category) => {
         const productRows = productUsageSummaryRows(category, start, end, query);
         const rows = productRows.map(({ product, received, used }) => {
@@ -9710,7 +9724,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         map.set(id, (map.get(id) || 0) + 1);
         return map;
       }, new Map());
-      const groupedProducts = ["비급여", "인체조직", "ANCHOR"].map((category) => {
+      const groupedProducts = PRODUCT_CATEGORIES.map((category) => {
         const items = Array.from(productCounts.entries())
           .map(([id, qty]) => ({ product: productById(id), id, qty }))
           .filter((item) => productCategory(item.product?.category) === category)
@@ -9720,7 +9734,13 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const missingProducts = Array.from(productCounts.entries())
         .map(([id, qty]) => ({ id, qty, product: productById(id) }))
         .filter((item) => !item.product);
-      const groupClass = (category) => category === "비급여" ? "nonpay" : category === "인체조직" ? "tissue" : "anchor";
+      const groupClass = (category) => {
+        const key = productCategory(category);
+        if (key === "비급여") return "nonpay";
+        if (key === "인체조직") return "tissue";
+        if (["ANCHOR", "URO_LANDING", "GS_LANDING", "IMPLANT"].includes(key)) return "anchor";
+        return "";
+      };
       const doubleCheck = usage.doubleCheck || {};
       const doubleCheckText = doubleCheck.status === "finalSaved"
         ? `더블체크: 임시저장 ${doubleCheck.draftSavedBy || "-"}${doubleCheck.draftSavedAt ? ` (${formatDateTime(doubleCheck.draftSavedAt)})` : ""} · 최종저장 ${doubleCheck.finalSavedBy || "-"}${doubleCheck.finalSavedAt ? ` (${formatDateTime(doubleCheck.finalSavedAt)})` : ""}`
