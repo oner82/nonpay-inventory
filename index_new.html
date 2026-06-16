@@ -5615,60 +5615,220 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       }));
     };
 
-    const renderImplantStatementPdfBlob = async (date, group) => {
-      await loadExternalScriptOnce("vendor/html2canvas.min.js", () => Boolean(window.html2canvas));
-      await loadExternalScriptOnce("vendor/jspdf.umd.min.js", () => Boolean(window.jspdf?.jsPDF));
-      const source = new DOMParser().parseFromString(implantSendStatementPrintHtmlV2(date, group), "text/html");
-      const wrapper = document.createElement("div");
-      wrapper.style.cssText = "position:fixed;left:-10000px;top:0;width:794px;background:#fff;z-index:-1;";
-      const style = source.querySelector("style")?.textContent || "";
-      wrapper.innerHTML = `<style>${style}
-        .statement { width: 190mm !important; margin: 0 auto !important; page-break-after: auto !important; break-after: auto !important; }
-      </style>${source.body.innerHTML}`;
-      document.body.appendChild(wrapper);
-      try {
-        if (document.fonts?.ready) await document.fonts.ready;
-        await inlineRenderImages(wrapper);
-        await waitForRenderImages(wrapper);
-        const pages = Array.from(wrapper.querySelectorAll(".statement"));
-        const pdf = new window.jspdf.jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
-        for (let index = 0; index < pages.length; index += 1) {
-          const canvas = await window.html2canvas(pages[index], {
-            scale: 2,
-            useCORS: true,
-            allowTaint: false,
-            imageTimeout: 8000,
-            logging: false,
-            backgroundColor: "#ffffff",
-            windowWidth: 794
-          });
-          const image = canvas.toDataURL("image/jpeg", 0.92);
-          if (index) pdf.addPage("a4", "portrait");
-          const width = 190;
-          const height = Math.min(277, (canvas.height * width) / canvas.width);
-          pdf.addImage(image, "JPEG", 10, 10, width, height, undefined, "FAST");
+    const implantPdfWrapText = (ctx, text, maxWidth, maxLines = 99) => {
+      const output = [];
+      String(text || "").split(/\n/).forEach((paragraph) => {
+        if (output.length >= maxLines) return;
+        if (!paragraph) {
+          output.push("");
+          return;
         }
-        return pdf.output("blob");
-      } finally {
-        wrapper.remove();
+        let line = "";
+        Array.from(paragraph).forEach((char) => {
+          if (output.length >= maxLines) return;
+          const next = line + char;
+          if (ctx.measureText(next).width <= maxWidth || !line) {
+            line = next;
+          } else {
+            output.push(line);
+            line = char;
+          }
+        });
+        if (line && output.length < maxLines) output.push(line);
+      });
+      if (output.length > maxLines) {
+        output.length = maxLines;
+        output[maxLines - 1] = `${output[maxLines - 1].slice(0, -1)}...`;
+      }
+      return output;
+    };
+
+    const implantPdfDrawTextBox = (ctx, label, value, x, y, width, height, options = {}) => {
+      ctx.strokeStyle = "#111827";
+      ctx.lineWidth = options.lineWidth || 3;
+      ctx.strokeRect(x, y, width, height);
+      ctx.fillStyle = "#475569";
+      ctx.font = `900 ${options.labelSize || 18}px Arial, "Malgun Gothic", sans-serif`;
+      ctx.fillText(label, x + 12, y + 24);
+      ctx.fillStyle = "#111827";
+      ctx.font = `900 ${options.valueSize || 27}px Arial, "Malgun Gothic", sans-serif`;
+      const lines = implantPdfWrapText(ctx, value, width - 24, options.maxLines || 2);
+      lines.forEach((line, index) => ctx.fillText(line, x + 12, y + 58 + (index * (options.lineHeight || 32))));
+    };
+
+    const implantPdfDrawWrapped = (ctx, text, x, y, width, lineHeight, maxLines) => {
+      const lines = implantPdfWrapText(ctx, text, width, maxLines);
+      lines.forEach((line, index) => ctx.fillText(line, x, y + (index * lineHeight)));
+    };
+
+    const implantPdfLoadPhotoImage = async (photo) => {
+      const src = implantPhotoViewSrc(photo);
+      if (!src) return null;
+      try {
+        return await promiseWithTimeout(loadImageFromUrl(src), 12000, "PDF 사진 처리 시간이 초과되었습니다.");
+      } catch (error) {
+        console.warn("PDF photo load failed", error);
+        return null;
       }
     };
 
-    const downloadImplantVendorStatementPdf = async (date, group) => {
-      const blob = await renderImplantStatementPdfBlob(date, group);
-      downloadBlob(implantVendorStatementFileName(date, group.vendor, "pdf"), blob);
+    const implantPdfDrawImageContain = (ctx, image, x, y, width, height) => {
+      const sourceWidth = image.naturalWidth || image.width || 1;
+      const sourceHeight = image.naturalHeight || image.height || 1;
+      const ratio = Math.min(width / sourceWidth, height / sourceHeight);
+      const drawWidth = sourceWidth * ratio;
+      const drawHeight = sourceHeight * ratio;
+      ctx.drawImage(image, x + ((width - drawWidth) / 2), y + ((height - drawHeight) / 2), drawWidth, drawHeight);
     };
 
-    const implantVendorStatementPdfFile = async (date, group) => {
-      const blob = await renderImplantStatementPdfBlob(date, group);
-      return new File([blob], implantVendorStatementFileName(date, group.vendor, "pdf"), {
-        type: "application/pdf"
+    const implantPdfReleaseImage = (image) => {
+      const objectUrl = image?.dataset?.objectUrl;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+
+    const implantStatementCanvasPage = async ({ date, group, record, photos, descriptions, chunk, chunkIndex, chunkTotal }) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1240;
+      canvas.height = 1754;
+      const ctx = canvas.getContext("2d");
+      const margin = 70;
+      const pageWidth = canvas.width;
+      const contentWidth = pageWidth - (margin * 2);
+      const patientNo = implantPatientNoText(record) || "미마감";
+      const surgeryText = record.surgeryName || surgeryById(record.surgeryId)?.name || "-";
+      const doctorText = record.surgeonCode || departmentById(record.doctorId)?.name || "-";
+      const user = auditUserText(record) || currentAuditUser()?.name || currentAuditUser()?.loginId || "-";
+      const pageLabel = chunkTotal > 1 ? ` · 사진 ${chunkIndex + 1}/${chunkTotal}` : "";
+      const desc = chunkIndex
+        ? `사진 계속 (${chunkIndex + 1}/${chunkTotal})`
+        : (descriptions.length ? descriptions.join("\n\n") : `사진 ${photos.length}장 기록`);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#111827";
+      ctx.font = '900 44px Arial, "Malgun Gothic", sans-serif';
+      ctx.fillText("임플란트 사용 명세서", margin, 82);
+      ctx.fillStyle = "#475569";
+      ctx.font = '800 20px Arial, "Malgun Gothic", sans-serif';
+      ctx.fillText("환자명/환자ID 제외", margin, 116);
+      ctx.strokeStyle = "#111827";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(margin, 140);
+      ctx.lineTo(pageWidth - margin, 140);
+      ctx.stroke();
+
+      const metaY = 160;
+      const metaH = 118;
+      const widths = [300, 270, 220, contentWidth - 790];
+      let metaX = margin;
+      [
+        ["DATE / 환자번호", `${implantRecordDate(record) || date || "-"} · 환자번호 #${patientNo}${pageLabel}`],
+        ["업체명", group.vendor],
+        ["원장코드", doctorText],
+        ["OP", surgeryText]
+      ].forEach(([label, value], index) => {
+        implantPdfDrawTextBox(ctx, label, value, metaX, metaY, widths[index], metaH, { valueSize: index === 0 ? 26 : 28 });
+        metaX += widths[index];
       });
+
+      ctx.fillStyle = "#1d4ed8";
+      ctx.fillRect(margin, 314, 7, 25);
+      ctx.fillStyle = "#111827";
+      ctx.font = '900 24px Arial, "Malgun Gothic", sans-serif';
+      ctx.fillText("IMPLANT", margin + 16, 336);
+      ctx.strokeStyle = "#111827";
+      ctx.lineWidth = 4;
+      ctx.strokeRect(margin, 354, contentWidth, 160);
+      ctx.fillStyle = "#111827";
+      ctx.font = '900 30px Consolas, "Malgun Gothic", monospace';
+      implantPdfDrawWrapped(ctx, desc, margin + 18, 398, contentWidth - 36, 36, 3);
+
+      ctx.fillStyle = "#1d4ed8";
+      ctx.fillRect(margin, 550, 7, 25);
+      ctx.fillStyle = "#111827";
+      ctx.font = '900 23px Arial, "Malgun Gothic", sans-serif';
+      ctx.fillText("사진", margin + 16, 572);
+
+      const photoGap = 22;
+      const photoX = margin;
+      const photoY = 595;
+      const cellW = (contentWidth - photoGap) / 2;
+      const cellH = 430;
+      for (let index = 0; index < 4; index += 1) {
+        const col = index % 2;
+        const row = Math.floor(index / 2);
+        const x = photoX + (col * (cellW + photoGap));
+        const y = photoY + (row * (cellH + photoGap));
+        ctx.strokeStyle = "#111827";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x, y, cellW, cellH);
+        if (!chunk[index]) {
+          ctx.fillStyle = "#94a3b8";
+          ctx.font = '800 24px Arial, "Malgun Gothic", sans-serif';
+          ctx.fillText("사진 없음", x + 24, y + 52);
+          continue;
+        }
+        const image = await implantPdfLoadPhotoImage(chunk[index]);
+        if (image) {
+          implantPdfDrawImageContain(ctx, image, x + 8, y + 8, cellW - 16, cellH - 16);
+          implantPdfReleaseImage(image);
+        } else {
+          ctx.fillStyle = "#b91c1c";
+          ctx.font = '900 24px Arial, "Malgun Gothic", sans-serif';
+          ctx.fillText("사진 불러오기 실패", x + 24, y + 52);
+        }
+      }
+
+      const footerY = 1600;
+      const footerW = contentWidth / 3;
+      [
+        ["발송일", today()],
+        ["발송자", user],
+        ["확인처", "윌스기념병원 수술실"]
+      ].forEach(([label, value], index) => {
+        implantPdfDrawTextBox(ctx, label, value, margin + (footerW * index), footerY, footerW, 82, {
+          labelSize: 18,
+          valueSize: 24,
+          maxLines: 1
+        });
+      });
+
+      return canvas;
+    };
+
+    const renderImplantStatementPdfBlob = async (date, group) => {
+      await loadExternalScriptOnce("vendor/jspdf.umd.min.js", () => Boolean(window.jspdf?.jsPDF));
+      if (document.fonts?.ready) await document.fonts.ready;
+      const pdf = new window.jspdf.jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+      let pageIndex = 0;
+      for (const patientGroup of implantSendPatientGroups(group)) {
+        const chunks = implantStatementPhotoChunks(patientGroup.photos, 4);
+        for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+          const canvas = await implantStatementCanvasPage({
+            date,
+            group,
+            record: patientGroup.record,
+            photos: patientGroup.photos,
+            descriptions: patientGroup.descriptions,
+            chunk: chunks[chunkIndex],
+            chunkIndex,
+            chunkTotal: chunks.length
+          });
+          if (pageIndex) pdf.addPage("a4", "portrait");
+          pdf.addImage(canvas.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, 210, 297, undefined, "FAST");
+          pageIndex += 1;
+        }
+      }
+      return pdf.output("blob");
     };
 
     const saveAndShareImplantVendorStatementPdf = async (date, group) => {
-      const file = await implantVendorStatementPdfFile(date, group);
-      downloadBlob(file.name, file);
+      const blob = await renderImplantStatementPdfBlob(date, group);
+      const filename = implantVendorStatementFileName(date, group.vendor, "pdf");
+      downloadBlob(filename, blob);
+      if (typeof File !== "function") return "saved-only";
+      const file = new File([blob], filename, { type: "application/pdf" });
       const title = `${date} ${group.vendor} 임플란트 명세서`;
       const text = `${date} ${group.vendor} 임플란트 명세서 PDF`;
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
@@ -7602,7 +7762,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           } catch (error) {
             console.error(error);
             downloadImplantVendorStatementHtml(date, group);
-            saveErrorToast("PDF 생성 실패 · HTML 명세서를 대신 다운로드했습니다.");
+            saveErrorToast(`PDF 생성 실패: ${error.message || error} · HTML 명세서를 대신 다운로드했습니다.`);
           } finally {
             setButtonBusy(printButton, false);
           }
