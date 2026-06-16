@@ -2744,13 +2744,30 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       ? (draft.customVendor || draft.vendor || "")
       : (implantVendorById(draft.vendorId)?.name || draft.vendor || draft.customVendor || "");
     const implantRowHasContent = (row = {}) => Boolean(String(row.description || "").trim() || (row.photos || []).length);
+    const implantDraftHasManualContent = (draft = {}) => {
+      const description = String(draft.description || "").trim();
+      const autoDescription = String(draft.autoDescription || "").trim();
+      return Boolean((draft.photos || []).length || (description && description !== autoDescription));
+    };
+    const implantDraftCanAutoUpdateDescription = (draft = {}) => {
+      const description = String(draft.description || "").trim();
+      const autoDescription = String(draft.autoDescription || "").trim();
+      return !description || description === autoDescription;
+    };
+    const implantDraftAutoDescription = (items = []) => items
+      .map(({ product, qty }) => `${product?.name || "제품명 없음"} ${Math.max(1, num(qty))}ea`)
+      .join("\n");
     const implantVendorTargetsFromUseItems = (items = []) => {
       const targets = new Map();
       items.forEach((item) => {
         const product = productById(item.productId);
         if (!productNeedsImplantLedger(product)) return;
         const target = implantVendorSelectionForProduct(product);
-        if (target.key && !targets.has(target.key)) targets.set(target.key, target);
+        if (!target.key) return;
+        const current = targets.get(target.key) || { ...target, items: [] };
+        current.items.push({ product, qty: item.qty });
+        current.description = implantDraftAutoDescription(current.items);
+        targets.set(target.key, current);
       });
       return [...targets.values()];
     };
@@ -6889,7 +6906,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           description,
           photos: Array.isArray(current.photos) ? current.photos : [],
           pendingPhotoCount: num(current.pendingPhotoCount),
-          photoUploadErrors: Array.isArray(current.photoUploadErrors) ? current.photoUploadErrors : []
+          photoUploadErrors: Array.isArray(current.photoUploadErrors) ? current.photoUploadErrors : [],
+          autoSource: current.autoSource || "",
+          autoCompanyKey: current.autoCompanyKey || "",
+          autoDescription: current.autoDescription || ""
         };
       }).filter((row) => row.vendor || row.description || row.photos.length);
       const editImplantRowById = (id) => editImplantRows.find((item) => item.id === id);
@@ -6919,7 +6939,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         let changed = false;
         for (let index = editImplantRows.length - 1; index >= 0; index -= 1) {
           const row = editImplantRows[index];
-          if (row.autoSource === "product" && !targetKeys.has(row.autoCompanyKey) && !implantRowHasContent(row)) {
+          if (row.autoSource === "product" && !targetKeys.has(row.autoCompanyKey) && !implantDraftHasManualContent(row)) {
             editImplantRows.splice(index, 1);
             changed = true;
           }
@@ -6931,6 +6951,19 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           ));
           if (existing) {
             if (!existing.autoCompanyKey) existing.autoCompanyKey = target.key;
+            if (existing.vendorId !== target.vendorId || existing.customVendor !== target.customVendor || existing.vendor !== target.vendor) {
+              existing.vendorId = target.vendorId;
+              existing.customVendor = target.customVendor;
+              existing.vendor = target.vendor;
+              changed = true;
+            }
+            if (implantDraftCanAutoUpdateDescription(existing) && existing.description !== target.description) {
+              existing.description = target.description;
+              existing.autoDescription = target.description;
+              changed = true;
+            } else if (existing.autoDescription !== target.description) {
+              existing.autoDescription = target.description;
+            }
             return;
           }
           const reusable = editImplantRows.find((row) => !row.autoSource && !implantDraftVendorName(row) && !implantRowHasContent(row));
@@ -6939,6 +6972,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               vendorId: target.vendorId,
               customVendor: target.customVendor,
               vendor: target.vendor,
+              description: target.description,
+              autoDescription: target.description,
               autoSource: "product",
               autoCompanyKey: target.key
             });
@@ -6950,11 +6985,12 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             vendorId: target.vendorId,
             customVendor: target.customVendor,
             vendor: target.vendor,
-            description: "",
+            description: target.description,
             photos: [],
             pendingPhotoCount: 0,
             photoUploadErrors: [],
             autoSource: "product",
+            autoDescription: target.description,
             autoCompanyKey: target.key
           });
           changed = true;
@@ -8569,7 +8605,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         let changed = false;
         for (let index = implantDrafts.length - 1; index >= 0; index -= 1) {
           const draft = implantDrafts[index];
-          if (draft.autoSource === "product" && !targetKeys.has(draft.autoCompanyKey) && !implantRowHasContent(draft)) {
+          if (draft.autoSource === "product" && !targetKeys.has(draft.autoCompanyKey) && !implantDraftHasManualContent(draft)) {
             implantDrafts.splice(index, 1);
             changed = true;
           }
@@ -8581,6 +8617,19 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           ));
           if (existing) {
             if (!existing.autoCompanyKey) existing.autoCompanyKey = target.key;
+            if (existing.vendorId !== target.vendorId || existing.customVendor !== target.customVendor || existing.vendor !== target.vendor) {
+              existing.vendorId = target.vendorId;
+              existing.customVendor = target.customVendor;
+              existing.vendor = target.vendor;
+              changed = true;
+            }
+            if (implantDraftCanAutoUpdateDescription(existing) && existing.description !== target.description) {
+              existing.description = target.description;
+              existing.autoDescription = target.description;
+              changed = true;
+            } else if (existing.autoDescription !== target.description) {
+              existing.autoDescription = target.description;
+            }
             return;
           }
           const reusable = implantDrafts.find((draft) => !draft.autoSource && !implantDraftVendorName(draft) && !implantRowHasContent(draft));
@@ -8589,6 +8638,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               vendorId: target.vendorId,
               customVendor: target.customVendor,
               vendor: target.vendor,
+              description: target.description,
+              autoDescription: target.description,
               autoSource: "product",
               autoCompanyKey: target.key
             });
@@ -8600,9 +8651,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             vendorId: target.vendorId,
             customVendor: target.customVendor,
             vendor: target.vendor,
-            description: "",
+            description: target.description,
             photos: [],
             autoSource: "product",
+            autoDescription: target.description,
             autoCompanyKey: target.key
           });
           changed = true;
