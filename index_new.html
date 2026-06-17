@@ -2522,6 +2522,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     let ref;
     let storage;
     let storageFallback;
+    let preferredImplantStorageBucket = null;
     let unsubscribe;
     let implantRecordsUnsubscribe;
     let implantVendorsUnsubscribe;
@@ -6312,6 +6313,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const surgeryText = record.surgeryName || surgeryById(record.surgeryId)?.name || "-";
       const locked = isImplantLedgerClosed(record);
       const showAdminTools = options.showAdminTools !== false && canEditImplantPatientNo();
+      const retryPhotoCount = vendors.reduce((sum, implant) => sum + (implant.photos || []).filter(implantPhotoNeedsStorageRetry).length, 0);
       return `
         <div class="card implant-record-card" data-implant-record="${escapeHtml(record.id)}">
           <div class="item-title">
@@ -6329,6 +6331,12 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             <div class="actions">
               ${locked ? `<button class="secondary" type="button" data-unlock-implant-record="${escapeHtml(record.id)}">마감 잠금 해제</button>` : (patientNo ? `<button class="secondary" type="button" data-lock-implant-record="${escapeHtml(record.id)}">다시 잠금</button>` : "")}
               <button class="danger" type="button" data-delete-implant-record="${escapeHtml(record.id)}">장부 삭제</button>
+            </div>
+          ` : ""}
+          ${retryPhotoCount ? `
+            <div class="implant-lock-banner">사진 ${retryPhotoCount}장 재업로드가 필요합니다.</div>
+            <div class="actions">
+              <button class="secondary" type="button" data-retry-implant-record-photos="${escapeHtml(record.id)}">사진 재업로드</button>
             </div>
           ` : ""}
           ${showAdminTools ? `
@@ -8299,6 +8307,27 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           showImplantPhotoModal(image.dataset.implantPhotoView);
           return;
         }
+        const retryPhotosButton = event.target.closest("[data-retry-implant-record-photos]");
+        if (retryPhotosButton) {
+          const recordId = retryPhotosButton.dataset.retryImplantRecordPhotos;
+          try {
+            setButtonBusy(retryPhotosButton, true, "재업로드 중...");
+            let failedCount = 0;
+            await retryImplantRecordPhotos(recordId, ({ done, total, failed }) => {
+              failedCount = failed;
+              const failText = failed ? ` · 실패 ${failed}` : "";
+              showSaveToast(`사진 재업로드 중 ${done}/${total}${failText}`, failed ? "error" : "saving", { hold: done < total });
+            });
+            saveDoneToast(failedCount ? "사진 재업로드 완료 · 확인 필요" : "사진 재업로드 완료");
+            renderList();
+          } catch (error) {
+            saveErrorToast(`사진 재업로드 실패: ${error.message}`);
+            alert(error.message);
+          } finally {
+            setButtonBusy(retryPhotosButton, false);
+          }
+          return;
+        }
         const unlockButton = event.target.closest("[data-unlock-implant-record]");
         if (unlockButton) {
           if (!canEditImplantPatientNo()) return;
@@ -8621,13 +8650,15 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const blob = await promiseWithTimeout(compressImplantImage(photo), 12000, "사진 처리 시간이 초과되었습니다.");
       const safeName = String(photo.file?.name || photo.name || "implant.jpg").replace(/[^a-zA-Z0-9._-]/g, "_");
       const path = `implant-records/${surgeryDate || today()}/${recordId}/${implantId}/${photo.id}-${safeName}.jpg`;
-      const candidates = [storage, storageFallback].filter(Boolean);
+      const allCandidates = [preferredImplantStorageBucket, storage, storageFallback].filter(Boolean);
+      const candidates = allCandidates.filter((bucket, index) => allCandidates.indexOf(bucket) === index);
       let lastError;
       for (const bucket of candidates) {
         try {
           const refPath = storageRef(bucket, path);
           await promiseWithTimeout(uploadBytes(refPath, blob, { contentType: "image/jpeg" }), 12000, "사진 업로드 시간이 초과되었습니다.");
           const url = await promiseWithTimeout(getDownloadURL(refPath), 6000, "사진 주소 확인 시간이 초과되었습니다.");
+          preferredImplantStorageBucket = bucket;
           return {
             id: photo.id,
             url,
