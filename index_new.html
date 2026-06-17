@@ -2546,6 +2546,36 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       sensitivity: "base"
     });
     const byName = (a, b) => alphaFirstCompare(a.name, b.name);
+    const productSortOrderValue = (item) => {
+      const value = Number(item?.sortOrder);
+      return Number.isFinite(value) && value > 0 ? value : null;
+    };
+    const productDisplaySort = (category = "") => (a, b) => {
+      const normalizedCategory = productCategory(category || a?.category || b?.category || "");
+      if (normalizedCategory === "비급여") {
+        const leftOrder = productSortOrderValue(a);
+        const rightOrder = productSortOrderValue(b);
+        if (leftOrder !== null && rightOrder !== null && leftOrder !== rightOrder) return leftOrder - rightOrder;
+        if (leftOrder !== null && rightOrder === null) return -1;
+        if (leftOrder === null && rightOrder !== null) return 1;
+      }
+      return byName(a, b);
+    };
+    const nonpayProductsInDisplayOrder = () => state.products
+      .filter((item) => productCategory(item.category) === "비급여")
+      .sort(productDisplaySort("비급여"));
+    const normalizeNonpaySortOrders = () => {
+      nonpayProductsInDisplayOrder().forEach((item, index) => {
+        item.sortOrder = (index + 1) * 10;
+      });
+    };
+    const nextNonpaySortOrder = (excludeId = "") => {
+      const orders = nonpayProductsInDisplayOrder()
+        .filter((item) => !sameId(item.id, excludeId))
+        .map(productSortOrderValue)
+        .filter((value) => value !== null);
+      return orders.length ? Math.max(...orders) + 10 : (nonpayProductsInDisplayOrder().length + 1) * 10;
+    };
     const productById = (id) => state.products.find((item) => item.id === id);
     const departmentById = (id) => state.doctors.find((item) => item.id === id);
     const surgeryById = (id) => state.surgeries.find((item) => item.id === id);
@@ -3264,6 +3294,31 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           return;
         }
 
+        const moveProductOrderBtn = event.target.closest("[data-move-product-order]");
+        if (moveProductOrderBtn) {
+          if (!canManageSettings()) {
+            alert("관리자와 책임사용자만 순서를 변경할 수 있습니다.");
+            return;
+          }
+          const [id, direction] = String(moveProductOrderBtn.dataset.moveProductOrder || "").split("::");
+          const products = nonpayProductsInDisplayOrder();
+          const index = products.findIndex((item) => sameId(item.id, id));
+          const nextIndex = direction === "up" ? index - 1 : index + 1;
+          if (index < 0 || nextIndex < 0 || nextIndex >= products.length) return;
+          normalizeNonpaySortOrders();
+          const current = products[index];
+          const next = products[nextIndex];
+          const currentOrder = current.sortOrder;
+          current.sortOrder = next.sortOrder;
+          next.sortOrder = currentOrder;
+          render();
+          await saveState("비급여 제품 순서 변경 완료", {
+            savingMessage: "비급여 제품 순서 저장 중입니다...",
+            doneMessage: "비급여 제품 순서 변경 완료"
+          });
+          return;
+        }
+
         const editDoctorBtn = event.target.closest("[data-edit-doctor]");
         if (editDoctorBtn) {
           if (!canManageSettings()) {
@@ -3689,7 +3744,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     ` : ""}
     `;
 
-    const productItem = (item) => {
+    const productItem = (item, options = {}) => {
       const low = num(item.stock) <= num(item.warningStock);
       const detail = [
         `분류: ${escapeHtml(productCategoryLabel(item.category))}`,
@@ -3707,6 +3762,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             <span>현재고: ${num(item.stock)} · 경고수량: ${num(item.warningStock)}${item.category === "비급여" ? "" : ` · 랜딩수량: ${num(item.landingQty)}`}</span>
           </div>
           ${canManageSettings() ? `<div class="actions">
+            ${options.showSort ? `
+              <button class="secondary" type="button" data-move-product-order="${item.id}::up" ${options.canMoveUp ? "" : "disabled"}>위</button>
+              <button class="secondary" type="button" data-move-product-order="${item.id}::down" ${options.canMoveDown ? "" : "disabled"}>아래</button>
+            ` : ""}
             <button class="secondary" type="button" data-edit-product="${item.id}">수정</button>
             <button class="danger" type="button" data-delete-product="${item.id}">삭제</button>
           </div>` : ""}
@@ -3741,14 +3800,16 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       if (!state.products.length) return `<div class="empty">제품을 추가해 주세요.</div>`;
       const categories = PRODUCT_CATEGORIES;
       return categories.map((category) => {
-        const categoryItems = state.products.filter((item) => productCategory(item.category) === category).sort(byName);
+        const categoryItems = state.products.filter((item) => productCategory(item.category) === category).sort(productDisplaySort(category));
         if (!categoryItems.length) return "";
         if (category === "비급여") {
           return `
             <details class="item">
               <summary><span>비급여</span><span class="pill">${categoryItems.length}</span></summary>
               <div class="details-body">
-                ${categoryItems.map((item) => withActions ? productItem(item) : productCheckItem(item)).join("")}
+                ${categoryItems.map((item, index) => withActions
+                  ? productItem(item, { showSort: true, canMoveUp: index > 0, canMoveDown: index < categoryItems.length - 1 })
+                  : productCheckItem(item)).join("")}
               </div>
             </details>
           `;
@@ -3874,6 +3935,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         }
         const selectedCompanyValue = document.getElementById("productCompany").value.trim();
         const selectedCompanyVendor = category === "비급여" ? null : implantVendorById(selectedCompanyValue);
+        const existingProduct = productById(id);
         const next = {
           id,
           category,
@@ -3883,7 +3945,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           subcategory: category === "ANCHOR" ? document.getElementById("productSubcategory").value : "",
           stock: num(document.getElementById("productStock").value),
           warningStock: num(document.getElementById("productWarning").value),
-          landingQty: category === "비급여" ? 0 : num(document.getElementById("productLanding").value)
+          landingQty: category === "비급여" ? 0 : num(document.getElementById("productLanding").value),
+          sortOrder: category === "비급여" ? (productSortOrderValue(existingProduct) || nextNonpaySortOrder(id)) : 0
         };
         if (!next.name) return;
         const { used, received } = productMovementCounts();
@@ -4397,7 +4460,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       if (!state.products.length) return `<div class="empty">제품이 없습니다.</div>`;
       const categories = PRODUCT_CATEGORIES;
       return categories.map((category) => {
-        const items = state.products.filter((item) => productCategory(item.category) === category).sort(byName);
+        const items = state.products.filter((item) => productCategory(item.category) === category).sort(productDisplaySort(category));
         if (!items.length) return "";
         return `
           <details class="item">
@@ -4686,7 +4749,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             <label for="nonpayReceiptProduct">제품 선택</label>
             <select id="nonpayReceiptProduct" required>
               <option value="">비급여 제품을 선택하세요</option>
-              ${state.products.filter((item) => productCategory(item.category) === "비급여").sort(byName).map((item) => `<option value="${item.id}">${escapeHtml(item.name)} / 현재고 ${num(item.stock)}</option>`).join("")}
+              ${state.products.filter((item) => productCategory(item.category) === "비급여").sort(productDisplaySort("비급여")).map((item) => `<option value="${item.id}">${escapeHtml(item.name)} / 현재고 ${num(item.stock)}</option>`).join("")}
             </select>
             <label for="nonpayReceiptQty">입고 수량</label>
             <input id="nonpayReceiptQty" type="number" min="1" value="1" required>
