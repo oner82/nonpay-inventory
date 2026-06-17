@@ -2532,6 +2532,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     let implantVendors = [];
     let pendingUsages = [];
     let suppressPendingUsagesRender = false;
+    let productCategoryToKeepOpen = "";
 
     const uid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
     const today = () => {
@@ -3362,6 +3363,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           const currentOrder = current.sortOrder;
           current.sortOrder = next.sortOrder;
           next.sortOrder = currentOrder;
+          productCategoryToKeepOpen = productCategory(current.category) || "비급여";
           render();
           await saveState("비급여 제품 순서 변경 완료", {
             savingMessage: "비급여 제품 순서 저장 중입니다...",
@@ -3855,7 +3857,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         if (!categoryItems.length) return "";
         if (category === "비급여") {
           return `
-            <details class="item">
+            <details class="item" ${withActions && productCategoryToKeepOpen === category ? "open" : ""}>
               <summary><span>비급여</span><span class="pill">${categoryItems.length}</span></summary>
               <div class="details-body">
                 ${categoryItems.map((item, index) => withActions
