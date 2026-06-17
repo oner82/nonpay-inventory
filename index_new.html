@@ -2853,6 +2853,57 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
     const implantDraftVendorName = (draft = {}) => draft.vendorId === "__custom__"
       ? (draft.customVendor || draft.vendor || "")
       : (implantVendorById(draft.vendorId)?.name || draft.vendor || draft.customVendor || "");
+    const mergeImplantDescriptionLines = (left = "", right = "") => {
+      const lines = [];
+      String(left || "").split(/\r?\n/).forEach((line) => {
+        const text = line.trim();
+        if (text && !lines.includes(text)) lines.push(text);
+      });
+      String(right || "").split(/\r?\n/).forEach((line) => {
+        const text = line.trim();
+        if (text && !lines.includes(text)) lines.push(text);
+      });
+      return lines.join("\n");
+    };
+    const implantVendorMatchKeys = (entry = {}) => {
+      const keys = new Set();
+      const addKey = (value = "") => {
+        const key = String(value || "").trim();
+        if (!key) return;
+        keys.add(key);
+        if (key.startsWith("id:")) {
+          const vendor = implantVendorById(key.slice(3));
+          if (vendor?.name) addName(vendor.name);
+        }
+      };
+      const addName = (value = "") => {
+        const key = implantVendorKey(value);
+        if (!key) return;
+        keys.add(key);
+        const matched = findImplantVendorByName(value);
+        if (matched?.id) keys.add(`id:${matched.id}`);
+      };
+      addKey(entry.key);
+      addKey(entry.autoCompanyKey);
+      const vendorId = String(entry.vendorId || "").trim();
+      if (vendorId && vendorId !== "__custom__") {
+        addKey(`id:${vendorId}`);
+        const vendor = implantVendorById(vendorId);
+        if (vendor?.name) addName(vendor.name);
+      }
+      addName(entry.vendor);
+      addName(entry.customVendor);
+      addName(implantDraftVendorName(entry));
+      return keys;
+    };
+    const implantVendorEntriesMatch = (left = {}, right = {}) => {
+      const leftKeys = implantVendorMatchKeys(left);
+      const rightKeys = implantVendorMatchKeys(right);
+      if (!leftKeys.size || !rightKeys.size) return false;
+      return [...leftKeys].some((key) => rightKeys.has(key));
+    };
+    const findImplantEntryByVendorTarget = (entries = [], target = {}) =>
+      entries.find((entry) => implantVendorEntriesMatch(entry, target));
     const implantRowHasContent = (row = {}) => Boolean(String(row.description || "").trim() || (row.photos || []).length);
     const implantDraftHasManualContent = (draft = {}) => {
       const description = String(draft.description || "").trim();
@@ -7104,6 +7155,37 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         }));
         renderEditImplantRows();
       };
+      const mergeDuplicateEditImplantRows = () => {
+        const kept = [];
+        let changed = false;
+        for (let index = 0; index < editImplantRows.length; index += 1) {
+          const row = editImplantRows[index];
+          const existing = kept.find((item) => implantVendorEntriesMatch(item, row));
+          if (!existing) {
+            kept.push(row);
+            continue;
+          }
+          existing.vendorId = existing.vendorId || row.vendorId || "";
+          existing.customVendor = existing.customVendor || row.customVendor || "";
+          existing.vendor = existing.vendor || row.vendor || "";
+          existing.autoSource = existing.autoSource || row.autoSource;
+          existing.autoCompanyKey = existing.autoCompanyKey || row.autoCompanyKey || "";
+          existing.description = mergeImplantDescriptionLines(existing.description, row.description);
+          existing.autoDescription = mergeImplantDescriptionLines(existing.autoDescription, row.autoDescription);
+          const existingPhotoIds = new Set((existing.photos || []).map((photo) => photo.id));
+          (row.photos || []).forEach((photo) => {
+            if (!existingPhotoIds.has(photo.id)) {
+              existing.photos = existing.photos || [];
+              existing.photos.push(photo);
+              existingPhotoIds.add(photo.id);
+            }
+          });
+          editImplantRows.splice(index, 1);
+          index -= 1;
+          changed = true;
+        }
+        return changed;
+      };
       const syncEditImplantRowsFromSelectedProducts = () => {
         if (!editImplantCanModify) return;
         const targets = implantVendorTargetsFromUseItems(selectedItems());
@@ -7116,11 +7198,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             changed = true;
           }
         }
+        if (mergeDuplicateEditImplantRows()) changed = true;
         targets.forEach((target) => {
-          const existing = editImplantRows.find((row) => (
-            row.autoCompanyKey === target.key ||
-            implantVendorKey(implantDraftVendorName(row)) === target.key
-          ));
+          const existing = findImplantEntryByVendorTarget(editImplantRows, target);
           if (existing) {
             if (!existing.autoCompanyKey) existing.autoCompanyKey = target.key;
             if (existing.vendorId !== target.vendorId || existing.customVendor !== target.customVendor || existing.vendor !== target.vendor) {
@@ -7531,6 +7611,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         if (!newProductIds.length) {
           alert("제품을 하나 이상 선택해 주세요.");
           return;
+        }
+        if (editImplantCanModify) {
+          syncEditImplantRowsFromSelectedProducts();
+          mergeDuplicateEditImplantRows();
         }
         const nextImplants = readEditImplantRows();
         const incompleteImplant = nextImplants.find((implant) => !implant.vendor || (!implant.description && !(implant.photos || []).length));
@@ -8826,34 +8910,23 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       };
       const commonImplantPhotoById = (id) => commonImplantPhotos.find((photo) => photo.id === id);
       const mergeImplantDescription = (left = "", right = "") => {
-        const lines = [];
-        String(left || "").split(/\r?\n/).forEach((line) => {
-          const text = line.trim();
-          if (text && !lines.includes(text)) lines.push(text);
-        });
-        String(right || "").split(/\r?\n/).forEach((line) => {
-          const text = line.trim();
-          if (text && !lines.includes(text)) lines.push(text);
-        });
-        return lines.join("\n");
+        return mergeImplantDescriptionLines(left, right);
       };
       const mergeDuplicateImplantDrafts = () => {
-        const byVendor = new Map();
+        const kept = [];
         let changed = false;
         for (let index = 0; index < implantDrafts.length; index += 1) {
           const draft = implantDrafts[index];
-          const key = draft.autoCompanyKey || implantVendorKey(implantDraftVendorName(draft));
-          if (!key) continue;
-          const existing = byVendor.get(key);
+          const existing = kept.find((item) => implantVendorEntriesMatch(item, draft));
           if (!existing) {
-            byVendor.set(key, draft);
+            kept.push(draft);
             continue;
           }
           existing.vendorId = existing.vendorId || draft.vendorId || "";
           existing.customVendor = existing.customVendor || draft.customVendor || "";
           existing.vendor = existing.vendor || draft.vendor || "";
           existing.autoSource = existing.autoSource || draft.autoSource;
-          existing.autoCompanyKey = existing.autoCompanyKey || draft.autoCompanyKey || key;
+          existing.autoCompanyKey = existing.autoCompanyKey || draft.autoCompanyKey || "";
           existing.description = mergeImplantDescription(existing.description, draft.description);
           existing.autoDescription = mergeImplantDescription(existing.autoDescription, draft.autoDescription);
           const existingPhotoIds = new Set((existing.photos || []).map((photo) => photo.id));
@@ -8883,10 +8956,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         }
         if (mergeDuplicateImplantDrafts()) changed = true;
         targets.forEach((target) => {
-          const existing = implantDrafts.find((draft) => (
-            draft.autoCompanyKey === target.key ||
-            implantVendorKey(implantDraftVendorName(draft)) === target.key
-          ));
+          const existing = findImplantEntryByVendorTarget(implantDrafts, target);
           if (existing) {
             if (!existing.autoCompanyKey) existing.autoCompanyKey = target.key;
             if (existing.vendorId !== target.vendorId || existing.customVendor !== target.customVendor || existing.vendor !== target.vendor) {
