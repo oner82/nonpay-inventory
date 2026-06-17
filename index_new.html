@@ -8461,6 +8461,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         rotation: photo.rotation || 0,
         cropped: Boolean(photo.cropped),
         cropRect: photo.cropped && photo.cropRect ? normalizeImplantCropRect(photo.cropRect) : null,
+        sourceCommonPhotoId: photo.sourceCommonPhotoId || "",
         uploadedAt: new Date().toISOString(),
         needsReupload: true,
         storageUploadFailed: true,
@@ -8476,10 +8477,10 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       photo.needsReupload = true;
     };
 
-    const initialImplantPhotoPayload = async (photo) => {
+    const initialImplantPhotoPayload = async (photo, cache = null) => {
       if (photo.url || photo.dataUrl) return cleanImplantPhotoPayload(photo);
       if (photo.file || photo.preview || photo.editedPreview) {
-        return implantPhotoFallbackPayload(photo, "Storage upload pending");
+        return cachedImplantPhotoPayload(photo, cache, () => implantPhotoFallbackPayload(photo, "Storage upload pending"));
       }
       return cleanImplantPhotoPayload(photo);
     };
@@ -8506,6 +8507,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             rotation: photo.rotation || 0,
             cropped: Boolean(photo.cropped),
             cropRect: photo.cropped && photo.cropRect ? normalizeImplantCropRect(photo.cropRect) : null,
+            sourceCommonPhotoId: photo.sourceCommonPhotoId || "",
             uploadedAt: new Date().toISOString()
           };
         } catch (error) {
@@ -8543,11 +8545,40 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       rotation: num(photo.rotation),
       cropped: Boolean(photo.cropped),
       cropRect: photo.cropped && photo.cropRect ? normalizeImplantCropRect(photo.cropRect) : null,
+      sourceCommonPhotoId: photo.sourceCommonPhotoId || "",
       uploadedAt: photo.uploadedAt || "",
       needsReupload: Boolean(photo.needsReupload),
       storageUploadFailed: Boolean(photo.storageUploadFailed),
       storageUploadError: photo.storageUploadError || ""
     });
+
+    const implantPhotoCacheKey = (photo = {}) => {
+      const source = photo.sourceCommonPhotoId
+        || (photo.file ? `file:${photo.file.name || ""}:${photo.file.size || 0}:${photo.file.lastModified || 0}` : "");
+      if (!source) return "";
+      const crop = photo.cropped && photo.cropRect ? normalizeImplantCropRect(photo.cropRect) : null;
+      return JSON.stringify({
+        source,
+        rotation: num(photo.rotation),
+        cropped: Boolean(photo.cropped),
+        crop
+      });
+    };
+
+    const cloneImplantPhotoPayload = (payload = {}, photo = {}) => ({
+      ...cleanImplantPhotoPayload(payload),
+      id: photo.id || payload.id || uid(),
+      name: photo.file?.name || photo.name || payload.name || "",
+      sourceCommonPhotoId: photo.sourceCommonPhotoId || payload.sourceCommonPhotoId || ""
+    });
+
+    const cachedImplantPhotoPayload = async (photo, cache, buildPayload) => {
+      const key = implantPhotoCacheKey(photo);
+      if (key && cache?.has(key)) return cloneImplantPhotoPayload(cache.get(key), photo);
+      const payload = await buildPayload();
+      if (key && cache) cache.set(key, payload);
+      return cloneImplantPhotoPayload(payload, photo);
+    };
 
     const countImplantPhotosToUpload = (implants = []) => implants.reduce((sum, implant) => (
       sum + (implant.photos || []).filter((photo) => photo.file || photo.needsReupload).length
@@ -8572,10 +8603,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       }
       const surgeryDate = usage.date || today();
       const cleanImplants = [];
+      const initialPhotoCache = new Map();
       for (const implant of implants) {
         const initialPhotos = [];
         for (const photo of implant.photos || []) {
-          initialPhotos.push(await initialImplantPhotoPayload(photo));
+          initialPhotos.push(await initialImplantPhotoPayload(photo, initialPhotoCache));
         }
         cleanImplants.push({
           id: implant.id || uid(),
@@ -8601,6 +8633,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const uploadTotal = countImplantPhotosToUpload(implants);
       let uploadDone = 0;
       let uploadFailed = 0;
+      const uploadPhotoCache = new Map();
       notifyImplantPhotoUpload(options.onPhotoProgress, uploadDone, uploadTotal, uploadFailed);
       for (const implant of implants) {
         const implantId = implant.id || uid();
@@ -8611,7 +8644,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         for (const photo of implant.photos || []) {
           if (photo.file || photo.needsReupload) {
             try {
-              photos.push(await uploadImplantPhoto(nextRecordId, implantId, photo, surgeryDate));
+              photos.push(await cachedImplantPhotoPayload(
+                photo,
+                uploadPhotoCache,
+                () => uploadImplantPhoto(nextRecordId, implantId, photo, surgeryDate)
+              ));
             } catch (error) {
               console.error(error);
               if (photo.url) photos.push(cleanImplantPhotoPayload(photo));
@@ -8653,13 +8690,14 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const doctor = departmentById(usage.doctorId);
       const surgeryDate = usage.date || today();
       const implants = [];
+      const initialPhotoCache = new Map();
       for (const draft of validDrafts) {
         const vendor = draft.vendorId === "__custom__"
           ? draft.customVendor.trim()
           : (implantVendorById(draft.vendorId)?.name || draft.customVendor || "").trim();
         const initialPhotos = [];
         for (const photo of draft.photos || []) {
-          initialPhotos.push(await initialImplantPhotoPayload(photo));
+          initialPhotos.push(await initialImplantPhotoPayload(photo, initialPhotoCache));
         }
         implants.push({
           id: draft.id || uid(),
@@ -8696,6 +8734,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const uploadTotal = validDrafts.reduce((sum, draft) => sum + (draft.photos || []).length, 0);
       let uploadDone = 0;
       let uploadFailed = 0;
+      const uploadPhotoCache = new Map();
       notifyImplantPhotoUpload(options.onPhotoProgress, uploadDone, uploadTotal, uploadFailed);
       for (const draft of validDrafts) {
         const implant = implants.find((item) => sameId(item.id, draft.id)) || implants.find((item) => item.vendor === (draft.vendorId === "__custom__" ? draft.customVendor.trim() : (implantVendorById(draft.vendorId)?.name || draft.customVendor || "").trim()));
@@ -8707,7 +8746,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             if ((photo.url || photo.dataUrl) && !photo.file && !photo.needsReupload) {
               photos.push(cleanImplantPhotoPayload(photo));
             } else {
-              photos.push(await uploadImplantPhoto(recordId, implantId, photo, surgeryDate));
+              photos.push(await cachedImplantPhotoPayload(
+                photo,
+                uploadPhotoCache,
+                () => uploadImplantPhoto(recordId, implantId, photo, surgeryDate)
+              ));
             }
           } catch (error) {
             console.error(error);
@@ -9112,15 +9155,21 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           implantDraftPayload
         };
       };
-      const pendingUsagePhotoPayload = async (pendingId, draft, photo, date, index, onProgress) => {
+      const pendingUsagePhotoPayload = async (pendingId, draft, photo, date, index, onProgress, cache = null) => {
         if (photo.url && photo.path && !photo.needsReupload) return cleanImplantPhotoPayload(photo);
         if (photo.dataUrl && !photo.file && !photo.preview && !photo.editedPreview) {
           return { ...cleanImplantPhotoPayload(photo), needsReupload: true };
         }
+        const cacheKey = implantPhotoCacheKey(photo);
+        if (cacheKey && cache?.has(cacheKey)) {
+          if (typeof onProgress === "function") onProgress();
+          return { ...cloneImplantPhotoPayload(cache.get(cacheKey), photo), needsReupload: true };
+        }
         try {
           const uploaded = await implantPhotoFallbackPayload(photo, "Storage upload pending");
+          if (cacheKey && cache) cache.set(cacheKey, uploaded);
           if (typeof onProgress === "function") onProgress();
-          return { ...uploaded, needsReupload: true };
+          return { ...cloneImplantPhotoPayload(uploaded, photo), needsReupload: true };
         } catch (error) {
           console.error(error);
           if (typeof onProgress === "function") onProgress(true);
@@ -9130,10 +9179,11 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const buildPendingUsagePayload = async (snapshot, pendingId, onProgress) => {
         const existingPending = loadedPendingUsageId ? pendingUsageById(loadedPendingUsageId) : null;
         const implantDraftsPayload = [];
+        const pendingPhotoCache = new Map();
         for (const draft of snapshot.implantDraftPayload) {
           const photos = [];
           for (let index = 0; index < (draft.photos || []).length; index += 1) {
-            photos.push(await pendingUsagePhotoPayload(pendingId, draft, draft.photos[index], snapshot.date || today(), index, onProgress));
+            photos.push(await pendingUsagePhotoPayload(pendingId, draft, draft.photos[index], snapshot.date || today(), index, onProgress, pendingPhotoCache));
           }
           const vendor = draft.vendorId === "__custom__"
             ? draft.customVendor
