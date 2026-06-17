@@ -6925,6 +6925,19 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
             <h3>임플란트 기록 수정</h3>
             <p class="helper">선택한 환자 사용내역과 연결된 임플란트 업체명·사용내용과 사진을 함께 수정합니다. 기존 사진은 유지되며, 필요하면 이 화면에서 사진을 추가하거나 기존 사진 삭제 후 새 사진으로 교체할 수 있습니다.</p>
             <div id="editImplantLockNote"></div>
+            <div class="implant-common-photos" id="editCommonImplantWrap">
+              <div class="implant-common-head">
+                <strong>공용 사진함</strong>
+                <div class="implant-common-actions">
+                  <button class="secondary" type="button" id="openEditCommonImplantGallery">파일 선택</button>
+                  <button type="button" id="openEditCommonImplantCamera">공용 사진 찍기</button>
+                  <input id="editCommonImplantGallery" type="file" accept="image/*" multiple>
+                  <input id="editCommonImplantCamera" type="file" accept="image/*" capture="environment">
+                </div>
+              </div>
+              <div class="muted">수정 화면에서도 한 번 찍은 사진을 여러 업체에 나눠 붙일 수 있습니다.</div>
+              <div id="editCommonImplantPhotoList" class="implant-common-grid"></div>
+            </div>
             <div id="editImplantRows" class="implant-panel"></div>
             <div class="actions">
               <button class="secondary" type="button" id="addEditImplantRow">임플란트 업체 추가</button>
@@ -6987,12 +7000,25 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
       const editImplantSection = document.getElementById("editImplantSection");
       const editImplantLockNote = document.getElementById("editImplantLockNote");
       const editImplantRowsWrap = document.getElementById("editImplantRows");
+      const editCommonImplantPhotoList = document.getElementById("editCommonImplantPhotoList");
+      const openEditCommonImplantGallery = document.getElementById("openEditCommonImplantGallery");
+      const openEditCommonImplantCamera = document.getElementById("openEditCommonImplantCamera");
+      const editCommonImplantGallery = document.getElementById("editCommonImplantGallery");
+      const editCommonImplantCamera = document.getElementById("editCommonImplantCamera");
       const addEditImplantRow = document.getElementById("addEditImplantRow");
       const deleteButton = document.getElementById("editUsageDelete");
       let editImplantRecordId = "";
       let editImplantRows = [];
+      const editCommonImplantPhotos = [];
       let editImplantCanModify = true;
       let activeEditImplantPhotoPair = "";
+      const clearEditCommonImplantPhotos = () => {
+        editCommonImplantPhotos.forEach((photo) => {
+          if (photo.preview) URL.revokeObjectURL(photo.preview);
+          if (photo.editedPreview) URL.revokeObjectURL(photo.editedPreview);
+        });
+        editCommonImplantPhotos.splice(0, editCommonImplantPhotos.length);
+      };
       const renderUsageSelectOptions = (date, selectedId = "") => {
         const validSelectedId = selectedId && state.usages.some((usage) => usage.id === selectedId && (usage.date || "") === date) ? selectedId : "";
         select.value = validSelectedId;
@@ -7008,6 +7034,8 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         if (editImplantLockNote) editImplantLockNote.innerHTML = "";
         editImplantRecordId = "";
         editImplantRows = [];
+        clearEditCommonImplantPhotos();
+        renderEditCommonImplantPhotos();
         pendingEditUsageId = "";
         if (patientList) patientList.querySelectorAll("[data-edit-usage-card]").forEach((card) => card.classList.remove("active"));
       };
@@ -7046,6 +7074,53 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         return selected === "__custom__" ? (implant.vendor || "") : "";
       };
       const editImplantPhotoSrc = (photo) => implantPhotoViewSrc(photo);
+      const editCommonImplantPhotoById = (id) => editCommonImplantPhotos.find((photo) => photo.id === id);
+      const cloneEditCommonImplantPhoto = (photo) => ({
+        id: uid(),
+        file: photo.file || null,
+        preview: photo.file ? URL.createObjectURL(photo.file) : (photo.preview || ""),
+        url: photo.url || "",
+        dataUrl: photo.dataUrl || "",
+        name: photo.name || photo.file?.name || "",
+        size: num(photo.size || photo.file?.size),
+        contentType: photo.contentType || photo.file?.type || "image/jpeg",
+        rotation: 0,
+        cropped: false,
+        cropRect: null,
+        sourceCommonPhotoId: photo.id
+      });
+      const renderEditCommonImplantPhotos = () => {
+        if (!editCommonImplantPhotoList) return;
+        editCommonImplantPhotoList.innerHTML = editCommonImplantPhotos.map((photo, index) => {
+          const src = implantPhotoViewSrc(photo);
+          return `
+            <div class="implant-common-photo" data-edit-common-implant-photo="${escapeHtml(photo.id)}">
+              ${src ? `<img src="${escapeHtml(src)}" alt="수정 공용 임플란트 사진 ${index + 1}" data-preview-edit-common-implant-photo="${escapeHtml(photo.id)}">` : ""}
+              <div class="implant-photo-actions">
+                <button class="secondary" type="button" data-preview-edit-common-implant-photo="${escapeHtml(photo.id)}">확대</button>
+                <button class="danger" type="button" data-remove-edit-common-implant-photo="${escapeHtml(photo.id)}" ${editImplantCanModify ? "" : "disabled"}>삭제</button>
+              </div>
+            </div>
+          `;
+        }).join("") || `<div class="empty">공용 사진을 먼저 촬영하거나 선택해 주세요.</div>`;
+      };
+      const addEditCommonImplantPhotos = (files = []) => {
+        if (!editImplantCanModify) return;
+        files.filter((file) => file.type.startsWith("image/")).forEach((file) => {
+          editCommonImplantPhotos.push({
+            id: uid(),
+            file,
+            preview: URL.createObjectURL(file),
+            name: file.name || "implant.jpg",
+            size: file.size,
+            contentType: file.type || "image/jpeg",
+            rotation: 0,
+            cropped: false
+          });
+        });
+        renderEditCommonImplantPhotos();
+        renderEditImplantRows();
+      };
       const renderEditImplantRows = () => {
         if (!editImplantRowsWrap) return;
         editImplantRowsWrap.innerHTML = editImplantRows.length ? editImplantRows.map((row, index) => {
@@ -7076,6 +7151,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
               <button class="secondary" type="button" data-open-edit-implant-gallery="${escapeHtml(row.id)}" ${editImplantCanModify ? "" : "disabled"}>파일 선택</button>
               <button type="button" data-open-edit-implant-camera="${escapeHtml(row.id)}" ${editImplantCanModify ? "" : "disabled"}>사진 찍기</button>
               <span class="muted">기존 사진 ${existingPhotoCount}장 유지 · 교체는 기존 사진 삭제 후 새 사진을 추가하세요.</span>
+              <button class="secondary" type="button" data-use-edit-common-implant-photo="${escapeHtml(row.id)}" ${editImplantCanModify && editCommonImplantPhotos.length ? "" : "disabled"}>공용 사진 사용</button>
               <input id="editImplantGallery-${escapeHtml(row.id)}" type="file" accept="image/*" multiple data-edit-implant-photo-input="${escapeHtml(row.id)}" ${editImplantCanModify ? "" : "disabled"}>
               <input id="editImplantCamera-${escapeHtml(row.id)}" type="file" accept="image/*" capture="environment" data-edit-implant-camera-input="${escapeHtml(row.id)}" ${editImplantCanModify ? "" : "disabled"}>
             </div>
@@ -7291,6 +7367,7 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         editImplantCanModify = canModify && (!record || canModifyImplantRecord(record));
         const implantLockMessage = record && !editImplantCanModify ? implantEditLockMessage(record) : "";
         editImplantRecordId = record?.id || "";
+        clearEditCommonImplantPhotos();
         editImplantRows = (Array.isArray(record?.implants) ? record.implants : []).map((implant) => ({
           id: implant.id || uid(),
           vendorId: implantVendorSelectValue(implant),
@@ -7306,6 +7383,9 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
           editImplantLockNote.innerHTML = implantLockMessage ? `<div class="edit-lock-note">${escapeHtml(implantLockMessage)} 관리자에게 요청해 주세요.</div>` : "";
         }
         if (addEditImplantRow) addEditImplantRow.disabled = !editImplantCanModify;
+        if (openEditCommonImplantGallery) openEditCommonImplantGallery.disabled = !editImplantCanModify;
+        if (openEditCommonImplantCamera) openEditCommonImplantCamera.disabled = !editImplantCanModify;
+        renderEditCommonImplantPhotos();
         renderEditImplantRows();
       };
       const syncEditStockLimits = (usage) => {
@@ -7464,6 +7544,44 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         });
       });
       productSearch.addEventListener("input", renderSearch);
+      openEditCommonImplantGallery?.addEventListener("click", () => {
+        if (editImplantCanModify) editCommonImplantGallery?.click();
+      });
+      openEditCommonImplantCamera?.addEventListener("click", () => {
+        if (editImplantCanModify) editCommonImplantCamera?.click();
+      });
+      [editCommonImplantGallery, editCommonImplantCamera].forEach((input) => {
+        input?.addEventListener("change", () => {
+          addEditCommonImplantPhotos(Array.from(input.files || []));
+          input.value = "";
+        });
+      });
+      editCommonImplantPhotoList?.addEventListener("click", (event) => {
+        const preview = event.target.closest("[data-preview-edit-common-implant-photo]");
+        if (preview) {
+          const photo = editCommonImplantPhotoById(preview.dataset.previewEditCommonImplantPhoto);
+          if (photo) {
+            activeEditImplantPhotoPair = "";
+            const tools = document.getElementById("implantPhotoEditTools");
+            const image = document.getElementById("implantPhotoModalImage");
+            if (tools) tools.hidden = true;
+            if (image) image.style.transform = "";
+            showImplantPhotoModal(implantPhotoViewSrc(photo));
+          }
+          return;
+        }
+        const remove = event.target.closest("[data-remove-edit-common-implant-photo]");
+        if (remove && editImplantCanModify) {
+          const index = editCommonImplantPhotos.findIndex((photo) => photo.id === remove.dataset.removeEditCommonImplantPhoto);
+          if (index >= 0) {
+            if (editCommonImplantPhotos[index].preview) URL.revokeObjectURL(editCommonImplantPhotos[index].preview);
+            if (editCommonImplantPhotos[index].editedPreview) URL.revokeObjectURL(editCommonImplantPhotos[index].editedPreview);
+            editCommonImplantPhotos.splice(index, 1);
+            renderEditCommonImplantPhotos();
+            renderEditImplantRows();
+          }
+        }
+      });
       editImplantRowsWrap?.addEventListener("input", (event) => updateEditImplantRowFromInput(event.target));
       editImplantRowsWrap?.addEventListener("change", (event) => {
         const target = event.target;
@@ -7482,6 +7600,19 @@ ANCHOR	Mega suture 4.75(L)	골드메디	ANCHOR	10	10`;
         const cameraButton = event.target.closest("[data-open-edit-implant-camera]");
         if (cameraButton) {
           editImplantRowsWrap.querySelector(`[data-edit-implant-camera-input="${cameraButton.dataset.openEditImplantCamera}"]`)?.click();
+          return;
+        }
+        const useCommon = event.target.closest("[data-use-edit-common-implant-photo]");
+        if (useCommon && editImplantCanModify) {
+          const row = editImplantRowById(useCommon.dataset.useEditCommonImplantPhoto);
+          if (!row || !editCommonImplantPhotos.length) return;
+          const addedPhotos = editCommonImplantPhotos.map(cloneEditCommonImplantPhoto);
+          row.photos = row.photos || [];
+          row.photos.push(...addedPhotos);
+          renderEditImplantRows();
+          if (addedPhotos.length === 1) {
+            openEditImplantPhotoEditor(`${row.id}::${addedPhotos[0].id}`);
+          }
           return;
         }
         const editPhotoButton = event.target.closest("[data-edit-existing-implant-photo]");
