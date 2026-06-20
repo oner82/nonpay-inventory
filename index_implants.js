@@ -40,8 +40,6 @@
       downloadBytes,
       zipFiles,
       xlsxWorkbook,
-      promiseWithTimeout,
-      loadImageFromUrl,
       retryImplantRecordPhotos,
       setDoc,
       doc,
@@ -638,6 +636,30 @@ const exportImplantMonthlyBackup = async (month, onProgress) => {
   downloadBytes(`임플란트장부_백업_${month}.zip`, zipFiles(files), "application/zip");
   return { records: records.length, photos: photoRefs.length, failed: errors.length };
 };
+const loadImageFromUrl = async (url) => {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("사진 원본을 불러오지 못했습니다.");
+  const objectUrl = URL.createObjectURL(await response.blob());
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      image.dataset.objectUrl = objectUrl;
+      resolve(image);
+    };
+    image.onerror = reject;
+    image.src = objectUrl;
+  });
+};
+const promiseWithTimeout = (promise, timeoutMs, message) => new Promise((resolve, reject) => {
+  const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+  promise.then((value) => {
+    clearTimeout(timer);
+    resolve(value);
+  }).catch((error) => {
+    clearTimeout(timer);
+    reject(error);
+  });
+});
 const implantSendStatusLabels = {
   pending: "미발송",
   sent: "발송완료",
@@ -1902,6 +1924,8 @@ const bindImplants = () => {
       notifyImplantPhotoUpload,
       safeBackupFileName,
       exportImplantMonthlyBackup,
+      loadImageFromUrl,
+      promiseWithTimeout,
       implantDescriptionText,
       implantLedgerRows,
       implantLedgerTableHtml,

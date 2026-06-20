@@ -1496,7 +1496,7 @@
     .implant-photo img {
       width: 100%;
       aspect-ratio: 1;
-      object-fit: cover;
+      object-fit: contain;
       border-radius: 8px;
       background: #eef4ff;
     }
@@ -1581,6 +1581,23 @@
       border-radius: 10px;
       overflow: hidden;
       background: #111827;
+    }
+    #implantPhotoModal .search-modal-panel {
+      width: min(980px, 96vw);
+      max-height: 92vh;
+      overflow: auto;
+    }
+    #implantPhotoModal .implant-crop-stage {
+      align-items: center;
+      overflow: hidden;
+    }
+    #implantPhotoModal .implant-crop-stage.rotated {
+      height: min(62vh, 620px);
+      min-height: 320px;
+    }
+    #implantPhotoModal .implant-modal-image.rotated {
+      max-width: min(62vh, 620px);
+      max-height: min(82vw, 900px);
     }
     .implant-crop-stage .implant-modal-image {
       max-width: 100%;
