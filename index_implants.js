@@ -493,6 +493,41 @@ const implantVendorTargetsFromUseItems = (items = []) => {
   });
   return [...targets.values()];
 };
+const implantCropNumber = (value, fallback = 0) => {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+const implantClamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const normalizeImplantCropRect = (rect) => {
+  const source = rect && typeof rect === "object" ? rect : {};
+  const x = implantClamp(implantCropNumber(source.x), 0, 0.98);
+  const y = implantClamp(implantCropNumber(source.y), 0, 0.98);
+  const width = implantClamp(implantCropNumber(source.width || source.w, 0.8), 0.02, 1 - x);
+  const height = implantClamp(implantCropNumber(source.height || source.h, 0.8), 0.02, 1 - y);
+  return { x, y, width, height };
+};
+const defaultImplantCropRect = () => ({ x: 0.1, y: 0.1, width: 0.8, height: 0.8 });
+const implantSourceRect = (photo, image) => {
+  if (photo?.cropped && photo.cropRect) {
+    const rect = normalizeImplantCropRect(photo.cropRect);
+    return {
+      x: Math.round(rect.x * image.naturalWidth),
+      y: Math.round(rect.y * image.naturalHeight),
+      width: Math.max(1, Math.round(rect.width * image.naturalWidth)),
+      height: Math.max(1, Math.round(rect.height * image.naturalHeight))
+    };
+  }
+  if (photo?.cropped) {
+    const cropSize = Math.min(image.naturalWidth, image.naturalHeight);
+    return {
+      x: Math.round((image.naturalWidth - cropSize) / 2),
+      y: Math.round((image.naturalHeight - cropSize) / 2),
+      width: cropSize,
+      height: cropSize
+    };
+  }
+  return { x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight };
+};
 const implantSendStatusLabels = {
   pending: "미발송",
   sent: "발송완료",
@@ -1695,6 +1730,11 @@ const bindImplants = () => {
       implantDraftCanAutoUpdateDescription,
       implantDraftAutoDescription,
       implantVendorTargetsFromUseItems,
+      implantCropNumber,
+      implantClamp,
+      normalizeImplantCropRect,
+      defaultImplantCropRect,
+      implantSourceRect,
       implantDescriptionText,
       implantLedgerRows,
       implantLedgerTableHtml,

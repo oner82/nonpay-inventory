@@ -3675,41 +3675,11 @@ const loadImageFromUrl = async (url) => {
   ? loadImageFromFile(photo.file)
   : loadImageFromUrl(photo.preview || photo.url || photo.dataUrl || photo.editedPreview || "");
 
-const implantCropNumber = (value, fallback = 0) => {
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-};
-const implantClamp = (value, min, max) => Math.min(max, Math.max(min, value));
-const normalizeImplantCropRect = (rect) => {
-  const source = rect && typeof rect === "object" ? rect : {};
-  const x = implantClamp(implantCropNumber(source.x), 0, 0.98);
-  const y = implantClamp(implantCropNumber(source.y), 0, 0.98);
-  const width = implantClamp(implantCropNumber(source.width || source.w, 0.8), 0.02, 1 - x);
-  const height = implantClamp(implantCropNumber(source.height || source.h, 0.8), 0.02, 1 - y);
-  return { x, y, width, height };
-};
-const defaultImplantCropRect = () => ({ x: 0.1, y: 0.1, width: 0.8, height: 0.8 });
-const implantSourceRect = (photo, image) => {
-  if (photo?.cropped && photo.cropRect) {
-    const rect = normalizeImplantCropRect(photo.cropRect);
-    return {
-      x: Math.round(rect.x * image.naturalWidth),
-      y: Math.round(rect.y * image.naturalHeight),
-      width: Math.max(1, Math.round(rect.width * image.naturalWidth)),
-      height: Math.max(1, Math.round(rect.height * image.naturalHeight))
-    };
-  }
-  if (photo?.cropped) {
-    const cropSize = Math.min(image.naturalWidth, image.naturalHeight);
-    return {
-      x: Math.round((image.naturalWidth - cropSize) / 2),
-      y: Math.round((image.naturalHeight - cropSize) / 2),
-      width: cropSize,
-      height: cropSize
-    };
-  }
-  return { x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight };
-};
+const implantCropNumber = (value, fallback = 0) => getImplantsModule().implantCropNumber(value, fallback);
+const implantClamp = (value, min, max) => getImplantsModule().implantClamp(value, min, max);
+const normalizeImplantCropRect = (rect) => getImplantsModule().normalizeImplantCropRect(rect);
+const defaultImplantCropRect = () => getImplantsModule().defaultImplantCropRect();
+const implantSourceRect = (photo, image) => getImplantsModule().implantSourceRect(photo, image);
 
 const renderImplantPhotoBlob = async (photo, maxSide = 2400, quality = 0.9) => {
   const image = await loadImageFromImplantPhoto(photo);
