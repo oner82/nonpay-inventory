@@ -19,6 +19,7 @@
       surgeryById,
       departmentById,
       auditUserText,
+      auditTimeText,
       currentAuditUser,
       safeBackupFileName,
       isImplantLedgerClosed,
@@ -361,6 +362,27 @@ const implantRecordCardHtml = (record, options = {}) => {
     </div>
   `;
 };
+
+const implantDescriptionText = (record) => (Array.isArray(record.implants) ? record.implants : [])
+  .map((implant) => `[${implant.vendor || "업체 없음"}]\n${implant.description || `사진 ${(implant.photos || []).length}장 기록`}`)
+  .join("\n\n");
+
+const implantLedgerRows = (records) => records.flatMap((record) => {
+  const implants = Array.isArray(record.implants) && record.implants.length ? record.implants : [{ vendor: "", description: "", photos: [] }];
+  return implants.map((implant) => [
+    implantRecordDate(record),
+    implantPatientNoText(record) ? `#${implantPatientNoText(record)}` : "",
+    record.patientName || "",
+    record.patientId || "",
+    record.surgeryName || surgeryById(record.surgeryId)?.name || "",
+    record.surgeonCode || departmentById(record.doctorId)?.name || "",
+    auditUserText(record) || "",
+    auditTimeText(record) || "",
+    implant.vendor || "",
+    implant.description || "",
+    (implant.photos || []).length
+  ]);
+});
 
 const implantSendStatusLabels = {
   pending: "미발송",
@@ -1546,6 +1568,8 @@ const bindImplants = () => {
       renderImplants,
       bindImplants,
       filteredImplantRecords,
+      implantDescriptionText,
+      implantLedgerRows,
       implantLedgerTableHtml,
       implantSendStatusLabel,
       implantSendStatusClass,

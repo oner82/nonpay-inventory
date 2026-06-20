@@ -1854,26 +1854,8 @@ const assignImplantPatientNosForDate = async (date) => {
   return updates.length;
 };
 
-const implantDescriptionText = (record) => (Array.isArray(record.implants) ? record.implants : [])
-  .map((implant) => `[${implant.vendor || "업체 없음"}]\n${implant.description || `사진 ${(implant.photos || []).length}장 기록`}`)
-  .join("\n\n");
-
-const implantLedgerRows = (records) => records.flatMap((record) => {
-  const implants = Array.isArray(record.implants) && record.implants.length ? record.implants : [{ vendor: "", description: "", photos: [] }];
-  return implants.map((implant) => [
-    implantRecordDate(record),
-    implantPatientNoText(record) ? `#${implantPatientNoText(record)}` : "",
-    record.patientName || "",
-    record.patientId || "",
-    record.surgeryName || surgeryById(record.surgeryId)?.name || "",
-    record.surgeonCode || departmentById(record.doctorId)?.name || "",
-    auditUserText(record) || "",
-    auditTimeText(record) || "",
-    implant.vendor || "",
-    implant.description || "",
-    (implant.photos || []).length
-  ]);
-});
+const implantDescriptionText = (record) => getImplantsModule().implantDescriptionText(record);
+const implantLedgerRows = (records) => getImplantsModule().implantLedgerRows(records);
 
 const implantLedgerTableHtml = (records) => getImplantsModule().implantLedgerTableHtml(records);
 
@@ -2195,6 +2177,7 @@ const getImplantsModule = () => {
       surgeryById,
       departmentById,
       auditUserText,
+      auditTimeText,
       currentAuditUser,
       safeBackupFileName,
       isImplantLedgerClosed,
