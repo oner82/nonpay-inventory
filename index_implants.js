@@ -25,7 +25,6 @@
       canAssignImplantPatientNo,
       canEditImplantPatientNo,
       implantRecordsForDate,
-      implantSendPanelOrganizedHtml,
       assignImplantPatientNosForDate,
       exportImplantLedgerExcel,
       exportImplantMonthlyBackup,
@@ -38,6 +37,8 @@
       updateImplantSendGroupStatus,
       implantSendStatusLabel,
       implantSendGroups,
+      implantSendGroupStats,
+      implantSendStatementCardsHtml,
       setButtonBusy,
       saveAndShareImplantVendorStatementPdf,
       downloadImplantVendorStatementHtml,
@@ -315,6 +316,108 @@ const implantRecordCardHtml = (record, options = {}) => {
       <div class="implant-send-preview">
         업체 발송용 데이터 준비: 환자명/환자ID 제외, 환자번호 ${escapeHtml(patientNo || "미부여")} · ${escapeHtml(doctorText)} · ${escapeHtml(surgeryText)} · 업체별 사용내용만 출력 가능
       </div>
+    </div>
+  `;
+};
+
+const implantSendPanelHtml = (date) => {
+  const groups = implantSendGroups(date);
+  if (!groups.length) return `<div class="empty">업체별로 발송할 임플란트 기록이 없습니다.</div>`;
+  return `
+    <div class="implant-send-list">
+      ${groups.map((group) => {
+        const message = implantSendMessage(date, group.vendor, group.lines);
+        const email = group.contact?.email || "";
+        const phone = group.contact?.phone || "";
+        return `
+          <div class="implant-send-card">
+            <div class="item-title">
+              <span>${escapeHtml(group.vendor)}</span>
+              <span class="pill">${group.lines.length}건 · ${escapeHtml(implantSendStatusLabel(group.status))}</span>
+            </div>
+            <div class="meta">
+              ${email ? `<span>이메일: ${escapeHtml(email)}</span>` : ""}
+              ${phone ? `<span>연락처: ${escapeHtml(phone)}</span>` : ""}
+              ${!email && !phone ? `<span>설정에 연락처가 없습니다.</span>` : ""}
+            </div>
+            <div class="implant-send-text">${escapeHtml(message)}</div>
+            ${implantSendStatementCardsHtml(group)}
+            <div class="actions">
+              ${email ? `<button type="button" data-send-implant-email="${escapeHtml(group.vendor)}">메일 작성</button>` : ""}
+              ${phone ? `<button class="secondary" type="button" data-send-implant-sms="${escapeHtml(group.vendor)}">문자 작성</button>` : ""}
+              <button class="secondary" type="button" data-copy-implant-send="${escapeHtml(group.vendor)}">내용 복사</button>
+              <button type="button" data-print-implant-send="${escapeHtml(group.vendor)}">PDF 저장/공유</button>
+              <button class="secondary" type="button" data-share-implant-send="${escapeHtml(group.vendor)}">PDF 공유</button>
+              <button class="secondary" type="button" data-download-implant-send="${escapeHtml(group.vendor)}">명세서 다운로드</button>
+              <button class="secondary" type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="pending">미발송</button>
+              <button type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="sent">발송완료</button>
+              <button class="secondary" type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="excluded">발송제외</button>
+              <button class="secondary" type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="resend">재발송</button>
+            </div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+};
+
+const implantSendPanelOrganizedHtml = (date) => {
+  const groups = implantSendGroups(date);
+  if (!groups.length) return `<div class="empty">업체별로 발송할 임플란트 기록이 없습니다.</div>`;
+  const unnumberedTotal = implantRecordsForDate(date).filter((record) => !implantPatientNoText(record)).length;
+  return `
+    ${unnumberedTotal ? `<div class="implant-send-preview">선택 날짜에 환자번호가 없는 기록 ${unnumberedTotal}건이 있습니다. 업체 발송 전 마감 또는 번호 부여가 필요합니다.</div>` : ""}
+    <div class="implant-send-list">
+      ${groups.map((group) => {
+        const message = implantSendMessage(date, group.vendor, group.lines);
+        const email = group.contact?.email || "";
+        const phone = group.contact?.phone || "";
+        const stats = implantSendGroupStats(group);
+        return `
+          <div class="implant-send-card implant-send-clean-card">
+            <div class="implant-send-clean-head">
+              <div>
+                <div class="implant-send-clean-title">
+                  <span>${escapeHtml(group.vendor)}</span>
+                  <span class="pill">${escapeHtml(implantSendStatusLabel(group.status))}</span>
+                </div>
+                <div class="implant-send-compact-meta">
+                  <span>${escapeHtml(date)}</span>
+                  <span>환자 ${stats.patients}명</span>
+                  <span>기록 ${group.lines.length}건</span>
+                  <span>사진 ${stats.photos}장</span>
+                  ${stats.unnumbered ? `<span>미마감 ${stats.unnumbered}건</span>` : ""}
+                </div>
+                <div class="implant-send-contact-row">
+                  ${email ? `<span>메일 ${escapeHtml(email)}</span>` : ""}
+                  ${phone ? `<span>연락처 ${escapeHtml(phone)}</span>` : ""}
+                  ${!email && !phone ? `<span>설정된 연락처 없음</span>` : ""}
+                </div>
+              </div>
+              <label class="implant-send-status-control">
+                <span>발송상태</span>
+                <select data-change-implant-send-status="${escapeHtml(group.vendor)}">
+                  <option value="pending" ${group.status === "pending" ? "selected" : ""}>미발송</option>
+                  <option value="sent" ${group.status === "sent" ? "selected" : ""}>발송완료</option>
+                  <option value="resend" ${group.status === "resend" ? "selected" : ""}>재발송</option>
+                  <option value="excluded" ${group.status === "excluded" ? "selected" : ""}>발송제외</option>
+                </select>
+              </label>
+            </div>
+            <div class="implant-send-primary-actions">
+              <button type="button" data-print-implant-send="${escapeHtml(group.vendor)}">PDF 저장/공유</button>
+              <button type="button" data-set-implant-send-status="${escapeHtml(group.vendor)}" data-send-status="sent">발송완료</button>
+            </div>
+            <details class="implant-send-details">
+              <summary>사진 포함 A4 명세서 미리보기</summary>
+              <div class="implant-send-details-body">
+                <div class="implant-send-preview">환자 1명당 A4 1장 기준입니다. 사진이 4장을 넘으면 다음 장으로 자동 분리됩니다. PDF 저장/공유를 누르면 파일 저장 후 지원 기기에서 공유창이 열립니다.</div>
+                ${implantSendStatementCardsHtml(group)}
+              </div>
+            </details>
+          </div>
+        `;
+      }).join("")}
     </div>
   `;
 };
@@ -702,6 +805,8 @@ const bindImplants = () => {
       bindImplants,
       filteredImplantRecords,
       implantLedgerTableHtml,
+      implantSendPanelHtml,
+      implantSendPanelOrganizedHtml,
       implantPhotoHtml,
       implantPhotoStatusHtml,
       implantPhotoStatusPanelHtml,
