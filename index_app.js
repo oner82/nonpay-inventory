@@ -530,24 +530,17 @@ const patientIdText = (usage) => String(usage?.patientId || "").trim();
 const patientDisplayName = (usage) => patientIdText(usage)
   ? `${usage.patientName || ""} (${patientIdText(usage)})`
   : (usage.patientName || "");
-const canAssignImplantPatientNo = () => ["admin", "manager"].includes(currentUserRole());
-const canEditImplantPatientNo = () => currentUserRole() === "admin";
+const canAssignImplantPatientNo = () => getImplantsModule().canAssignImplantPatientNo();
+const canEditImplantPatientNo = () => getImplantsModule().canEditImplantPatientNo();
 const implantRecordsForUsage = (usageId) => sortImplantRecords(implantRecords.filter((record) => sameId(record.usageId, usageId)));
 const pendingUsagesOpen = () => pendingUsages
   .filter((item) => (item.status || "pending") === "pending")
   .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
 const pendingUsageById = (id) => pendingUsages.find((item) => sameId(item.id, id));
-const isImplantEditUnlocked = (record) => record?.editUnlocked === true;
-const isImplantLedgerClosed = (record) => !isImplantEditUnlocked(record) && Boolean(implantPatientNoText(record) || record?.closedAt || record?.patientNoAssignedAt);
-const implantLockLabel = (record) => isImplantLedgerClosed(record)
-  ? "마감 잠금"
-  : (implantPatientNoText(record) ? "관리자 해제" : "작성 가능");
-const implantEditLockMessage = (record) => {
-  if (!record) return "";
-  if (isImplantLedgerClosed(record)) return "임플란트 장부가 마감되어 관리자만 임플란트 기록을 수정할 수 있습니다.";
-  if (implantRecordDate(record) !== today()) return "당일이 아닌 임플란트 기록은 관리자만 수정할 수 있습니다.";
-  return "";
-};
+const isImplantEditUnlocked = (record) => getImplantsModule().isImplantEditUnlocked(record);
+const isImplantLedgerClosed = (record) => getImplantsModule().isImplantLedgerClosed(record);
+const implantLockLabel = (record) => getImplantsModule().implantLockLabel(record);
+const implantEditLockMessage = (record) => getImplantsModule().implantEditLockMessage(record);
 const canModifyImplantRecord = (record) => {
   if (!canEditUsage()) return false;
   if (currentUserRole() === "admin") return true;
@@ -2170,6 +2163,7 @@ const getImplantsModule = () => {
       render,
       num,
       normalizedName,
+      currentUserRole,
       alphaFirstCompare,
       implantVendorById,
       findImplantVendorByName,
@@ -2180,10 +2174,6 @@ const getImplantsModule = () => {
       auditTimeText,
       currentAuditUser,
       safeBackupFileName,
-      isImplantLedgerClosed,
-      implantLockLabel,
-      canAssignImplantPatientNo,
-      canEditImplantPatientNo,
       implantRecordsForDate,
       assignImplantPatientNosForDate,
       exportImplantLedgerExcel,

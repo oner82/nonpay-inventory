@@ -12,6 +12,7 @@
       render,
       num,
       normalizedName,
+      currentUserRole,
       alphaFirstCompare,
       implantVendorById,
       findImplantVendorByName,
@@ -22,10 +23,6 @@
       auditTimeText,
       currentAuditUser,
       safeBackupFileName,
-      isImplantLedgerClosed,
-      implantLockLabel,
-      canAssignImplantPatientNo,
-      canEditImplantPatientNo,
       implantRecordsForDate,
       assignImplantPatientNosForDate,
       exportImplantLedgerExcel,
@@ -98,6 +95,20 @@
       if (!pending && !failed && !retry && !missing && !errors) return null;
       return { record, implant, pending, failed, retry, missing, errors };
     }).filter(Boolean));
+
+    const canAssignImplantPatientNo = () => ["admin", "manager"].includes(currentUserRole());
+    const canEditImplantPatientNo = () => currentUserRole() === "admin";
+    const isImplantEditUnlocked = (record) => record?.editUnlocked === true;
+    const isImplantLedgerClosed = (record) => !isImplantEditUnlocked(record) && Boolean(implantPatientNoText(record) || record?.closedAt || record?.patientNoAssignedAt);
+    const implantLockLabel = (record) => isImplantLedgerClosed(record)
+      ? "마감 잠금"
+      : (implantPatientNoText(record) ? "관리자 해제" : "작성 가능");
+    const implantEditLockMessage = (record) => {
+      if (!record) return "";
+      if (isImplantLedgerClosed(record)) return "임플란트 장부가 마감되어 관리자만 임플란트 기록을 수정할 수 있습니다.";
+      if (implantRecordDate(record) !== today()) return "당일이 아닌 임플란트 기록은 관리자만 수정할 수 있습니다.";
+      return "";
+    };
 
     const renderImplants = () => {
       const date = today();
@@ -1568,6 +1579,12 @@ const bindImplants = () => {
       renderImplants,
       bindImplants,
       filteredImplantRecords,
+      canAssignImplantPatientNo,
+      canEditImplantPatientNo,
+      isImplantEditUnlocked,
+      isImplantLedgerClosed,
+      implantLockLabel,
+      implantEditLockMessage,
       implantDescriptionText,
       implantLedgerRows,
       implantLedgerTableHtml,
