@@ -18,10 +18,6 @@
       auditUserText,
       currentAuditUser,
       safeBackupFileName,
-      implantPhotoStatusStats,
-      implantPhotoProblemRows,
-      implantPhotoViewSrc,
-      implantPhotoNeedsStorageRetry,
       isImplantLedgerClosed,
       implantLockLabel,
       canAssignImplantPatientNo,
@@ -59,6 +55,50 @@
       implantRecordDate,
       auditUpdateFields
     } = context;
+
+    const implantPhotoViewSrc = (photo) => {
+      if (!photo) return "";
+      if (photo.editedPreview) return photo.editedPreview;
+      if (photo.preview) return photo.preview;
+      if ((photo.needsReupload || photo.storageUploadFailed) && photo.dataUrl) return photo.dataUrl;
+      return photo.url || photo.dataUrl || "";
+    };
+
+    const implantPhotoRotationStyle = (photo) => {
+      const rotation = photo?.editedPreview ? 0 : num(photo?.rotation);
+      return rotation ? `transform:rotate(${rotation}deg);` : "";
+    };
+
+    const implantPhotoStoredInStorage = (photo) => Boolean(photo?.url && photo?.path && photo?.storageUploadFailed !== true);
+    const implantPhotoNeedsStorageRetry = (photo) => Boolean(photo?.dataUrl && (!photo?.url || photo?.storageUploadFailed || !photo?.path));
+
+    const implantPhotoStatusStats = (records) => records.reduce((stats, record) => {
+      (record.implants || []).forEach((implant) => {
+        const photos = implant.photos || [];
+        stats.implants += 1;
+        stats.pending += num(implant.pendingPhotoCount);
+        stats.errors += Array.isArray(implant.photoUploadErrors) ? implant.photoUploadErrors.length : 0;
+        photos.forEach((photo) => {
+          stats.photos += 1;
+          if (implantPhotoStoredInStorage(photo)) stats.storage += 1;
+          if (implantPhotoNeedsStorageRetry(photo)) stats.retry += 1;
+          if (photo?.storageUploadFailed) stats.failed += 1;
+          if (!implantPhotoViewSrc(photo)) stats.missing += 1;
+        });
+      });
+      return stats;
+    }, { implants: 0, photos: 0, storage: 0, pending: 0, failed: 0, retry: 0, missing: 0, errors: 0 });
+
+    const implantPhotoProblemRows = (records) => records.flatMap((record) => (record.implants || []).map((implant) => {
+      const photos = implant.photos || [];
+      const pending = num(implant.pendingPhotoCount);
+      const failed = photos.filter((photo) => photo?.storageUploadFailed).length;
+      const retry = photos.filter(implantPhotoNeedsStorageRetry).length;
+      const missing = photos.filter((photo) => !implantPhotoViewSrc(photo)).length;
+      const errors = Array.isArray(implant.photoUploadErrors) ? implant.photoUploadErrors.length : 0;
+      if (!pending && !failed && !retry && !missing && !errors) return null;
+      return { record, implant, pending, failed, retry, missing, errors };
+    }).filter(Boolean));
 
     const renderImplants = () => {
       const date = today();
@@ -1437,6 +1477,11 @@ const bindImplants = () => {
       implantSendStatementPrintHtmlV2,
       implantSendPanelHtml,
       implantSendPanelOrganizedHtml,
+      implantPhotoViewSrc,
+      implantPhotoRotationStyle,
+      implantPhotoNeedsStorageRetry,
+      implantPhotoStatusStats,
+      implantPhotoProblemRows,
       implantPhotoHtml,
       implantPhotoStatusHtml,
       implantPhotoStatusPanelHtml,
