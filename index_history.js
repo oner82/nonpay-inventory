@@ -123,6 +123,78 @@
 
     const reportPeriodLabel = (period) => period.start === period.end ? period.start : `${period.start} ~ ${period.end}`;
 
+    const usageDateValue = (usage) => usage?.date || String(usage?.createdAt || usage?.updatedAt || "").slice(0, 10) || "";
+
+    const productSeedFor = (product) => {
+      const seeds = context.parseSeedProducts();
+      const seedByKey = new Map(seeds.map((item) => [context.productKey(item), item]));
+      const seedByLooseKey = new Map(seeds.map((item) => [context.productLooseKey(item), item]));
+      return seedByKey.get(context.productKey(product)) || seedByLooseKey.get(context.productLooseKey(product));
+    };
+
+    const productMovementTotal = (productId, type, dateMatch = () => true) => {
+      const state = context.getState();
+      if (type === "receipt") {
+        return state.receipts.reduce((sum, receipt) => {
+          if (!context.sameId(receipt.productId, productId) || !dateMatch(context.receiptDateValue(receipt))) return sum;
+          return sum + context.num(receipt.qty);
+        }, 0);
+      }
+      return state.usages.reduce((sum, usage) => {
+        if (!dateMatch(usageDateValue(usage))) return sum;
+        return sum + (Array.isArray(usage.productIds) ? usage.productIds : []).filter((id) => context.sameId(id, productId)).length;
+      }, 0);
+    };
+
+    const productInitialStock = (product, totalReceived, totalUsed) => {
+      if (Number.isFinite(Number(product.baseStock))) return context.num(product.baseStock);
+      const seed = productSeedFor(product);
+      if (seed) return context.num(seed.baseStock);
+      return context.num(product.stock) - totalReceived + totalUsed;
+    };
+
+    const productMatchesReportQuery = (product, query = "") => {
+      const normalizedQuery = context.normalizedName(query || "");
+      if (!normalizedQuery) return true;
+      return context.normalizedName(`${product.name} ${product.company || ""} ${product.subcategory || ""} ${context.productCategoryLabel(product.category)}`).includes(normalizedQuery);
+    };
+
+    const latestReceiptDateForProduct = (productId) => context.getState().receipts.reduce((latest, receipt) => {
+      if (!context.sameId(receipt.productId, productId)) return latest;
+      const date = context.receiptDateValue(receipt);
+      if (!date) return latest;
+      return !latest || date > latest ? date : latest;
+    }, "");
+
+    const productStockFlowRows = (category, period, query = "") => context.getState().products
+      .filter((product) => context.productCategory(product.category) === category)
+      .filter((product) => productMatchesReportQuery(product, query))
+      .sort(context.productUsageSort(category))
+      .map((product) => {
+        const totalReceived = productMovementTotal(product.id, "receipt");
+        const totalUsed = productMovementTotal(product.id, "usage");
+        const initialStock = productInitialStock(product, totalReceived, totalUsed);
+        const basisReceived = productMovementTotal(product.id, "receipt", (date) => Boolean(date) && date < period.start);
+        const basisUsed = productMovementTotal(product.id, "usage", (date) => Boolean(date) && date < period.start);
+        const periodReceived = productMovementTotal(product.id, "receipt", (date) => Boolean(date) && date >= period.start && date <= period.end);
+        const periodUsed = productMovementTotal(product.id, "usage", (date) => Boolean(date) && date >= period.start && date <= period.end);
+        const basisStock = initialStock + basisReceived - basisUsed;
+        const currentStock = basisStock + periodReceived - periodUsed;
+        const systemCurrentStock = Math.max(0, initialStock + totalReceived - totalUsed);
+        return {
+          product,
+          initialStock,
+          totalReceived,
+          totalUsed,
+          basisStock,
+          periodReceived,
+          periodUsed,
+          currentStock,
+          systemCurrentStock,
+          latestReceiptDate: latestReceiptDateForProduct(product.id)
+        };
+      });
+
     const productUsageSummaryHtml = (start = "", end = "", query = "") => {
       const defaultsToToday = !start && !end;
       const effectiveStart = defaultsToToday ? context.today() : start;
@@ -263,7 +335,7 @@
       const { start, end, query } = historyFilterValues();
       const period = reportPeriodFromFilters(start, end);
       const periodText = reportPeriodLabel(period);
-      const rows = context.productStockFlowRows(category, period, query).map((item) => [
+      const rows = productStockFlowRows(category, period, query).map((item) => [
         item.product.name,
         context.productCategoryLabel(item.product.category),
         item.basisStock,
@@ -283,7 +355,7 @@
       const { start, end, query } = historyFilterValues();
       const period = reportPeriodFromFilters(start, end);
       const periodText = reportPeriodLabel(period);
-      const rows = context.productStockFlowRows(category, period, query).map((item) => [
+      const rows = productStockFlowRows(category, period, query).map((item) => [
         item.product.name,
         context.productCategoryLabel(item.product.category),
         item.basisStock,
@@ -391,10 +463,17 @@
       historyPeriodText,
       reportPeriodFromFilters,
       reportPeriodLabel,
+      usageDateValue,
+      productSeedFor,
+      productMovementTotal,
+      productInitialStock,
+      productMatchesReportQuery,
+      latestReceiptDateForProduct,
       filteredHistoryUsages,
       productUsagePatientRows,
       historyMovementCounts,
       productUsageSummaryRows,
+      productStockFlowRows,
       productUsageSummaryHtml,
       patientHistoryListHtml,
       usageItem,
