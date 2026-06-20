@@ -1781,10 +1781,7 @@ const exportImplantLedgerExcel = (date) => {
   );
 };
 
-const safeBackupFileName = (value) => String(value || "implant")
-  .replace(/[\\/:*?"<>|]+/g, "_")
-  .replace(/\s+/g, "_")
-  .slice(0, 80);
+const safeBackupFileName = (value) => getImplantsModule().safeBackupFileName(value);
 const downloadBytes = (filename, bytes, type = "application/octet-stream") => {
   const blob = new Blob([bytes], { type });
   downloadBlob(filename, blob);
@@ -1802,63 +1799,7 @@ const downloadBlob = (filename, blob) => {
     link.remove();
   }, 0);
 };
-const implantRecordsForMonth = (month) => sortImplantRecords(implantRecords.filter((record) => implantRecordDate(record).startsWith(month)));
-const exportImplantMonthlyBackup = async (month, onProgress) => {
-  if (!month) throw new Error("백업할 월을 선택해 주세요.");
-  const records = implantRecordsForMonth(month);
-  if (!records.length) throw new Error("선택한 월의 임플란트 기록이 없습니다.");
-  const headers = ["날짜", "번호", "환자명", "ID", "수술명", "원장코드", "저장자", "저장시간", "업체", "사용분", "사진수"];
-  const photoRefs = [];
-  records.forEach((record) => {
-    (record.implants || []).forEach((implant) => {
-      (implant.photos || []).forEach((photo, index) => {
-        const src = photo.url || photo.dataUrl || "";
-        if (!src) return;
-        photoRefs.push({ record, implant, photo, index, src });
-      });
-    });
-  });
-  const files = [
-    { name: "implant-ledger.xlsx", content: xlsxWorkbook(headers, implantLedgerRows(records)) },
-    { name: "implant-records.json", content: JSON.stringify(records, null, 2) },
-    { name: "photo-urls.txt", content: photoRefs.map(({ record, implant, src, index }) => [
-      implantRecordDate(record),
-      implantPatientNoText(record) ? `#${implantPatientNoText(record)}` : "미마감",
-      record.patientName || "",
-      record.patientId || "",
-      implant.vendor || "업체 없음",
-      `photo ${index + 1}`,
-      src
-    ].join("\t")).join("\n") }
-  ];
-  const errors = [];
-  let done = 0;
-  onProgress?.({ done, total: photoRefs.length, failed: 0 });
-  for (const item of photoRefs) {
-    try {
-      const response = await fetch(item.src);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      const ext = (item.photo.contentType || "image/jpeg").includes("png") ? "png" : "jpg";
-      const photoName = [
-        item.record.surgeryDate || implantRecordDate(item.record),
-        implantPatientNoText(item.record) ? `no-${implantPatientNoText(item.record)}` : "no-pending",
-        item.record.patientName || "patient",
-        item.implant.vendor || "vendor",
-        `photo-${item.index + 1}.${ext}`
-      ].map(safeBackupFileName).join("_");
-      files.push({ name: `photos/${photoName}`, content: bytes });
-    } catch (error) {
-      errors.push(`${implantRecordDate(item.record)} ${item.record.patientName || ""} ${item.implant.vendor || ""} photo ${item.index + 1}: ${error.message}`);
-    } finally {
-      done += 1;
-      onProgress?.({ done, total: photoRefs.length, failed: errors.length });
-    }
-  }
-  if (errors.length) files.push({ name: "photo-download-errors.txt", content: errors.join("\n") });
-  downloadBytes(`임플란트장부_백업_${month}.zip`, zipFiles(files), "application/zip");
-  return { records: records.length, photos: photoRefs.length, failed: errors.length };
-};
+const exportImplantMonthlyBackup = (month, onProgress) => getImplantsModule().exportImplantMonthlyBackup(month, onProgress);
 
 const implantSendMessage = (date, vendorName, lines) => getImplantsModule().implantSendMessage(date, vendorName, lines);
 const implantSendGroups = (date) => getImplantsModule().implantSendGroups(date);
@@ -2002,11 +1943,9 @@ const getImplantsModule = () => {
       auditUserText,
       auditTimeText,
       currentAuditUser,
-      safeBackupFileName,
       implantRecordsForDate,
       assignImplantPatientNosForDate,
       exportImplantLedgerExcel,
-      exportImplantMonthlyBackup,
       showSaveToast,
       saveDoneToast,
       saveErrorToast,
@@ -2017,6 +1956,8 @@ const getImplantsModule = () => {
       setButtonBusy,
       downloadBlob,
       downloadBytes,
+      zipFiles,
+      xlsxWorkbook,
       promiseWithTimeout,
       loadImageFromUrl,
       retryImplantRecordPhotos,
