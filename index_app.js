@@ -2003,55 +2003,26 @@ const getImplantVendorsModule = () => {
 const renderImplantVendors = () => getImplantVendorsModule().renderImplantVendors();
 const bindImplantVendors = () => getImplantVendorsModule().bindImplantVendors();
 
-const pendingUsageSummary = (item) => {
-  const productCount = (item.productItems || []).reduce((sum, product) => sum + Math.max(1, num(product.qty)), 0);
-  const implantCount = (item.implantDrafts || []).length;
-  const photoCount = (item.implantDrafts || []).reduce((sum, implant) => sum + (implant.photos || []).length, 0);
-  return { productCount, implantCount, photoCount };
+let usageEntryModule = null;
+const getUsageEntryModule = () => {
+  if (!window.createUsageEntryModule) throw new Error("사용입력 모듈을 불러오지 못했습니다.");
+  if (!usageEntryModule) {
+    usageEntryModule = window.createUsageEntryModule({
+      pendingUsagesOpen,
+      num,
+      departmentById,
+      surgeryById,
+      escapeHtml,
+      patientDisplayName,
+      today,
+      formatDateTime
+    });
+  }
+  return usageEntryModule;
 };
 
-const renderPendingUsageList = () => {
-  const items = pendingUsagesOpen();
-  if (!items.length) return "";
-  return `
-    <div class="card">
-      <div class="use-draft-head">
-        <div>
-          <h3 style="margin:0;">스크럽 확인 대기</h3>
-          <div class="muted">임시저장된 기록은 새로고침 후에도 남아 있습니다. 확인할 환자를 불러와 최종저장하세요.</div>
-        </div>
-        <span class="use-draft-status">${items.length}건</span>
-      </div>
-      <div class="pending-usage-list">
-        ${items.map((item) => {
-          const summary = pendingUsageSummary(item);
-          const doctor = departmentById(item.doctorId);
-          const surgery = surgeryById(item.surgeryId);
-          return `
-            <div class="pending-usage-card">
-              <div class="pending-usage-head">
-                <strong>${escapeHtml(patientDisplayName(item) || "환자 정보 없음")}</strong>
-                <span class="pill">${escapeHtml(item.date || today())}</span>
-              </div>
-              <div class="pending-usage-meta">
-                <span>${escapeHtml(doctor?.name || "-")}</span>
-                <span>${escapeHtml(surgery?.name || "-")}</span>
-                <span>제품 ${summary.productCount}개</span>
-                <span>임플란트 ${summary.implantCount}업체 · 사진 ${summary.photoCount}장</span>
-                <span>입력 ${escapeHtml(item.enteredBy?.name || item.enteredBy?.loginId || item.draftSavedBy || "-")}</span>
-                <span>${escapeHtml(formatDateTime(item.updatedAt || item.createdAt || ""))}</span>
-              </div>
-              <div class="actions">
-                <button type="button" data-load-pending-usage="${escapeHtml(item.id)}">불러오기</button>
-                <button class="danger" type="button" data-delete-pending-usage="${escapeHtml(item.id)}">대기삭제</button>
-              </div>
-            </div>
-          `;
-        }).join("")}
-      </div>
-    </div>
-  `;
-};
+const pendingUsageSummary = (item) => getUsageEntryModule().pendingUsageSummary(item);
+const renderPendingUsageList = () => getUsageEntryModule().renderPendingUsageList();
 
 const renderUse = () => `
   <section class="grid">
