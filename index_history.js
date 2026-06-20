@@ -68,6 +68,17 @@
       });
     };
 
+    const productUsagePatientRows = (productId, start = "", end = "") => filteredHistoryUsages(start, end, "")
+      .map((usage) => {
+        const qty = (usage.productIds || []).filter((id) => id === productId).length;
+        if (!qty) return null;
+        const doctor = context.departmentById(usage.doctorId);
+        const surgery = context.surgeryById(usage.surgeryId);
+        return { usage, qty, doctor, surgery };
+      })
+      .filter(Boolean)
+      .sort((a, b) => context.alphaFirstCompare(b.usage.date, a.usage.date) || context.alphaFirstCompare(a.usage.patientName, b.usage.patientName));
+
     const historyPeriodText = (start = "", end = "") => start || end
       ? `${start || "처음"} ~ ${end || "오늘"}`
       : "전체 기간";
@@ -94,7 +105,7 @@
         const productRows = context.productUsageSummaryRows(category, effectiveStart, effectiveEnd, query);
         const rows = productRows.map(({ product, received, used }) => {
           const isNonpay = context.productCategory(product.category) === "비급여";
-          const patientRows = context.productUsagePatientRows(product.id, effectiveStart, effectiveEnd);
+          const patientRows = productUsagePatientRows(product.id, effectiveStart, effectiveEnd);
           return `
             <details class="summary-row ${isNonpay ? "nonpay" : ""}">
               <summary>
@@ -352,6 +363,7 @@
       reportPeriodFromFilters,
       reportPeriodLabel,
       filteredHistoryUsages,
+      productUsagePatientRows,
       productUsageSummaryHtml,
       patientHistoryListHtml,
       usageItem,

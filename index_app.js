@@ -5099,16 +5099,7 @@ const stockStatusClass = (product) => {
   return "stock-ok";
 };
 
-const productUsagePatientRows = (productId, start = "", end = "") => filteredHistoryUsages(start, end, "")
-  .map((usage) => {
-    const qty = (usage.productIds || []).filter((id) => id === productId).length;
-    if (!qty) return null;
-    const doctor = departmentById(usage.doctorId);
-    const surgery = surgeryById(usage.surgeryId);
-    return { usage, qty, doctor, surgery };
-  })
-  .filter(Boolean)
-  .sort((a, b) => alphaFirstCompare(b.usage.date, a.usage.date) || alphaFirstCompare(a.usage.patientName, b.usage.patientName));
+const productUsagePatientRows = (productId, start = "", end = "") => getHistoryModule().productUsagePatientRows(productId, start, end);
 
 const productUsageSummaryHtml = (start = "", end = "", query = "") => getHistoryModule().productUsageSummaryHtml(start, end, query);
 
@@ -5130,7 +5121,6 @@ const getHistoryModule = () => {
       productCategories: PRODUCT_CATEGORIES,
       productCategory,
       productUsageSummaryRows,
-      productUsagePatientRows,
       stockStatusClass,
       num,
       patientDisplayName,
