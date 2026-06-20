@@ -131,7 +131,77 @@
 
     const patientHistoryListHtml = (start = "", end = "", query = "") => {
       const usages = context.filteredHistoryUsages(start, end, query).slice().reverse();
-      return usages.map(context.usageItem).join("") || `<div class="empty">사용내역이 없습니다.</div>`;
+      return usages.map(usageItem).join("") || `<div class="empty">사용내역이 없습니다.</div>`;
+    };
+
+    const usageItem = (usage, options = {}) => {
+      const showDelete = options.showDelete !== false && context.canDeleteUsageRecord(usage);
+      const showEdit = options.showEdit !== false && context.canEditUsage();
+      const showActions = options.showDelete !== false && (showEdit || showDelete);
+      const doctor = context.departmentById(usage.doctorId);
+      const surgery = context.surgeryById(usage.surgeryId);
+      const surgeryDepartment = surgery ? (surgery.department || context.inferSurgeryDepartment(surgery.name)) : "-";
+      const productCounts = usage.productIds.reduce((map, id) => {
+        map.set(id, (map.get(id) || 0) + 1);
+        return map;
+      }, new Map());
+      const groupedProducts = context.productCategories.map((category) => {
+        const items = Array.from(productCounts.entries())
+          .map(([id, qty]) => ({ product: context.productById(id), id, qty }))
+          .filter((item) => context.productCategory(item.product?.category) === category)
+          .sort((a, b) => context.alphaFirstCompare(a.product?.name || "", b.product?.name || ""));
+        return { category, items };
+      }).filter((group) => group.items.length);
+      const missingProducts = Array.from(productCounts.entries())
+        .map(([id, qty]) => ({ id, qty, product: context.productById(id) }))
+        .filter((item) => !item.product);
+      const groupClass = (category) => {
+        const key = context.productCategory(category);
+        if (key === "비급여") return "nonpay";
+        if (key === "인체조직") return "tissue";
+        if (["ANCHOR", "URO_LANDING", "GS_LANDING", "IMPLANT"].includes(key)) return "anchor";
+        return "";
+      };
+      const doubleCheck = usage.doubleCheck || {};
+      const doubleCheckText = doubleCheck.status === "finalSaved"
+        ? `더블체크: 임시저장 ${doubleCheck.draftSavedBy || "-"}${doubleCheck.draftSavedAt ? ` (${context.formatDateTime(doubleCheck.draftSavedAt)})` : ""} · 최종저장 ${doubleCheck.finalSavedBy || "-"}${doubleCheck.finalSavedAt ? ` (${context.formatDateTime(doubleCheck.finalSavedAt)})` : ""}`
+        : "";
+      return `
+        <div class="item">
+          <div class="item-title">
+            <span>${context.escapeHtml(context.patientDisplayName(usage))}</span>
+            <span class="pill">${usage.date}</span>
+          </div>
+          <div class="meta">
+            ${context.auditMetaHtml(usage, "입력")}
+            ${doubleCheckText ? `<span>${context.escapeHtml(doubleCheckText)}</span>` : ""}
+            <span>과/원장 코드: ${context.escapeHtml(doctor?.name || "-")} · 수술: ${context.escapeHtml(surgeryDepartment)} - ${context.escapeHtml(surgery?.name || "-")}</span>
+            <div class="usage-products">
+              ${groupedProducts.map((group) => `
+                <div class="usage-product-group ${groupClass(group.category)}">
+                  <div class="usage-product-heading">
+                    <span>${context.escapeHtml(context.productCategoryLabel(group.category))}</span>
+                    <span class="pill ${group.category === "비급여" ? "low" : ""}">${group.items.reduce((sum, item) => sum + item.qty, 0)}개</span>
+                  </div>
+                  <div class="usage-product-chips">
+                    ${group.items.map((item) => `<span class="usage-chip">${context.escapeHtml(item.product.name)}${item.qty > 1 ? ` · ${item.qty}개` : ""}</span>`).join("")}
+                  </div>
+                </div>
+              `).join("")}
+              ${missingProducts.length ? `
+                <div class="usage-product-group">
+                  <div class="usage-product-heading"><span>삭제된 제품</span><span class="pill">${missingProducts.reduce((sum, item) => sum + item.qty, 0)}개</span></div>
+                  <div class="usage-product-chips">${missingProducts.map((item) => `<span class="usage-chip">삭제된 제품${item.qty > 1 ? ` · ${item.qty}개` : ""}</span>`).join("")}</div>
+                </div>
+              ` : ""}
+            </div>
+          </div>
+          ${showActions ? `<div class="actions">
+            ${showEdit ? `<button class="secondary" type="button" data-edit-usage="${usage.id}">${context.canModifyUsageRecord(usage) ? "사용내용 수정" : "사용내용 확인"}</button>` : ""}
+            ${showDelete ? `<button class="danger" type="button" data-delete-usage="${usage.id}">사용내역 삭제</button>` : ""}
+          </div>` : ""}
+        </div>
+      `;
     };
 
     const exportHistoryCategory = (category) => {
@@ -268,6 +338,7 @@
       reportPeriodLabel,
       productUsageSummaryHtml,
       patientHistoryListHtml,
+      usageItem,
       renderHistory,
       bindHistory,
       exportHistoryCategory,

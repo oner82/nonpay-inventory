@@ -5137,6 +5137,7 @@ const getHistoryModule = () => {
       render,
       byName,
       escapeHtml,
+      alphaFirstCompare,
       productCategories: PRODUCT_CATEGORIES,
       productCategory,
       productUsageSummaryRows,
@@ -5145,8 +5146,8 @@ const getHistoryModule = () => {
       num,
       patientDisplayName,
       auditMetaHtml,
+      formatDateTime,
       filteredHistoryUsages,
-      usageItem,
       productStockFlowRows,
       productCategoryLabel,
       downloadExcel,
@@ -5158,6 +5159,9 @@ const getHistoryModule = () => {
       auditTimeText,
       today,
       inferSurgeryDepartment,
+      canEditUsage,
+      canModifyUsageRecord,
+      canDeleteUsageRecord,
       deleteUsageRecord
     });
   }
@@ -5167,75 +5171,7 @@ const getHistoryModule = () => {
 const renderHistory = () => getHistoryModule().renderHistory();
 const bindHistory = () => getHistoryModule().bindHistory();
 
-const usageItem = (usage, options = {}) => {
-  const showDelete = options.showDelete !== false && canDeleteUsageRecord(usage);
-  const showEdit = options.showEdit !== false && canEditUsage();
-  const showActions = options.showDelete !== false && (showEdit || showDelete);
-  const doctor = departmentById(usage.doctorId);
-  const surgery = surgeryById(usage.surgeryId);
-  const surgeryDepartment = surgery ? (surgery.department || inferSurgeryDepartment(surgery.name)) : "-";
-  const productCounts = usage.productIds.reduce((map, id) => {
-    map.set(id, (map.get(id) || 0) + 1);
-    return map;
-  }, new Map());
-  const groupedProducts = PRODUCT_CATEGORIES.map((category) => {
-    const items = Array.from(productCounts.entries())
-      .map(([id, qty]) => ({ product: productById(id), id, qty }))
-      .filter((item) => productCategory(item.product?.category) === category)
-      .sort((a, b) => alphaFirstCompare(a.product?.name || "", b.product?.name || ""));
-    return { category, items };
-  }).filter((group) => group.items.length);
-  const missingProducts = Array.from(productCounts.entries())
-    .map(([id, qty]) => ({ id, qty, product: productById(id) }))
-    .filter((item) => !item.product);
-  const groupClass = (category) => {
-    const key = productCategory(category);
-    if (key === "비급여") return "nonpay";
-    if (key === "인체조직") return "tissue";
-    if (["ANCHOR", "URO_LANDING", "GS_LANDING", "IMPLANT"].includes(key)) return "anchor";
-    return "";
-  };
-  const doubleCheck = usage.doubleCheck || {};
-  const doubleCheckText = doubleCheck.status === "finalSaved"
-    ? `더블체크: 임시저장 ${doubleCheck.draftSavedBy || "-"}${doubleCheck.draftSavedAt ? ` (${formatDateTime(doubleCheck.draftSavedAt)})` : ""} · 최종저장 ${doubleCheck.finalSavedBy || "-"}${doubleCheck.finalSavedAt ? ` (${formatDateTime(doubleCheck.finalSavedAt)})` : ""}`
-    : "";
-  return `
-    <div class="item">
-      <div class="item-title">
-        <span>${escapeHtml(patientDisplayName(usage))}</span>
-        <span class="pill">${usage.date}</span>
-      </div>
-      <div class="meta">
-        ${auditMetaHtml(usage, "입력")}
-        ${doubleCheckText ? `<span>${escapeHtml(doubleCheckText)}</span>` : ""}
-        <span>과/원장 코드: ${escapeHtml(doctor?.name || "-")} · 수술: ${escapeHtml(surgeryDepartment)} - ${escapeHtml(surgery?.name || "-")}</span>
-        <div class="usage-products">
-          ${groupedProducts.map((group) => `
-            <div class="usage-product-group ${groupClass(group.category)}">
-              <div class="usage-product-heading">
-                <span>${escapeHtml(productCategoryLabel(group.category))}</span>
-                <span class="pill ${group.category === "비급여" ? "low" : ""}">${group.items.reduce((sum, item) => sum + item.qty, 0)}개</span>
-              </div>
-              <div class="usage-product-chips">
-                ${group.items.map((item) => `<span class="usage-chip">${escapeHtml(item.product.name)}${item.qty > 1 ? ` · ${item.qty}개` : ""}</span>`).join("")}
-              </div>
-            </div>
-          `).join("")}
-          ${missingProducts.length ? `
-            <div class="usage-product-group">
-              <div class="usage-product-heading"><span>삭제된 제품</span><span class="pill">${missingProducts.reduce((sum, item) => sum + item.qty, 0)}개</span></div>
-              <div class="usage-product-chips">${missingProducts.map((item) => `<span class="usage-chip">삭제된 제품${item.qty > 1 ? ` · ${item.qty}개` : ""}</span>`).join("")}</div>
-            </div>
-          ` : ""}
-        </div>
-      </div>
-      ${showActions ? `<div class="actions">
-        ${showEdit ? `<button class="secondary" type="button" data-edit-usage="${usage.id}">${canModifyUsageRecord(usage) ? "사용내용 수정" : "사용내용 확인"}</button>` : ""}
-        ${showDelete ? `<button class="danger" type="button" data-delete-usage="${usage.id}">사용내역 삭제</button>` : ""}
-      </div>` : ""}
-    </div>
-  `;
-};
+const usageItem = (usage, options = {}) => getHistoryModule().usageItem(usage, options);
 
 const zipFiles = (files) => window.ORInventoryExportUtils.zipFiles(files);
 const xlsxWorkbook = (headers, rows) => window.ORInventoryExportUtils.xlsxWorkbook(headers, rows);
