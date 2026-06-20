@@ -11,6 +11,7 @@
       setCurrentImplantSubView,
       render,
       num,
+      uid,
       normalizedName,
       productCategory,
       productById,
@@ -204,11 +205,6 @@
               <span class="implant-crop-handle" data-crop-handle="sw"></span>
               <span class="implant-crop-handle" data-crop-handle="w"></span>
             </div>
-          </div>
-          <div class="actions" id="implantPhotoEditTools" hidden>
-            <button class="secondary" type="button" id="implantModalRotate">회전</button>
-            <button class="secondary" type="button" id="implantModalCrop">자르기</button>
-            <button type="button" id="implantModalDone">완료</button>
           </div>
         </div>
       </div>
@@ -527,6 +523,60 @@ const implantSourceRect = (photo, image) => {
     };
   }
   return { x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight };
+};
+const cleanImplantPhotoPayload = (photo) => ({
+  id: photo.id || uid(),
+  url: photo.url || "",
+  path: photo.path || "",
+  dataUrl: photo.dataUrl || "",
+  name: photo.name || "",
+  size: num(photo.size),
+  contentType: photo.contentType || "image/jpeg",
+  rotation: num(photo.rotation),
+  cropped: Boolean(photo.cropped),
+  cropRect: photo.cropped && photo.cropRect ? normalizeImplantCropRect(photo.cropRect) : null,
+  sourceCommonPhotoId: photo.sourceCommonPhotoId || "",
+  uploadedAt: photo.uploadedAt || "",
+  needsReupload: Boolean(photo.needsReupload),
+  storageUploadFailed: Boolean(photo.storageUploadFailed),
+  storageUploadError: photo.storageUploadError || ""
+});
+const implantPhotoCacheKey = (photo = {}) => {
+  const source = photo.sourceCommonPhotoId
+    || (photo.file ? `file:${photo.file.name || ""}:${photo.file.size || 0}:${photo.file.lastModified || 0}` : "");
+  if (!source) return "";
+  const crop = photo.cropped && photo.cropRect ? normalizeImplantCropRect(photo.cropRect) : null;
+  return JSON.stringify({
+    source,
+    rotation: num(photo.rotation),
+    cropped: Boolean(photo.cropped),
+    crop
+  });
+};
+const cloneImplantPhotoPayload = (payload = {}, photo = {}) => ({
+  ...cleanImplantPhotoPayload(payload),
+  id: photo.id || payload.id || uid(),
+  name: photo.file?.name || photo.name || payload.name || "",
+  sourceCommonPhotoId: photo.sourceCommonPhotoId || payload.sourceCommonPhotoId || ""
+});
+const cachedImplantPhotoPayload = async (photo, cache, buildPayload) => {
+  const key = implantPhotoCacheKey(photo);
+  if (key && cache?.has(key)) return cloneImplantPhotoPayload(cache.get(key), photo);
+  const payload = await buildPayload();
+  if (key && cache) cache.set(key, payload);
+  return cloneImplantPhotoPayload(payload, photo);
+};
+const countImplantPhotosToUpload = (implants = []) => implants.reduce((sum, implant) => (
+  sum + (implant.photos || []).filter((photo) => photo.file || photo.needsReupload).length
+), 0);
+const notifyImplantPhotoUpload = (onProgress, done, total, failed = 0) => {
+  if (!total) return;
+  if (typeof onProgress === "function") {
+    onProgress({ done, total, failed });
+  } else {
+    const failText = failed ? ` · 실패 ${failed}장` : "";
+    showSaveToast(`사진 업로드 중 ${done}/${total}${failText}`, failed ? "error" : "saving", { hold: done < total, duration: done >= total ? 1800 : undefined });
+  }
 };
 const implantSendStatusLabels = {
   pending: "미발송",
@@ -1735,6 +1785,12 @@ const bindImplants = () => {
       normalizeImplantCropRect,
       defaultImplantCropRect,
       implantSourceRect,
+      cleanImplantPhotoPayload,
+      implantPhotoCacheKey,
+      cloneImplantPhotoPayload,
+      cachedImplantPhotoPayload,
+      countImplantPhotosToUpload,
+      notifyImplantPhotoUpload,
       implantDescriptionText,
       implantLedgerRows,
       implantLedgerTableHtml,

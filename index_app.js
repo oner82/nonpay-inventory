@@ -2078,6 +2078,7 @@ const getImplantsModule = () => {
       setCurrentImplantSubView: (value) => { currentImplantSubView = value; },
       render,
       num,
+      uid,
       normalizedName,
       productCategory,
       productById,
@@ -2945,13 +2946,12 @@ const bindEditUsage = () => {
   const refreshEditImplantPhotoEditor = () => {
     const { photo } = parseEditImplantPair(activeEditImplantPhotoPair);
     const image = document.getElementById("implantPhotoModalImage");
-    const tools = document.getElementById("implantPhotoEditTools");
     const cropButton = document.getElementById("implantModalCrop");
-    if (!photo || !image || !tools) return;
+    if (!photo || !image) return;
     image.src = implantPhotoViewSrc(photo);
     image.style.transform = implantPhotoRotationStyle(photo).replace("transform:", "").replace(";", "");
     image.classList.toggle("cropped", Boolean(photo.cropped));
-    tools.hidden = false;
+    showImplantPhotoEditTools();
     if (cropButton) cropButton.textContent = photo.cropped ? "자르기 수정" : "자르기";
   };
   const openEditImplantPhotoEditor = (pair) => {
@@ -3173,9 +3173,8 @@ const bindEditUsage = () => {
       const photo = editCommonImplantPhotoById(preview.dataset.previewEditCommonImplantPhoto);
       if (photo) {
         activeEditImplantPhotoPair = "";
-        const tools = document.getElementById("implantPhotoEditTools");
         const image = document.getElementById("implantPhotoModalImage");
-        if (tools) tools.hidden = true;
+        hideImplantPhotoEditTools();
         if (image) image.style.transform = "";
         showImplantPhotoModal(implantPhotoViewSrc(photo));
       }
@@ -3452,6 +3451,27 @@ const implantCropElements = () => ({
   frame: document.getElementById("implantCropFrame"),
   cropButton: document.getElementById("implantModalCrop")
 });
+const implantPhotoNodes = (id) => Array.from(document.querySelectorAll(`[id="${id}"]`));
+const hideImplantPhotoEditTools = () => {
+  implantPhotoNodes("implantPhotoEditTools").forEach((tools) => {
+    tools.hidden = true;
+    tools.style.display = "none";
+  });
+};
+const showImplantPhotoEditTools = () => {
+  hideImplantPhotoEditTools();
+  const tools = document.getElementById("implantPhotoEditTools");
+  if (tools) {
+    tools.hidden = false;
+    tools.style.display = "";
+  }
+};
+const resetImplantPhotoFrames = () => {
+  implantPhotoNodes("implantCropFrame").forEach((frame) => {
+    frame.hidden = true;
+    frame.style.display = "";
+  });
+};
 const implantImageBoundsInStage = () => {
   const { stage, image } = implantCropElements();
   if (!stage || !image) return null;
@@ -3608,8 +3628,7 @@ const openImplantCropEditor = async (photo, onApply) => {
   activeImplantCropPhoto = photo;
   activeImplantCropApply = onApply;
   const { image } = implantCropElements();
-  const tools = document.getElementById("implantPhotoEditTools");
-  if (tools) tools.hidden = false;
+  showImplantPhotoEditTools();
   if (image) {
     image.style.transform = "";
     image.classList.remove("cropped");
@@ -3623,10 +3642,14 @@ const showImplantPhotoModal = (url) => {
   const frame = document.getElementById("implantCropFrame");
   if (!modal || !image || !url) return;
   image.src = url;
+  image.style.transform = "";
   image.classList.remove("cropped");
+  hideImplantPhotoEditTools();
+  resetImplantPhotoFrames();
   if (frame) frame.hidden = true;
   activeImplantCropPhoto = null;
   activeImplantCropApply = null;
+  implantCropPointerState = null;
   setImplantCropButtonText("자르기");
   modal.hidden = false;
 };
@@ -3634,12 +3657,12 @@ const showImplantPhotoModal = (url) => {
 const hideImplantPhotoModal = () => {
   const modal = document.getElementById("implantPhotoModal");
   const image = document.getElementById("implantPhotoModalImage");
-  const tools = document.getElementById("implantPhotoEditTools");
   const frame = document.getElementById("implantCropFrame");
   if (image) image.removeAttribute("src");
   if (image) image.style.transform = "";
   if (image) image.classList.remove("cropped");
-  if (tools) tools.hidden = true;
+  hideImplantPhotoEditTools();
+  resetImplantPhotoFrames();
   if (frame) frame.hidden = true;
   activeImplantCropPhoto = null;
   activeImplantCropApply = null;
@@ -3810,65 +3833,12 @@ const implantRecordBasePayload = (usage) => {
   };
 };
 
-const cleanImplantPhotoPayload = (photo) => ({
-  id: photo.id || uid(),
-  url: photo.url || "",
-  path: photo.path || "",
-  dataUrl: photo.dataUrl || "",
-  name: photo.name || "",
-  size: num(photo.size),
-  contentType: photo.contentType || "image/jpeg",
-  rotation: num(photo.rotation),
-  cropped: Boolean(photo.cropped),
-  cropRect: photo.cropped && photo.cropRect ? normalizeImplantCropRect(photo.cropRect) : null,
-  sourceCommonPhotoId: photo.sourceCommonPhotoId || "",
-  uploadedAt: photo.uploadedAt || "",
-  needsReupload: Boolean(photo.needsReupload),
-  storageUploadFailed: Boolean(photo.storageUploadFailed),
-  storageUploadError: photo.storageUploadError || ""
-});
-
-const implantPhotoCacheKey = (photo = {}) => {
-  const source = photo.sourceCommonPhotoId
-    || (photo.file ? `file:${photo.file.name || ""}:${photo.file.size || 0}:${photo.file.lastModified || 0}` : "");
-  if (!source) return "";
-  const crop = photo.cropped && photo.cropRect ? normalizeImplantCropRect(photo.cropRect) : null;
-  return JSON.stringify({
-    source,
-    rotation: num(photo.rotation),
-    cropped: Boolean(photo.cropped),
-    crop
-  });
-};
-
-const cloneImplantPhotoPayload = (payload = {}, photo = {}) => ({
-  ...cleanImplantPhotoPayload(payload),
-  id: photo.id || payload.id || uid(),
-  name: photo.file?.name || photo.name || payload.name || "",
-  sourceCommonPhotoId: photo.sourceCommonPhotoId || payload.sourceCommonPhotoId || ""
-});
-
-const cachedImplantPhotoPayload = async (photo, cache, buildPayload) => {
-  const key = implantPhotoCacheKey(photo);
-  if (key && cache?.has(key)) return cloneImplantPhotoPayload(cache.get(key), photo);
-  const payload = await buildPayload();
-  if (key && cache) cache.set(key, payload);
-  return cloneImplantPhotoPayload(payload, photo);
-};
-
-const countImplantPhotosToUpload = (implants = []) => implants.reduce((sum, implant) => (
-  sum + (implant.photos || []).filter((photo) => photo.file || photo.needsReupload).length
-), 0);
-
-const notifyImplantPhotoUpload = (onProgress, done, total, failed = 0) => {
-  if (!total) return;
-  if (typeof onProgress === "function") {
-    onProgress({ done, total, failed });
-  } else {
-    const failText = failed ? ` · 실패 ${failed}장` : "";
-    showSaveToast(`사진 업로드 중 ${done}/${total}${failText}`, failed ? "error" : "saving", { hold: done < total, duration: done >= total ? 1800 : undefined });
-  }
-};
+const cleanImplantPhotoPayload = (photo) => getImplantsModule().cleanImplantPhotoPayload(photo);
+const implantPhotoCacheKey = (photo = {}) => getImplantsModule().implantPhotoCacheKey(photo);
+const cloneImplantPhotoPayload = (payload = {}, photo = {}) => getImplantsModule().cloneImplantPhotoPayload(payload, photo);
+const cachedImplantPhotoPayload = (photo, cache, buildPayload) => getImplantsModule().cachedImplantPhotoPayload(photo, cache, buildPayload);
+const countImplantPhotosToUpload = (implants = []) => getImplantsModule().countImplantPhotosToUpload(implants);
+const notifyImplantPhotoUpload = (onProgress, done, total, failed = 0) => getImplantsModule().notifyImplantPhotoUpload(onProgress, done, total, failed);
 
 const saveImplantRecordFromEdit = async (usage, recordId, implants, options = {}) => {
   if (!recordId && !implants.length) return;
@@ -4608,13 +4578,12 @@ const bindUse = () => {
   const refreshImplantPhotoEditor = () => {
     const { photo } = parseImplantPair(activeImplantEditPair);
     const image = document.getElementById("implantPhotoModalImage");
-    const tools = document.getElementById("implantPhotoEditTools");
     const cropButton = document.getElementById("implantModalCrop");
-    if (!photo || !image || !tools) return;
+    if (!photo || !image) return;
     image.src = implantPhotoViewSrc(photo);
     image.style.transform = implantPhotoRotationStyle(photo).replace("transform:", "").replace(";", "");
     image.classList.toggle("cropped", Boolean(photo.cropped));
-    tools.hidden = false;
+    showImplantPhotoEditTools();
     if (cropButton) cropButton.textContent = photo.cropped ? "자르기 수정" : "자르기";
   };
   const openImplantPhotoEditor = (pair) => {
@@ -4875,9 +4844,8 @@ const bindUse = () => {
       const photo = commonImplantPhotoById(preview.dataset.previewCommonImplantPhoto);
       if (photo) {
         activeImplantEditPair = "";
-        const tools = document.getElementById("implantPhotoEditTools");
         const image = document.getElementById("implantPhotoModalImage");
-        if (tools) tools.hidden = true;
+        hideImplantPhotoEditTools();
         if (image) image.style.transform = "";
         showImplantPhotoModal(implantPhotoViewSrc(photo));
       }
@@ -4957,9 +4925,8 @@ const bindUse = () => {
     if (previewButton) {
       const { photo } = parseImplantPair(previewButton.dataset.previewImplantPhoto);
       activeImplantEditPair = "";
-      const tools = document.getElementById("implantPhotoEditTools");
       const image = document.getElementById("implantPhotoModalImage");
-      if (tools) tools.hidden = true;
+      hideImplantPhotoEditTools();
       if (image) image.style.transform = "";
       if (photo) {
         showImplantPhotoModal(implantPhotoViewSrc(photo));

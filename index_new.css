@@ -286,6 +286,7 @@
     button.warn { background: var(--warn); }
     .row { display: grid; grid-template-columns: 1fr; gap: 12px; }
     .actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 12px; }
+    .actions[hidden] { display: none !important; }
 
     .dashboard-shell { display: grid; gap: 16px; }
     .dashboard-content { display: grid; grid-template-columns: 1fr; gap: 16px; }
