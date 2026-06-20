@@ -155,7 +155,7 @@ function showApp() {
   setupMode = false;
   $("loginScreen").style.display = "none";
   $("appShell").style.display = "grid";
-  $("inventoryFrame").src = `./index_new.html?v=20260620-backup-prepare&t=${Date.now()}`;
+  $("inventoryFrame").src = `./index_new.html?v=20260620-session-controls&t=${Date.now()}`;
   $("currentUserText").textContent = `${currentUser.name} (${currentUser.loginId})`;
   $("roleText").textContent = `${roleLabels[currentUser.role] || currentUser.role} · 앱 여는 중`;
   $("accountManageBtn").style.display = currentUser.role === "admin" ? "inline-flex" : "none";
@@ -355,96 +355,7 @@ function openAccountDialog() {
 
 function renderFrameAccountControls(frameDoc) {
   if (!currentUser || !frameDoc) return;
-  const topbar = frameDoc.querySelector(".topbar");
-  if (!topbar) return;
-
-  if (!frameDoc.getElementById("authShellControlsStyle")) {
-    const style = frameDoc.createElement("style");
-    style.id = "authShellControlsStyle";
-    style.textContent = `
-      .topbar {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        align-items: end;
-        column-gap: 10px;
-      }
-      .topbar .brand,
-      .topbar #nav {
-        grid-column: 1 / -1;
-      }
-      .topbar #status {
-        grid-column: 1 / -1;
-        align-self: center;
-      }
-      .auth-shell-controls {
-        grid-column: 1 / -1;
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 6px;
-        min-width: 0;
-        margin: 6px 0 2px;
-        white-space: nowrap;
-      }
-      .auth-shell-user {
-        display: inline-flex;
-        align-items: center;
-        min-height: 32px;
-        max-width: 220px;
-        padding: 0 10px;
-        border: 1px solid #d7e2ef;
-        border-radius: 10px;
-        background: rgba(255,255,255,.72);
-        color: #2e405c;
-        font-size: 12px;
-        font-weight: 900;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .auth-shell-controls button {
-        min-height: 32px;
-        padding: 0 10px;
-        border-radius: 10px;
-        font-size: 12px;
-        box-shadow: none;
-      }
-      .auth-shell-controls button.danger {
-        background: #ef4444;
-        color: #fff;
-      }
-      @media (max-width: 720px) {
-        .topbar { grid-template-columns: 1fr; }
-        .topbar #status,
-        .auth-shell-controls {
-          grid-column: 1;
-        }
-        .auth-shell-controls {
-          justify-content: flex-start;
-          overflow-x: auto;
-          padding-bottom: 2px;
-        }
-        .auth-shell-user { max-width: 170px; }
-      }
-    `;
-    frameDoc.head.appendChild(style);
-  }
-
-  let controls = frameDoc.getElementById("authShellControls");
-  if (!controls) {
-    controls = frameDoc.createElement("div");
-    controls.id = "authShellControls";
-    controls.className = "auth-shell-controls";
-    const status = frameDoc.getElementById("status");
-    topbar.insertBefore(controls, status?.nextSibling || topbar.querySelector("#nav"));
-  }
-
-  controls.innerHTML = `
-    <span class="auth-shell-user" title="${escapeHtml(roleLabels[currentUser.role] || currentUser.role)}">${escapeHtml(currentUser.name)} · ${escapeHtml(currentUser.loginId)}</span>
-    ${currentUser.role === "admin" ? `<button type="button" class="secondary" data-auth-account>계정관리</button>` : ""}
-    <button type="button" class="danger" data-auth-logout>로그아웃</button>
-  `;
-  controls.querySelector("[data-auth-account]")?.addEventListener("click", openAccountDialog);
-  controls.querySelector("[data-auth-logout]")?.addEventListener("click", logout);
+  frameDoc.getElementById("authShellControls")?.remove();
 }
 
 function applyRoleToFrame() {
@@ -508,6 +419,12 @@ $("requestCloseBtn").addEventListener("click", () => $("requestDialog").close())
 $("accountManageBtn").addEventListener("click", openAccountDialog);
 $("accountCloseBtn").addEventListener("click", () => $("accountDialog").close());
 $("accountResetBtn").addEventListener("click", resetAccountForm);
+
+window.addEventListener("message", (event) => {
+  if (event.origin !== window.location.origin) return;
+  if (event.data?.type !== "orInventoryOpenAccountDialog") return;
+  openAccountDialog();
+});
 
 $("requestForm").addEventListener("submit", async (event) => {
   event.preventDefault();
