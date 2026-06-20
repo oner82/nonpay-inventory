@@ -4977,20 +4977,7 @@ const inDateRange = (date, start, end) => {
   return true;
 };
 
-const filteredHistoryUsages = (start, end, query) => {
-  const normalizedQuery = normalizedName(query || "");
-  return state.usages.filter((usage) => {
-    if (!inDateRange(usage.date, start, end)) return false;
-    if (!normalizedQuery) return true;
-    const doctor = departmentById(usage.doctorId);
-    const surgery = surgeryById(usage.surgeryId);
-    const productText = usage.productIds.map((id) => {
-      const product = productById(id);
-      return `${product?.name || ""} ${product?.company || ""} ${product?.subcategory || ""}`;
-    }).join(" ");
-    return normalizedName(`${usage.patientName || ""} ${patientIdText(usage)} ${doctor?.name || ""} ${surgery?.name || ""} ${productText}`).includes(normalizedQuery);
-  });
-};
+const filteredHistoryUsages = (start, end, query) => getHistoryModule().filteredHistoryUsages(start, end, query);
 
 const historyPeriodText = (start = "", end = "") => getHistoryModule().historyPeriodText(start, end);
 
@@ -5137,6 +5124,8 @@ const getHistoryModule = () => {
       render,
       byName,
       escapeHtml,
+      normalizedName,
+      inDateRange,
       alphaFirstCompare,
       productCategories: PRODUCT_CATEGORIES,
       productCategory,
@@ -5147,7 +5136,6 @@ const getHistoryModule = () => {
       patientDisplayName,
       auditMetaHtml,
       formatDateTime,
-      filteredHistoryUsages,
       productStockFlowRows,
       productCategoryLabel,
       downloadExcel,

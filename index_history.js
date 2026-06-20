@@ -53,6 +53,21 @@
       query: document.getElementById("historySearch")?.value || ""
     });
 
+    const filteredHistoryUsages = (start, end, query) => {
+      const normalizedQuery = context.normalizedName(query || "");
+      return context.getState().usages.filter((usage) => {
+        if (!context.inDateRange(usage.date, start, end)) return false;
+        if (!normalizedQuery) return true;
+        const doctor = context.departmentById(usage.doctorId);
+        const surgery = context.surgeryById(usage.surgeryId);
+        const productText = usage.productIds.map((id) => {
+          const product = context.productById(id);
+          return `${product?.name || ""} ${product?.company || ""} ${product?.subcategory || ""}`;
+        }).join(" ");
+        return context.normalizedName(`${usage.patientName || ""} ${context.patientIdText(usage)} ${doctor?.name || ""} ${surgery?.name || ""} ${productText}`).includes(normalizedQuery);
+      });
+    };
+
     const historyPeriodText = (start = "", end = "") => start || end
       ? `${start || "처음"} ~ ${end || "오늘"}`
       : "전체 기간";
@@ -130,7 +145,7 @@
     };
 
     const patientHistoryListHtml = (start = "", end = "", query = "") => {
-      const usages = context.filteredHistoryUsages(start, end, query).slice().reverse();
+      const usages = filteredHistoryUsages(start, end, query).slice().reverse();
       return usages.map(usageItem).join("") || `<div class="empty">사용내역이 없습니다.</div>`;
     };
 
@@ -252,7 +267,7 @@
 
     const exportHistoryPatients = () => {
       const { start, end, query } = historyFilterValues();
-      const rows = context.filteredHistoryUsages(start, end, query).slice().reverse().map((usage) => {
+      const rows = filteredHistoryUsages(start, end, query).slice().reverse().map((usage) => {
         const doctor = context.departmentById(usage.doctorId);
         const surgery = context.surgeryById(usage.surgeryId);
         const productText = usage.productIds.map((id) => context.productById(id)?.name || "삭제된 제품").join(", ");
@@ -336,6 +351,7 @@
       historyPeriodText,
       reportPeriodFromFilters,
       reportPeriodLabel,
+      filteredHistoryUsages,
       productUsageSummaryHtml,
       patientHistoryListHtml,
       usageItem,
