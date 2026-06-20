@@ -601,102 +601,18 @@ const productCompanyOptions = (selectedName = "", selectedId = "") => {
     ${vendors.map((vendor) => `<option value="${escapeHtml(vendor.id || "")}" ${sameId(vendor.id, selectedValue) ? "selected" : ""}>${escapeHtml(vendor.name || "업체명 없음")}${vendor.active === false ? " · 발송 정지" : ""}</option>`).join("")}
   `;
 };
-const productNeedsImplantLedger = (product) => {
-  const category = productCategory(product?.category);
-  return ["인체조직", "ANCHOR", "URO_LANDING", "GS_LANDING", "IMPLANT"].includes(category);
-};
-const implantVendorKey = (value) => normalizedName(value);
-const implantVendorSelectionForProduct = (product = {}) => {
-  const byId = product.companyVendorId ? implantVendorById(product.companyVendorId) : null;
-  const name = String(byId?.name || product.company || "").trim();
-  if (!name || name === "업체 없음") return { key: "", vendorId: "", customVendor: "", vendor: "" };
-  const matched = byId || findImplantVendorByName(name);
-  if (matched) return { key: `id:${matched.id}`, vendorId: matched.id, customVendor: "", vendor: matched.name || name };
-  return { key: implantVendorKey(name), vendorId: "__custom__", customVendor: name, vendor: name };
-};
-const implantVendorSelectionForCompany = (company = "") => implantVendorSelectionForProduct({ company });
-const implantDraftVendorName = (draft = {}) => draft.vendorId === "__custom__"
-  ? (draft.customVendor || draft.vendor || "")
-  : (implantVendorById(draft.vendorId)?.name || draft.vendor || draft.customVendor || "");
-const mergeImplantDescriptionLines = (left = "", right = "") => {
-  const lines = [];
-  String(left || "").split(/\r?\n/).forEach((line) => {
-    const text = line.trim();
-    if (text && !lines.includes(text)) lines.push(text);
-  });
-  String(right || "").split(/\r?\n/).forEach((line) => {
-    const text = line.trim();
-    if (text && !lines.includes(text)) lines.push(text);
-  });
-  return lines.join("\n");
-};
-const implantVendorMatchKeys = (entry = {}) => {
-  const keys = new Set();
-  const addKey = (value = "") => {
-    const key = String(value || "").trim();
-    if (!key) return;
-    keys.add(key);
-    if (key.startsWith("id:")) {
-      const vendor = implantVendorById(key.slice(3));
-      if (vendor?.name) addName(vendor.name);
-    }
-  };
-  const addName = (value = "") => {
-    const key = implantVendorKey(value);
-    if (!key) return;
-    keys.add(key);
-    const matched = findImplantVendorByName(value);
-    if (matched?.id) keys.add(`id:${matched.id}`);
-  };
-  addKey(entry.key);
-  addKey(entry.autoCompanyKey);
-  const vendorId = String(entry.vendorId || "").trim();
-  if (vendorId && vendorId !== "__custom__") {
-    addKey(`id:${vendorId}`);
-    const vendor = implantVendorById(vendorId);
-    if (vendor?.name) addName(vendor.name);
-  }
-  addName(entry.vendor);
-  addName(entry.customVendor);
-  addName(implantDraftVendorName(entry));
-  return keys;
-};
-const implantVendorEntriesMatch = (left = {}, right = {}) => {
-  const leftKeys = implantVendorMatchKeys(left);
-  const rightKeys = implantVendorMatchKeys(right);
-  if (!leftKeys.size || !rightKeys.size) return false;
-  return [...leftKeys].some((key) => rightKeys.has(key));
-};
-const findImplantEntryByVendorTarget = (entries = [], target = {}) =>
-  entries.find((entry) => implantVendorEntriesMatch(entry, target));
-const implantRowHasContent = (row = {}) => Boolean(String(row.description || "").trim() || (row.photos || []).length);
-const implantDraftHasManualContent = (draft = {}) => {
-  const description = String(draft.description || "").trim();
-  const autoDescription = String(draft.autoDescription || "").trim();
-  return Boolean((draft.photos || []).length || (description && description !== autoDescription));
-};
-const implantDraftCanAutoUpdateDescription = (draft = {}) => {
-  const description = String(draft.description || "").trim();
-  const autoDescription = String(draft.autoDescription || "").trim();
-  return !description || description === autoDescription;
-};
-const implantDraftAutoDescription = (items = []) => items
-  .map(({ product, qty }) => `${product?.name || "제품명 없음"} ${Math.max(1, num(qty))}ea`)
-  .join("\n");
-const implantVendorTargetsFromUseItems = (items = []) => {
-  const targets = new Map();
-  items.forEach((item) => {
-    const product = productById(item.productId);
-    if (!productNeedsImplantLedger(product)) return;
-    const target = implantVendorSelectionForProduct(product);
-    if (!target.key) return;
-    const current = targets.get(target.key) || { ...target, items: [] };
-    current.items.push({ product, qty: item.qty });
-    current.description = implantDraftAutoDescription(current.items);
-    targets.set(target.key, current);
-  });
-  return [...targets.values()];
-};
+const productNeedsImplantLedger = (product) => getImplantsModule().productNeedsImplantLedger(product);
+const implantVendorSelectionForProduct = (product = {}) => getImplantsModule().implantVendorSelectionForProduct(product);
+const implantVendorSelectionForCompany = (company = "") => getImplantsModule().implantVendorSelectionForCompany(company);
+const implantDraftVendorName = (draft = {}) => getImplantsModule().implantDraftVendorName(draft);
+const mergeImplantDescriptionLines = (left = "", right = "") => getImplantsModule().mergeImplantDescriptionLines(left, right);
+const implantVendorEntriesMatch = (left = {}, right = {}) => getImplantsModule().implantVendorEntriesMatch(left, right);
+const findImplantEntryByVendorTarget = (entries = [], target = {}) => getImplantsModule().findImplantEntryByVendorTarget(entries, target);
+const implantRowHasContent = (row = {}) => getImplantsModule().implantRowHasContent(row);
+const implantDraftHasManualContent = (draft = {}) => getImplantsModule().implantDraftHasManualContent(draft);
+const implantDraftCanAutoUpdateDescription = (draft = {}) => getImplantsModule().implantDraftCanAutoUpdateDescription(draft);
+const implantDraftAutoDescription = (items = []) => getImplantsModule().implantDraftAutoDescription(items);
+const implantVendorTargetsFromUseItems = (items = []) => getImplantsModule().implantVendorTargetsFromUseItems(items);
 const implantRecordDate = (record) => record?.surgeryDate || String(record?.createdAt || "").slice(0, 10) || "";
 const implantPatientNoText = (record) => String(record?.patientNo || "").trim();
 const implantPatientNoSortValue = (record) => {
@@ -2163,6 +2079,8 @@ const getImplantsModule = () => {
       render,
       num,
       normalizedName,
+      productCategory,
+      productById,
       currentUserRole,
       alphaFirstCompare,
       implantVendorById,
