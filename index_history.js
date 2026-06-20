@@ -39,7 +39,7 @@
               <summary><span>환자별 사용내역</span><span class="pill">${state.usages.length}</span></summary>
               <div class="details-body">
                 <div class="actions"><button class="secondary" type="button" id="exportHistoryPatients">엑셀 저장</button></div>
-                <div id="historyPatientList">${state.usages.slice().reverse().map(context.usageItem).join("") || `<div class="empty">사용내역이 없습니다.</div>`}</div>
+                <div id="historyPatientList">${patientHistoryListHtml()}</div>
               </div>
             </details>
           </div>
@@ -127,6 +127,11 @@
         </div>
         ${groups}
       `;
+    };
+
+    const patientHistoryListHtml = (start = "", end = "", query = "") => {
+      const usages = context.filteredHistoryUsages(start, end, query).slice().reverse();
+      return usages.map(context.usageItem).join("") || `<div class="empty">사용내역이 없습니다.</div>`;
     };
 
     const exportHistoryCategory = (category) => {
@@ -222,8 +227,7 @@
         const end = endInput.value;
         const query = searchInput.value;
         summary.innerHTML = productUsageSummaryHtml(start, end, query);
-        const usages = context.filteredHistoryUsages(start, end, query).slice().reverse();
-        patientList.innerHTML = usages.map(context.usageItem).join("") || `<div class="empty">사용내역이 없습니다.</div>`;
+        patientList.innerHTML = patientHistoryListHtml(start, end, query);
         bindHistoryDeleteButtons();
         bindHistoryExports();
       };
@@ -263,6 +267,7 @@
       reportPeriodFromFilters,
       reportPeriodLabel,
       productUsageSummaryHtml,
+      patientHistoryListHtml,
       renderHistory,
       bindHistory,
       exportHistoryCategory,
