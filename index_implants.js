@@ -1181,6 +1181,7 @@ const bindImplants = () => {
       implantSendLedgerTableRowsHtml,
       implantSendPhotoLedgerTableHtml,
       implantSendPrintTableHtml,
+      implantStatementPhotoChunks,
       implantStatementFooterHtml,
       implantSendStatementCardsHtml,
       implantSendStatementPrintHtml,

@@ -2089,6 +2089,7 @@ const implantSendPrintHtml = (date, group) => getImplantsModule().implantSendPri
 const implantSendLedgerTableRowsHtml = (group, options = {}) => getImplantsModule().implantSendLedgerTableRowsHtml(group, options);
 const implantSendPhotoLedgerTableHtml = (group) => getImplantsModule().implantSendPhotoLedgerTableHtml(group);
 const implantSendPrintTableHtml = (date, group) => getImplantsModule().implantSendPrintTableHtml(date, group);
+const implantStatementPhotoChunks = (photos = [], size = 4) => getImplantsModule().implantStatementPhotoChunks(photos, size);
 const implantStatementFooterHtml = (record = {}) => getImplantsModule().implantStatementFooterHtml(record);
 const implantSendStatementCardsHtml = (group) => getImplantsModule().implantSendStatementCardsHtml(group);
 const implantSendStatementPrintHtml = (date, group) => getImplantsModule().implantSendStatementPrintHtml(date, group);
