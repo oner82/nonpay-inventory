@@ -10,13 +10,21 @@
       getCurrentImplantSubView,
       setCurrentImplantSubView,
       render,
+      num,
+      normalizedName,
+      sortImplantRecords,
+      surgeryById,
+      departmentById,
+      auditUserText,
+      implantPhotoStatusStats,
+      implantPhotoProblemRows,
+      implantPhotoViewSrc,
+      implantPhotoNeedsStorageRetry,
+      isImplantLedgerClosed,
+      implantLockLabel,
       canAssignImplantPatientNo,
       canEditImplantPatientNo,
-      filteredImplantRecords,
-      implantRecordCardHtml,
-      implantLedgerTableHtml,
       implantRecordsForDate,
-      implantPhotoStatusPanelHtml,
       implantSendPanelOrganizedHtml,
       assignImplantPatientNosForDate,
       exportImplantLedgerExcel,
@@ -150,6 +158,166 @@
     </section>
   `;
     };
+
+const filteredImplantRecords = (date, patientName, patientId, patientNo) => {
+  const nameQuery = normalizedName(patientName || "");
+  const idQuery = normalizedName(patientId || "");
+  const noQuery = normalizedName(patientNo || "");
+  return sortImplantRecords(getImplantRecords()).filter((record) => {
+    if (date && implantRecordDate(record) !== date) return false;
+    if (nameQuery && !normalizedName(record.patientName || "").includes(nameQuery)) return false;
+    if (idQuery && !normalizedName(record.patientId || "").includes(idQuery)) return false;
+    if (noQuery && !normalizedName(implantPatientNoText(record)).includes(noQuery)) return false;
+    return true;
+  });
+};
+
+const implantLedgerTableHtml = (records) => {
+  if (!records.length) return `<div class="empty">선택한 날짜의 임플란트 마감 자료가 없습니다.</div>`;
+  return `
+    <div class="implant-ledger-list">
+      ${records.map((record) => `
+        <div class="item implant-record-card">
+          <div class="item-title">
+            <span>${escapeHtml(implantPatientNoText(record) ? `#${implantPatientNoText(record)} ` : "미마감 ")}${escapeHtml(record.patientName || "이름 없음")}${record.patientId ? ` (${escapeHtml(record.patientId)})` : ""}</span>
+            <span class="pill">${escapeHtml(implantRecordDate(record))}</span>
+          </div>
+          <div class="meta">
+            <span>수술명: ${escapeHtml(record.surgeryName || surgeryById(record.surgeryId)?.name || "-")}</span>
+            <span>원장코드: ${escapeHtml(record.surgeonCode || departmentById(record.doctorId)?.name || "-")}</span>
+            <span>저장자: ${escapeHtml(auditUserText(record) || "-")}</span>
+          </div>
+          ${(record.implants || []).length ? (record.implants || []).map((implant) => `
+            <div class="implant-vendor-block">
+              <div class="item-title">
+                <span>${escapeHtml(implant.vendor || "업체 없음")}</span>
+                <span class="pill">${(implant.photos || []).length}장</span>
+              </div>
+              ${implant.description ? `<div class="implant-description">${escapeHtml(implant.description)}</div>` : `<div class="muted">사용내용 없음 · 사진 기록</div>`}
+              ${implantPhotoStatusHtml(implant)}
+              <div class="implant-photo-strip">
+                ${(implant.photos || []).map(implantPhotoHtml).join("")}
+              </div>
+            </div>
+          `).join("") : `<div class="empty">업체별 기록이 없습니다.</div>`}
+        </div>
+      `).join("")}
+    </div>
+  `;
+};
+
+const implantPhotoHtml = (photo) => {
+  const src = implantPhotoViewSrc(photo);
+  return src ? `
+    <img class="implant-photo-thumb" src="${escapeHtml(src)}" alt="임플란트 사진" data-implant-photo-view="${escapeHtml(src)}">
+  ` : "";
+};
+const implantPhotoStatusHtml = (implant) => {
+  const pending = num(implant.pendingPhotoCount);
+  const errors = Array.isArray(implant.photoUploadErrors) ? implant.photoUploadErrors : [];
+  if (!pending && !errors.length) return "";
+  const missingPhotoHint = pending && !(implant.photos || []).length ? " · 사진이 보이지 않으면 수정에서 다시 첨부" : "";
+  return `<div class="muted">${pending ? `사진 ${pending}장 업로드 대기${missingPhotoHint}` : ""}${pending && errors.length ? " · " : ""}${errors.length ? `사진 업로드 확인 필요 ${errors.length}건` : ""}</div>`;
+};
+
+const implantPhotoStatusPanelHtml = (date) => {
+  const records = implantRecordsForDate(date);
+  const stats = implantPhotoStatusStats(records);
+  const rows = implantPhotoProblemRows(records);
+  return `
+    <div class="implant-status-grid">
+      <div class="implant-status-tile"><span>전체 사진</span><strong>${stats.photos}</strong></div>
+      <div class="implant-status-tile"><span>Storage 저장</span><strong>${stats.storage}</strong></div>
+      <div class="implant-status-tile"><span>업로드 대기</span><strong>${stats.pending}</strong></div>
+      <div class="implant-status-tile"><span>재업로드 가능</span><strong>${stats.retry}</strong></div>
+      <div class="implant-status-tile"><span>확인 필요</span><strong>${stats.failed + stats.missing + stats.errors}</strong></div>
+    </div>
+    ${rows.length ? `
+      <div class="implant-status-list">
+        ${rows.map(({ record, implant, pending, failed, retry, missing, errors }) => `
+          <div class="implant-status-row">
+            <div class="item-title">
+              <span>${escapeHtml(implantPatientNoText(record) ? `#${implantPatientNoText(record)} ` : "")}${escapeHtml(record.patientName || "이름 없음")} · ${escapeHtml(implant.vendor || "업체 없음")}</span>
+              <span class="pill">${escapeHtml(implantRecordDate(record))}</span>
+            </div>
+            <div class="meta">
+              ${pending ? `<span>대기 ${pending}장</span>` : ""}
+              ${retry ? `<span>재업로드 가능 ${retry}장</span>` : ""}
+              ${failed ? `<span>업로드 실패 ${failed}장</span>` : ""}
+              ${missing ? `<span>미표시 ${missing}장</span>` : ""}
+              ${errors ? `<span>오류 ${errors}건</span>` : ""}
+            </div>
+            ${retry ? `<div class="actions"><button class="secondary" type="button" data-retry-implant-photos="${escapeHtml(record.id)}">임시저장 사진 재업로드</button></div>` : ""}
+          </div>
+        `).join("")}
+      </div>
+    ` : `<div class="empty">선택 날짜의 사진 업로드 상태가 정상입니다.</div>`}
+  `;
+};
+
+const implantRecordCardHtml = (record, options = {}) => {
+  const vendors = Array.isArray(record.implants) ? record.implants : [];
+  const patientNo = implantPatientNoText(record);
+  const doctorText = record.surgeonCode || departmentById(record.doctorId)?.name || "-";
+  const surgeryText = record.surgeryName || surgeryById(record.surgeryId)?.name || "-";
+  const locked = isImplantLedgerClosed(record);
+  const showAdminTools = options.showAdminTools !== false && canEditImplantPatientNo();
+  const retryPhotoCount = vendors.reduce((sum, implant) => sum + (implant.photos || []).filter(implantPhotoNeedsStorageRetry).length, 0);
+  return `
+    <div class="card implant-record-card" data-implant-record="${escapeHtml(record.id)}">
+      <div class="item-title">
+        <span>${patientNo ? `${escapeHtml(patientNo)}번 ` : ""}${escapeHtml(record.patientName || "이름 없음")}${record.patientId ? ` (${escapeHtml(record.patientId)})` : ""}</span>
+        <span class="pill">${escapeHtml(implantRecordDate(record) || "-")}</span>
+      </div>
+      <div class="meta">
+        <span>원장코드: ${escapeHtml(doctorText)}</span>
+        <span>과: ${escapeHtml(record.department || "-")}</span>
+        <span>수술: ${escapeHtml(surgeryText)}</span>
+        ${record.surgeryTime ? `<span>수술시간: ${escapeHtml(record.surgeryTime)}</span>` : ""}
+      </div>
+      <div class="implant-lock-banner">${escapeHtml(implantLockLabel(record))}${record.editUnlockedAt ? ` · 해제: ${escapeHtml(record.editUnlockedAt.slice(0, 16).replace("T", " "))}` : ""}</div>
+      ${showAdminTools ? `
+        <div class="actions">
+          ${locked ? `<button class="secondary" type="button" data-unlock-implant-record="${escapeHtml(record.id)}">마감 잠금 해제</button>` : (patientNo ? `<button class="secondary" type="button" data-lock-implant-record="${escapeHtml(record.id)}">다시 잠금</button>` : "")}
+          <button class="danger" type="button" data-delete-implant-record="${escapeHtml(record.id)}">장부 삭제</button>
+        </div>
+      ` : ""}
+      ${retryPhotoCount ? `
+        <div class="implant-lock-banner">사진 ${retryPhotoCount}장 재업로드가 필요합니다.</div>
+        <div class="actions">
+          <button class="secondary" type="button" data-retry-implant-record-photos="${escapeHtml(record.id)}">사진 재업로드</button>
+        </div>
+      ` : ""}
+      ${showAdminTools ? `
+        <div class="row two">
+          <div>
+            <label for="implantPatientNo-${escapeHtml(record.id)}">환자번호 수동 수정</label>
+            <input id="implantPatientNo-${escapeHtml(record.id)}" data-implant-patient-no-input="${escapeHtml(record.id)}" value="${escapeHtml(patientNo)}" inputmode="numeric" autocomplete="off">
+          </div>
+          <div class="actions">
+            <button class="secondary" type="button" data-implant-patient-no-save="${escapeHtml(record.id)}">번호 저장</button>
+          </div>
+        </div>
+      ` : ""}
+      ${vendors.length ? vendors.map((implant) => `
+        <div class="implant-vendor-block">
+          <div class="item-title">
+            <span>${escapeHtml(implant.vendor || "업체 없음")}</span>
+            <span class="pill">${(implant.photos || []).length}장</span>
+          </div>
+          <div class="implant-description">${escapeHtml(implant.description || "")}</div>
+          ${implantPhotoStatusHtml(implant)}
+          <div class="implant-photo-strip">
+            ${(implant.photos || []).map(implantPhotoHtml).join("")}
+          </div>
+        </div>
+      `).join("") : `<div class="empty">업체별 기록이 없습니다.</div>`}
+      <div class="implant-send-preview">
+        업체 발송용 데이터 준비: 환자명/환자ID 제외, 환자번호 ${escapeHtml(patientNo || "미부여")} · ${escapeHtml(doctorText)} · ${escapeHtml(surgeryText)} · 업체별 사용내용만 출력 가능
+      </div>
+    </div>
+  `;
+};
 
 const bindImplants = () => {
   const list = document.getElementById("implantLedgerList");
@@ -529,6 +697,15 @@ const bindImplants = () => {
   renderList();
 };
 
-    return { renderImplants, bindImplants };
+    return {
+      renderImplants,
+      bindImplants,
+      filteredImplantRecords,
+      implantLedgerTableHtml,
+      implantPhotoHtml,
+      implantPhotoStatusHtml,
+      implantPhotoStatusPanelHtml,
+      implantRecordCardHtml
+    };
   };
 })();
