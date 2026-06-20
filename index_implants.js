@@ -38,7 +38,6 @@
       hideImplantPhotoModal,
       updateImplantSendGroupStatus,
       setButtonBusy,
-      loadExternalScriptOnce,
       downloadBlob,
       downloadBytes,
       promiseWithTimeout,
@@ -590,6 +589,55 @@ const implantSendStatusClass = (status = "pending") => ({
   excluded: "low",
   resend: "low"
 }[status] || "");
+const loadExternalScriptOnce = (src, globalCheck) => new Promise((resolve, reject) => {
+  if (globalCheck()) {
+    resolve();
+    return;
+  }
+  const resolveWhenReady = () => {
+    if (globalCheck()) resolve();
+    else reject(new Error("PDF 생성 라이브러리 확인에 실패했습니다."));
+  };
+  const existing = document.querySelector(`script[src="${src}"]`);
+  if (existing) {
+    if (existing.dataset.loadState === "loaded") {
+      resolveWhenReady();
+      return;
+    }
+    if (existing.dataset.loadState === "error") {
+      existing.remove();
+    } else {
+      const timer = window.setTimeout(() => reject(new Error("PDF 생성 라이브러리 로딩 시간이 초과되었습니다.")), 12000);
+      existing.addEventListener("load", () => {
+        existing.dataset.loadState = "loaded";
+        window.clearTimeout(timer);
+        resolveWhenReady();
+      }, { once: true });
+      existing.addEventListener("error", () => {
+        existing.dataset.loadState = "error";
+        window.clearTimeout(timer);
+        reject(new Error("PDF 생성 라이브러리를 불러오지 못했습니다."));
+      }, { once: true });
+      return;
+    }
+  }
+  const script = document.createElement("script");
+  script.src = src;
+  script.async = true;
+  script.dataset.loadState = "loading";
+  const timer = window.setTimeout(() => reject(new Error("PDF 생성 라이브러리 로딩 시간이 초과되었습니다.")), 12000);
+  script.onload = () => {
+    script.dataset.loadState = "loaded";
+    window.clearTimeout(timer);
+    resolveWhenReady();
+  };
+  script.onerror = () => {
+    script.dataset.loadState = "error";
+    window.clearTimeout(timer);
+    reject(new Error("PDF 생성 라이브러리를 불러오지 못했습니다."));
+  };
+  document.head.appendChild(script);
+});
 
 const implantVendorContact = (vendorName = "", vendorId = "") => {
   const byId = vendorId ? implantVendorById(vendorId) : null;

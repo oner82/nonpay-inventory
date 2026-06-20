@@ -1876,96 +1876,6 @@ const implantSendStatementCardsHtml = (group) => getImplantsModule().implantSend
 const implantSendStatementPrintHtml = (date, group) => getImplantsModule().implantSendStatementPrintHtml(date, group);
 const implantSendStatementPrintHtmlV2 = (date, group) => getImplantsModule().implantSendStatementPrintHtmlV2(date, group);
 
-const loadExternalScriptOnce = (src, globalCheck) => new Promise((resolve, reject) => {
-  if (globalCheck()) {
-    resolve();
-    return;
-  }
-  const resolveWhenReady = () => {
-    if (globalCheck()) resolve();
-    else reject(new Error("PDF 생성 라이브러리 확인에 실패했습니다."));
-  };
-  const existing = document.querySelector(`script[src="${src}"]`);
-  if (existing) {
-    if (existing.dataset.loadState === "loaded") {
-      resolveWhenReady();
-      return;
-    }
-    if (existing.dataset.loadState === "error") {
-      existing.remove();
-    } else {
-      const timer = window.setTimeout(() => reject(new Error("PDF 생성 라이브러리 로딩 시간이 초과되었습니다.")), 12000);
-      existing.addEventListener("load", () => {
-        existing.dataset.loadState = "loaded";
-        window.clearTimeout(timer);
-        resolveWhenReady();
-      }, { once: true });
-      existing.addEventListener("error", () => {
-        existing.dataset.loadState = "error";
-        window.clearTimeout(timer);
-        reject(new Error("PDF 생성 라이브러리를 불러오지 못했습니다."));
-      }, { once: true });
-      return;
-    }
-  }
-  const script = document.createElement("script");
-  script.src = src;
-  script.async = true;
-  script.dataset.loadState = "loading";
-  const timer = window.setTimeout(() => reject(new Error("PDF 생성 라이브러리 로딩 시간이 초과되었습니다.")), 12000);
-  script.onload = () => {
-    script.dataset.loadState = "loaded";
-    window.clearTimeout(timer);
-    resolveWhenReady();
-  };
-  script.onerror = () => {
-    script.dataset.loadState = "error";
-    window.clearTimeout(timer);
-    reject(new Error("PDF 생성 라이브러리를 불러오지 못했습니다."));
-  };
-  document.head.appendChild(script);
-});
-
-const waitForRenderImages = async (root) => {
-  const images = Array.from(root.querySelectorAll("img"));
-  await Promise.all(images.map((image) => {
-    if (image.complete && image.naturalWidth) return Promise.resolve();
-    return new Promise((resolve) => {
-      const timer = window.setTimeout(resolve, 6000);
-      image.onload = () => {
-        window.clearTimeout(timer);
-        resolve();
-      };
-      image.onerror = () => {
-        window.clearTimeout(timer);
-        resolve();
-      };
-    });
-  }));
-};
-
-const inlineRenderImages = async (root) => {
-  const images = Array.from(root.querySelectorAll("img"));
-  await Promise.all(images.map(async (image) => {
-    const src = image.getAttribute("src") || "";
-    if (!src || src.startsWith("data:")) return;
-    try {
-      const response = await promiseWithTimeout(
-        fetch(src, { mode: "cors" }),
-        8000,
-        "사진 변환 시간이 초과되었습니다."
-      );
-      if (!response.ok) throw new Error("사진을 불러오지 못했습니다.");
-      const blob = await response.blob();
-      image.src = await blobToDataUrl(blob);
-      image.removeAttribute("crossorigin");
-    } catch (error) {
-      console.warn("PDF image inline failed", error);
-      image.crossOrigin = "anonymous";
-    }
-  }));
-};
-
 const implantSendPanelHtml = (date) => getImplantsModule().implantSendPanelHtml(date);
 const implantSendPanelOrganizedHtml = (date) => getImplantsModule().implantSendPanelOrganizedHtml(date);
 
@@ -2105,7 +2015,6 @@ const getImplantsModule = () => {
       hideImplantPhotoModal,
       updateImplantSendGroupStatus,
       setButtonBusy,
-      loadExternalScriptOnce,
       downloadBlob,
       downloadBytes,
       promiseWithTimeout,
