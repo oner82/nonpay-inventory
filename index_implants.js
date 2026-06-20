@@ -12,6 +12,9 @@
       render,
       num,
       normalizedName,
+      alphaFirstCompare,
+      implantVendorById,
+      findImplantVendorByName,
       sortImplantRecords,
       surgeryById,
       departmentById,
@@ -33,17 +36,12 @@
       showImplantPhotoModal,
       hideImplantPhotoModal,
       updateImplantSendGroupStatus,
-      implantSendStatusLabel,
-      implantSendGroups,
-      implantSendPatientGroups,
-      implantSendGroupStats,
       setButtonBusy,
       loadExternalScriptOnce,
       downloadBlob,
       downloadBytes,
       promiseWithTimeout,
       loadImageFromUrl,
-      implantSendMessage,
       retryImplantRecordPhotos,
       setDoc,
       doc,
@@ -362,6 +360,90 @@ const implantRecordCardHtml = (record, options = {}) => {
       </div>
     </div>
   `;
+};
+
+const implantSendStatusLabels = {
+  pending: "미발송",
+  sent: "발송완료",
+  excluded: "발송제외",
+  resend: "재발송 필요"
+};
+const implantSendStatusLabel = (status = "pending") => implantSendStatusLabels[status] || implantSendStatusLabels.pending;
+const implantSendStatusClass = (status = "pending") => ({
+  sent: "ok",
+  excluded: "low",
+  resend: "low"
+}[status] || "");
+
+const implantVendorContact = (vendorName = "", vendorId = "") => {
+  const byId = vendorId ? implantVendorById(vendorId) : null;
+  if (byId) return byId;
+  return findImplantVendorByName(vendorName) || {};
+};
+const isImplantVendorSendPaused = (vendorName = "", vendorId = "") => implantVendorContact(vendorName, vendorId)?.active === false;
+
+const implantSendMessage = (date, vendorName, lines) => [
+  `${date} 임플란트 사용분`,
+  "",
+  ...lines.map(({ record, implant }) => [
+    `${implantPatientNoText(record) ? `#${implantPatientNoText(record)} ` : ""}${record.surgeonCode || departmentById(record.doctorId)?.name || ""}`,
+    record.surgeryName || surgeryById(record.surgeryId)?.name || "",
+    implant.description || `사진 ${(implant.photos || []).length}장 기록`
+  ].filter(Boolean).join("\n"))
+].join("\n\n");
+
+const implantSendGroups = (date) => {
+  const groups = new Map();
+  implantRecordsForDate(date).forEach((record) => {
+    (record.implants || []).forEach((implant) => {
+      const key = implant.vendor || "업체 없음";
+      if (isImplantVendorSendPaused(key, implant.vendorId)) return;
+      const current = groups.get(key) || { vendor: key, contact: implantVendorContact(key, implant.vendorId), lines: [], statuses: [] };
+      current.lines.push({ record, implant });
+      current.statuses.push(implant.sendStatus || "pending");
+      groups.set(key, current);
+    });
+  });
+  return Array.from(groups.values()).map((group) => {
+    const uniqueStatuses = Array.from(new Set(group.statuses));
+    const status = uniqueStatuses.length === 1 ? uniqueStatuses[0] : "resend";
+    return { ...group, status };
+  }).sort((a, b) => alphaFirstCompare(a.vendor, b.vendor));
+};
+
+const implantSendGroupStats = (group) => {
+  const patientNos = new Set();
+  let photoCount = 0;
+  let unnumbered = 0;
+  group.lines.forEach(({ record, implant }) => {
+    const patientNo = implantPatientNoText(record);
+    if (patientNo) patientNos.add(patientNo);
+    else unnumbered += 1;
+    photoCount += (implant.photos || []).length;
+  });
+  return {
+    patients: patientNos.size + unnumbered,
+    photos: photoCount,
+    unnumbered
+  };
+};
+
+const implantSendPatientGroups = (group) => {
+  const patients = new Map();
+  group.lines.forEach(({ record, implant }) => {
+    const key = record.id || `${implantRecordDate(record)}-${implantPatientNoText(record)}-${record.surgeryId}`;
+    const current = patients.get(key) || { record, implants: [], photos: [], descriptions: [] };
+    current.implants.push(implant);
+    current.photos.push(...(implant.photos || []));
+    if (String(implant.description || "").trim()) current.descriptions.push(String(implant.description || "").trim());
+    patients.set(key, current);
+  });
+  return Array.from(patients.values()).sort((a, b) => {
+    const noA = num(implantPatientNoText(a.record));
+    const noB = num(implantPatientNoText(b.record));
+    if (noA || noB) return noA - noB;
+    return String(a.record.createdAt || "").localeCompare(String(b.record.createdAt || ""));
+  });
 };
 
 const implantSendPhotoLedgerHtml = (group) => `
@@ -1465,6 +1547,12 @@ const bindImplants = () => {
       bindImplants,
       filteredImplantRecords,
       implantLedgerTableHtml,
+      implantSendStatusLabel,
+      implantSendStatusClass,
+      implantSendMessage,
+      implantSendGroups,
+      implantSendGroupStats,
+      implantSendPatientGroups,
       implantSendPhotoLedgerHtml,
       implantSendPrintHtml,
       implantSendLedgerTableRowsHtml,
