@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Open auth_shell in Chrome",
+      "type": "pwa-chrome",
+      "request": "launch",
+      "url": "http://localhost:5177/auth_shell.html",
+      "webRoot": "${workspaceFolder}",
+      "preLaunchTask": "local server: auth_shell"
+    }
+  ]
+}

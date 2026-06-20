@@ -1,0 +1,27 @@
+{
+  "editor.formatOnSave": false,
+  "editor.tabSize": 2,
+  "editor.detectIndentation": true,
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000,
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.associations": {
+    "*.html": "html",
+    "*.css": "css",
+    "*.js": "javascript"
+  },
+  "search.exclude": {
+    "**/.git": true,
+    "**/.firebase": true,
+    "**/vendor": true
+  },
+  "files.watcherExclude": {
+    "**/.git/**": true,
+    "**/.firebase/**": true
+  },
+  "html.format.wrapLineLength": 0,
+  "javascript.validate.enable": true,
+  "liveServer.settings.root": "/",
+  "liveServer.settings.port": 5177
+}

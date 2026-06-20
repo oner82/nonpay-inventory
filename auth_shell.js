@@ -1,10 +1,13 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
-
 const firebaseConfig = { projectId: "nonpay-inventory" };
-const fbApp = initializeApp(firebaseConfig);
-const db = getFirestore(fbApp);
-const usersRef = doc(db, "app", "users");
+let initializeApp;
+let getFirestore;
+let doc;
+let getDoc;
+let setDoc;
+let onSnapshot;
+let runTransaction;
+let db;
+let usersRef;
 
 const roleLabels = {
   admin: "관리자",
@@ -24,6 +27,24 @@ let setupMode = false;
 let unsubscribeUsers = null;
 let roleInterval = null;
 const userStorageKey = "orInventoryUser";
+window.orInventoryLoginReady = false;
+
+async function initFirebase() {
+  if (db && usersRef) return;
+  setLoginStatus("Firebase 로그인 모듈을 불러오는 중입니다.", "");
+  const appModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js");
+  const firestoreModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js");
+  initializeApp = appModule.initializeApp;
+  getFirestore = firestoreModule.getFirestore;
+  doc = firestoreModule.doc;
+  getDoc = firestoreModule.getDoc;
+  setDoc = firestoreModule.setDoc;
+  onSnapshot = firestoreModule.onSnapshot;
+  runTransaction = firestoreModule.runTransaction;
+  const fbApp = initializeApp(firebaseConfig);
+  db = getFirestore(fbApp);
+  usersRef = doc(db, "app", "users");
+}
 
 const readStoredUser = () => {
   for (const storageName of ["sessionStorage", "localStorage"]) {
@@ -100,6 +121,7 @@ async function hashPin(loginId, pin, salt) {
 }
 
 async function loadAccounts() {
+  setLoginStatus("계정 정보를 불러오는 중입니다.", "");
   const snap = await getDoc(usersRef);
   accounts = snap.exists() && Array.isArray(snap.data().accounts) ? snap.data().accounts : [];
   setupMode = accounts.length === 0;
@@ -132,10 +154,10 @@ function canDeleteAccount(user) {
 function showApp() {
   setupMode = false;
   $("loginScreen").style.display = "none";
-  $("appShell").style.display = "block";
-  $("inventoryFrame").src = `./index_new.html?v=20260608-implant-crop-resize&t=${Date.now()}`;
+  $("appShell").style.display = "grid";
+  $("inventoryFrame").src = `./index_new.html?v=20260620-backup-prepare&t=${Date.now()}`;
   $("currentUserText").textContent = `${currentUser.name} (${currentUser.loginId})`;
-  $("roleText").textContent = roleLabels[currentUser.role] || currentUser.role;
+  $("roleText").textContent = `${roleLabels[currentUser.role] || currentUser.role} · 앱 여는 중`;
   $("accountManageBtn").style.display = currentUser.role === "admin" ? "inline-flex" : "none";
   applyRoleToFrame();
 }
@@ -170,22 +192,35 @@ async function createFirstAdmin(loginId, pin) {
 
 async function handleLogin(loginId, pin) {
   if (setupMode) {
-    if (!loginId || !pin) return;
+    if (!loginId || !pin) {
+      setLoginStatus("아이디와 PIN을 입력해 주세요.", "error");
+      return;
+    }
     await createFirstAdmin(loginId, pin);
+    return;
+  }
+  if (!accounts.length) {
+    setLoginStatus("계정 목록을 아직 불러오지 못했습니다. 잠시 후 다시 눌러 주세요.", "error");
+    await loadAccounts();
+    return;
+  }
+  if (!loginId || !pin) {
+    setLoginStatus("아이디와 PIN을 입력해 주세요.", "error");
     return;
   }
   const user = accounts.find((item) => item.loginId === loginId && item.active !== false);
   if (!user || !user.pinHash || !user.salt) {
-    setLoginStatus("아이디, PIN 또는 사용 여부를 확인해 주세요.", "error");
+    setLoginStatus(`아이디, PIN 또는 사용 여부를 확인해 주세요. 불러온 계정 ${accounts.length}개`, "error");
     return;
   }
   const pinHash = await hashPin(loginId, pin, user.salt);
   if (pinHash !== user.pinHash) {
-    setLoginStatus("아이디, PIN 또는 사용 여부를 확인해 주세요.", "error");
+    setLoginStatus("PIN이 일치하지 않습니다.", "error");
     return;
   }
   currentUser = { id: user.id, loginId: user.loginId, name: user.name, role: user.role };
   writeStoredUser(currentUser);
+  setLoginStatus("로그인 성공 · 앱을 여는 중입니다.", "ok");
   showApp();
 }
 
@@ -338,17 +373,17 @@ function renderFrameAccountControls(frameDoc) {
         grid-column: 1 / -1;
       }
       .topbar #status {
-        grid-column: 1;
+        grid-column: 1 / -1;
         align-self: center;
       }
       .auth-shell-controls {
-        grid-column: 2;
+        grid-column: 1 / -1;
         display: flex;
         align-items: center;
         justify-content: flex-end;
         gap: 6px;
         min-width: 0;
-        margin: 0 0 2px;
+        margin: 6px 0 2px;
         white-space: nowrap;
       }
       .auth-shell-user {
@@ -372,6 +407,10 @@ function renderFrameAccountControls(frameDoc) {
         border-radius: 10px;
         font-size: 12px;
         box-shadow: none;
+      }
+      .auth-shell-controls button.danger {
+        background: #ef4444;
+        color: #fff;
       }
       @media (max-width: 720px) {
         .topbar { grid-template-columns: 1fr; }
@@ -439,6 +478,7 @@ function applyRoleToFrame() {
     }
   };
   frame.addEventListener("load", () => {
+    if (currentUser) $("roleText").textContent = `${roleLabels[currentUser.role] || currentUser.role} · 앱 열림`;
     apply();
     setTimeout(apply, 500);
     setTimeout(apply, 1500);
@@ -449,10 +489,18 @@ function applyRoleToFrame() {
   }, 2000);
 }
 
-$("loginForm").addEventListener("submit", async (event) => {
+async function submitLoginForm(event) {
   event.preventDefault();
-  await handleLogin($("loginId").value.trim(), $("loginPin").value.trim());
-});
+  setLoginStatus("로그인 확인 중입니다.", "");
+  try {
+    await handleLogin($("loginId").value.trim(), $("loginPin").value.trim());
+  } catch (error) {
+    console.error(error);
+    setLoginStatus(`로그인 처리 실패: ${error.message}`, "error");
+  }
+}
+
+$("loginForm").addEventListener("submit", submitLoginForm);
 
 $("logoutBtn").addEventListener("click", logout);
 $("requestAccountBtn").addEventListener("click", openRequestDialog);
@@ -512,31 +560,43 @@ $("accountForm").addEventListener("submit", async (event) => {
   resetAccountForm();
 });
 
-await loadAccounts();
-unsubscribeUsers = onSnapshot(usersRef, (snap) => {
-  accounts = snap.exists() && Array.isArray(snap.data().accounts) ? snap.data().accounts : [];
-  setupMode = accounts.length === 0;
-  if ($("accountDialog").open) renderAccounts();
-});
+async function bootAuthShell() {
+  try {
+    await initFirebase();
+    await loadAccounts();
+    window.orInventoryLoginReady = true;
+    unsubscribeUsers = onSnapshot(usersRef, (snap) => {
+      accounts = snap.exists() && Array.isArray(snap.data().accounts) ? snap.data().accounts : [];
+      setupMode = accounts.length === 0;
+      if ($("accountDialog").open) renderAccounts();
+    });
 
-const activeAccount = currentUser
-  ? accounts.find((item) => String(item.id) === String(currentUser.id) && item.active !== false)
-  : null;
+    const activeAccount = currentUser
+      ? accounts.find((item) => String(item.id) === String(currentUser.id) && item.active !== false)
+      : null;
 
-if (activeAccount) {
-  currentUser = {
-    id: activeAccount.id,
-    loginId: activeAccount.loginId || "",
-    name: activeAccount.name || activeAccount.loginId || "",
-    role: roleAllowedViews[activeAccount.role] ? activeAccount.role : "staff"
-  };
-  writeStoredUser(currentUser);
-  showApp();
-} else {
-  currentUser = null;
-  clearStoredUser();
-  showLogin();
+    if (activeAccount) {
+      currentUser = {
+        id: activeAccount.id,
+        loginId: activeAccount.loginId || "",
+        name: activeAccount.name || activeAccount.loginId || "",
+        role: roleAllowedViews[activeAccount.role] ? activeAccount.role : "staff"
+      };
+      writeStoredUser(currentUser);
+      showApp();
+    } else {
+      currentUser = null;
+      clearStoredUser();
+      showLogin();
+    }
+  } catch (error) {
+    console.error(error);
+    window.orInventoryLoginReady = false;
+    setLoginStatus(`로그인 모듈 준비 실패: ${error.message}`, "error");
+  }
 }
+
+bootAuthShell();
 
 window.addEventListener("beforeunload", () => {
   if (unsubscribeUsers) unsubscribeUsers();
