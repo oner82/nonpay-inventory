@@ -4992,9 +4992,7 @@ const filteredHistoryUsages = (start, end, query) => {
   });
 };
 
-const historyPeriodText = (start = "", end = "") => start || end
-  ? `${start || "처음"} ~ ${end || "오늘"}`
-  : "전체 기간";
+const historyPeriodText = (start = "", end = "") => getHistoryModule().historyPeriodText(start, end);
 
 const historyMovementCounts = (start = "", end = "") => {
   const usageCounts = new Map();
@@ -5009,15 +5007,8 @@ const historyMovementCounts = (start = "", end = "") => {
 };
 
 const usageDateValue = (usage) => usage?.date || String(usage?.createdAt || usage?.updatedAt || "").slice(0, 10) || "";
-const reportPeriodFromFilters = (start = "", end = "") => {
-  const fallback = today();
-  const periodStart = start || end || fallback;
-  const periodEnd = end || start || fallback;
-  return periodStart <= periodEnd
-    ? { start: periodStart, end: periodEnd }
-    : { start: periodEnd, end: periodStart };
-};
-const reportPeriodLabel = (period) => period.start === period.end ? period.start : `${period.start} ~ ${period.end}`;
+const reportPeriodFromFilters = (start = "", end = "") => getHistoryModule().reportPeriodFromFilters(start, end);
+const reportPeriodLabel = (period) => getHistoryModule().reportPeriodLabel(period);
 const productSeedFor = (product) => {
   const seeds = parseSeedProducts();
   const seedByKey = new Map(seeds.map((item) => [productKey(item), item]));
@@ -5206,8 +5197,6 @@ const getHistoryModule = () => {
       usageItem,
       productStockFlowRows,
       productCategoryLabel,
-      reportPeriodFromFilters,
-      reportPeriodLabel,
       downloadExcel,
       departmentById,
       surgeryById,
@@ -5215,7 +5204,7 @@ const getHistoryModule = () => {
       patientIdText,
       auditUserText,
       auditTimeText,
-      historyPeriodText,
+      today,
       inferSurgeryDepartment,
       deleteUsageRecord
     });

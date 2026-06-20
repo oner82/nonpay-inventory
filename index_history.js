@@ -53,10 +53,25 @@
       query: document.getElementById("historySearch")?.value || ""
     });
 
+    const historyPeriodText = (start = "", end = "") => start || end
+      ? `${start || "처음"} ~ ${end || "오늘"}`
+      : "전체 기간";
+
+    const reportPeriodFromFilters = (start = "", end = "") => {
+      const fallback = context.today();
+      const periodStart = start || end || fallback;
+      const periodEnd = end || start || fallback;
+      return periodStart <= periodEnd
+        ? { start: periodStart, end: periodEnd }
+        : { start: periodEnd, end: periodStart };
+    };
+
+    const reportPeriodLabel = (period) => period.start === period.end ? period.start : `${period.start} ~ ${period.end}`;
+
     const exportHistoryCategory = (category) => {
       const { start, end, query } = historyFilterValues();
-      const period = context.reportPeriodFromFilters(start, end);
-      const periodText = context.reportPeriodLabel(period);
+      const period = reportPeriodFromFilters(start, end);
+      const periodText = reportPeriodLabel(period);
       const rows = context.productStockFlowRows(category, period, query).map((item) => [
         item.product.name,
         context.productCategoryLabel(item.product.category),
@@ -75,8 +90,8 @@
 
     const exportHistoryCategoryDetail = (category) => {
       const { start, end, query } = historyFilterValues();
-      const period = context.reportPeriodFromFilters(start, end);
-      const periodText = context.reportPeriodLabel(period);
+      const period = reportPeriodFromFilters(start, end);
+      const periodText = reportPeriodLabel(period);
       const rows = context.productStockFlowRows(category, period, query).map((item) => [
         item.product.name,
         context.productCategoryLabel(item.product.category),
@@ -106,7 +121,7 @@
         const surgery = context.surgeryById(usage.surgeryId);
         const productText = usage.productIds.map((id) => context.productById(id)?.name || "삭제된 제품").join(", ");
         return [
-          context.historyPeriodText(start, end),
+          historyPeriodText(start, end),
           usage.date,
           usage.patientName,
           context.patientIdText(usage),
@@ -183,6 +198,9 @@
     };
 
     return {
+      historyPeriodText,
+      reportPeriodFromFilters,
+      reportPeriodLabel,
       renderHistory,
       bindHistory,
       exportHistoryCategory,
