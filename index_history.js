@@ -460,28 +460,9 @@
     };
 
     return {
-      historyPeriodText,
-      reportPeriodFromFilters,
-      reportPeriodLabel,
-      usageDateValue,
-      productSeedFor,
-      productMovementTotal,
-      productInitialStock,
-      productMatchesReportQuery,
-      latestReceiptDateForProduct,
-      filteredHistoryUsages,
-      productUsagePatientRows,
-      historyMovementCounts,
-      productUsageSummaryRows,
-      productStockFlowRows,
-      productUsageSummaryHtml,
-      patientHistoryListHtml,
       usageItem,
       renderHistory,
-      bindHistory,
-      exportHistoryCategory,
-      exportHistoryCategoryDetail,
-      exportHistoryPatients
+      bindHistory
     };
   };
 })();

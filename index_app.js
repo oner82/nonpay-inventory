@@ -4977,22 +4977,6 @@ const inDateRange = (date, start, end) => {
   return true;
 };
 
-const filteredHistoryUsages = (start, end, query) => getHistoryModule().filteredHistoryUsages(start, end, query);
-
-const historyPeriodText = (start = "", end = "") => getHistoryModule().historyPeriodText(start, end);
-
-const historyMovementCounts = (start = "", end = "") => getHistoryModule().historyMovementCounts(start, end);
-
-const usageDateValue = (usage) => getHistoryModule().usageDateValue(usage);
-const reportPeriodFromFilters = (start = "", end = "") => getHistoryModule().reportPeriodFromFilters(start, end);
-const reportPeriodLabel = (period) => getHistoryModule().reportPeriodLabel(period);
-const productSeedFor = (product) => getHistoryModule().productSeedFor(product);
-const productMovementTotal = (productId, type, dateMatch = () => true) => getHistoryModule().productMovementTotal(productId, type, dateMatch);
-const productInitialStock = (product, totalReceived, totalUsed) => getHistoryModule().productInitialStock(product, totalReceived, totalUsed);
-const productMatchesReportQuery = (product, query = "") => getHistoryModule().productMatchesReportQuery(product, query);
-const latestReceiptDateForProduct = (productId) => getHistoryModule().latestReceiptDateForProduct(productId);
-const productStockFlowRows = (category, period, query = "") => getHistoryModule().productStockFlowRows(category, period, query);
-
 const productUsageSort = (category) => (a, b) => {
   const normalizedCategory = productCategory(category);
   if (normalizedCategory === "인체조직") {
@@ -5007,8 +4991,6 @@ const productUsageSort = (category) => (a, b) => {
   return alphaFirstCompare(a.name, b.name);
 };
 
-const productUsageSummaryRows = (category, start = "", end = "", query = "") => getHistoryModule().productUsageSummaryRows(category, start, end, query);
-
 const stockStatusClass = (product) => {
   const stock = num(product?.stock);
   const warning = num(product?.warningStock);
@@ -5016,10 +4998,6 @@ const stockStatusClass = (product) => {
   if (warning > 0 && stock <= warning * 2) return "stock-warn";
   return "stock-ok";
 };
-
-const productUsagePatientRows = (productId, start = "", end = "") => getHistoryModule().productUsagePatientRows(productId, start, end);
-
-const productUsageSummaryHtml = (start = "", end = "", query = "") => getHistoryModule().productUsageSummaryHtml(start, end, query);
 
 let historyModule = null;
 const getHistoryModule = () => {
@@ -5076,10 +5054,6 @@ const usageItem = (usage, options = {}) => getHistoryModule().usageItem(usage, o
 const zipFiles = (files) => window.ORInventoryExportUtils.zipFiles(files);
 const xlsxWorkbook = (headers, rows) => window.ORInventoryExportUtils.xlsxWorkbook(headers, rows);
 const downloadExcel = (filename, headers, rows) => window.ORInventoryExportUtils.downloadExcel(filename, headers, rows);
-
-const exportHistoryCategory = (category) => getHistoryModule().exportHistoryCategory(category);
-const exportHistoryCategoryDetail = (category) => getHistoryModule().exportHistoryCategoryDetail(category);
-const exportHistoryPatients = () => getHistoryModule().exportHistoryPatients();
 
 const exportReceiptHistory = (start = "", end = "", query = "") => {
   const rows = filteredReceipts(start, end, query)
