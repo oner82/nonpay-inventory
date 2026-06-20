@@ -4981,17 +4981,7 @@ const filteredHistoryUsages = (start, end, query) => getHistoryModule().filtered
 
 const historyPeriodText = (start = "", end = "") => getHistoryModule().historyPeriodText(start, end);
 
-const historyMovementCounts = (start = "", end = "") => {
-  const usageCounts = new Map();
-  filteredHistoryUsages(start, end, "").forEach((usage) => {
-    usage.productIds.forEach((id) => usageCounts.set(id, (usageCounts.get(id) || 0) + 1));
-  });
-  const receiptCounts = new Map();
-  state.receipts
-    .filter((receipt) => inDateRange(receiptDateValue(receipt), start, end))
-    .forEach((receipt) => receiptCounts.set(receipt.productId, (receiptCounts.get(receipt.productId) || 0) + num(receipt.qty)));
-  return { usageCounts, receiptCounts };
-};
+const historyMovementCounts = (start = "", end = "") => getHistoryModule().historyMovementCounts(start, end);
 
 const usageDateValue = (usage) => usage?.date || String(usage?.createdAt || usage?.updatedAt || "").slice(0, 10) || "";
 const reportPeriodFromFilters = (start = "", end = "") => getHistoryModule().reportPeriodFromFilters(start, end);
@@ -5074,22 +5064,7 @@ const productUsageSort = (category) => (a, b) => {
   return alphaFirstCompare(a.name, b.name);
 };
 
-const productUsageSummaryRows = (category, start = "", end = "", query = "") => {
-  const normalizedQuery = normalizedName(query || "");
-  const { usageCounts, receiptCounts } = historyMovementCounts(start, end);
-  return state.products
-    .filter((product) => productCategory(product.category) === category)
-    .filter((product) => {
-      if (!normalizedQuery) return (usageCounts.get(product.id) || 0) || (receiptCounts.get(product.id) || 0);
-      return normalizedName(`${product.name} ${product.company || ""} ${product.subcategory || ""} ${productCategoryLabel(product.category)}`).includes(normalizedQuery);
-    })
-    .sort(productUsageSort(category))
-    .map((product) => ({
-      product,
-      received: receiptCounts.get(product.id) || 0,
-      used: usageCounts.get(product.id) || 0
-    }));
-};
+const productUsageSummaryRows = (category, start = "", end = "", query = "") => getHistoryModule().productUsageSummaryRows(category, start, end, query);
 
 const stockStatusClass = (product) => {
   const stock = num(product?.stock);
@@ -5117,10 +5092,11 @@ const getHistoryModule = () => {
       escapeHtml,
       normalizedName,
       inDateRange,
+      receiptDateValue,
       alphaFirstCompare,
       productCategories: PRODUCT_CATEGORIES,
       productCategory,
-      productUsageSummaryRows,
+      productUsageSort,
       stockStatusClass,
       num,
       patientDisplayName,

@@ -79,6 +79,35 @@
       .filter(Boolean)
       .sort((a, b) => context.alphaFirstCompare(b.usage.date, a.usage.date) || context.alphaFirstCompare(a.usage.patientName, b.usage.patientName));
 
+    const historyMovementCounts = (start = "", end = "") => {
+      const usageCounts = new Map();
+      filteredHistoryUsages(start, end, "").forEach((usage) => {
+        usage.productIds.forEach((id) => usageCounts.set(id, (usageCounts.get(id) || 0) + 1));
+      });
+      const receiptCounts = new Map();
+      context.getState().receipts
+        .filter((receipt) => context.inDateRange(context.receiptDateValue(receipt), start, end))
+        .forEach((receipt) => receiptCounts.set(receipt.productId, (receiptCounts.get(receipt.productId) || 0) + context.num(receipt.qty)));
+      return { usageCounts, receiptCounts };
+    };
+
+    const productUsageSummaryRows = (category, start = "", end = "", query = "") => {
+      const normalizedQuery = context.normalizedName(query || "");
+      const { usageCounts, receiptCounts } = historyMovementCounts(start, end);
+      return context.getState().products
+        .filter((product) => context.productCategory(product.category) === category)
+        .filter((product) => {
+          if (!normalizedQuery) return (usageCounts.get(product.id) || 0) || (receiptCounts.get(product.id) || 0);
+          return context.normalizedName(`${product.name} ${product.company || ""} ${product.subcategory || ""} ${context.productCategoryLabel(product.category)}`).includes(normalizedQuery);
+        })
+        .sort(context.productUsageSort(category))
+        .map((product) => ({
+          product,
+          received: receiptCounts.get(product.id) || 0,
+          used: usageCounts.get(product.id) || 0
+        }));
+    };
+
     const historyPeriodText = (start = "", end = "") => start || end
       ? `${start || "처음"} ~ ${end || "오늘"}`
       : "전체 기간";
@@ -102,7 +131,7 @@
         ? reportPeriodLabel({ start: effectiveStart, end: effectiveEnd })
         : historyPeriodText(start, end);
       const groups = context.productCategories.map((category) => {
-        const productRows = context.productUsageSummaryRows(category, effectiveStart, effectiveEnd, query);
+        const productRows = productUsageSummaryRows(category, effectiveStart, effectiveEnd, query);
         const rows = productRows.map(({ product, received, used }) => {
           const isNonpay = context.productCategory(product.category) === "비급여";
           const patientRows = productUsagePatientRows(product.id, effectiveStart, effectiveEnd);
@@ -364,6 +393,8 @@
       reportPeriodLabel,
       filteredHistoryUsages,
       productUsagePatientRows,
+      historyMovementCounts,
+      productUsageSummaryRows,
       productUsageSummaryHtml,
       patientHistoryListHtml,
       usageItem,
