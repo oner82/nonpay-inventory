@@ -5204,9 +5204,19 @@ const getHistoryModule = () => {
       productUsageSummaryHtml,
       filteredHistoryUsages,
       usageItem,
-      exportHistoryCategory,
-      exportHistoryCategoryDetail,
-      exportHistoryPatients,
+      productStockFlowRows,
+      productCategoryLabel,
+      reportPeriodFromFilters,
+      reportPeriodLabel,
+      downloadExcel,
+      departmentById,
+      surgeryById,
+      productById,
+      patientIdText,
+      auditUserText,
+      auditTimeText,
+      historyPeriodText,
+      inferSurgeryDepartment,
       deleteUsageRecord
     });
   }
@@ -5290,83 +5300,9 @@ const zipFiles = (files) => window.ORInventoryExportUtils.zipFiles(files);
 const xlsxWorkbook = (headers, rows) => window.ORInventoryExportUtils.xlsxWorkbook(headers, rows);
 const downloadExcel = (filename, headers, rows) => window.ORInventoryExportUtils.downloadExcel(filename, headers, rows);
 
-const historyFilterValues = () => ({
-  start: document.getElementById("historyStart")?.value || "",
-  end: document.getElementById("historyEnd")?.value || "",
-  query: document.getElementById("historySearch")?.value || ""
-});
-
-const exportHistoryCategory = (category) => {
-  const { start, end, query } = historyFilterValues();
-  const period = reportPeriodFromFilters(start, end);
-  const periodText = reportPeriodLabel(period);
-  const rows = productStockFlowRows(category, period, query).map((item) => [
-    item.product.name,
-    productCategoryLabel(item.product.category),
-    item.basisStock,
-    periodText,
-    item.periodReceived,
-    item.periodUsed,
-    item.currentStock
-  ]);
-  downloadExcel(
-    `보고용_재고흐름_${productCategoryLabel(category)}_${periodText}.xlsx`,
-    ["제품명", "분류", "기준재고", "조회기간", "기간입고", "기간사용", "현재고"],
-    rows
-  );
-};
-
-const exportHistoryCategoryDetail = (category) => {
-  const { start, end, query } = historyFilterValues();
-  const period = reportPeriodFromFilters(start, end);
-  const periodText = reportPeriodLabel(period);
-  const rows = productStockFlowRows(category, period, query).map((item) => [
-    item.product.name,
-    productCategoryLabel(item.product.category),
-    item.basisStock,
-    periodText,
-    item.periodReceived,
-    item.periodUsed,
-    item.currentStock,
-    item.product.company || "",
-    item.latestReceiptDate,
-    item.initialStock,
-    item.totalReceived,
-    item.totalUsed,
-    item.systemCurrentStock
-  ]);
-  downloadExcel(
-    `상세_재고흐름_${productCategoryLabel(category)}_${periodText}.xlsx`,
-    ["제품명", "분류", "기준재고", "조회기간", "기간입고", "기간사용", "현재고", "업체명", "최근입고일", "초기재고", "누적입고", "누적사용", "시스템현재고"],
-    rows
-  );
-};
-
-const exportHistoryPatients = () => {
-  const { start, end, query } = historyFilterValues();
-  const rows = filteredHistoryUsages(start, end, query).slice().reverse().map((usage) => {
-    const doctor = departmentById(usage.doctorId);
-    const surgery = surgeryById(usage.surgeryId);
-    const productText = usage.productIds.map((id) => productById(id)?.name || "삭제된 제품").join(", ");
-    return [
-      historyPeriodText(start, end),
-      usage.date,
-      usage.patientName,
-      patientIdText(usage),
-      auditUserText(usage),
-      auditTimeText(usage),
-      doctor?.name || "",
-      surgery?.department || inferSurgeryDepartment(surgery?.name || ""),
-      surgery?.name || "",
-      productText
-    ];
-  });
-  downloadExcel(
-    `환자별_사용내역_${start || "all"}_${end || "all"}.xlsx`,
-    ["조회기간", "사용일", "환자명", "환자ID", "입력자", "입력시각", "원장코드", "과", "수술", "사용제품"],
-    rows
-  );
-};
+const exportHistoryCategory = (category) => getHistoryModule().exportHistoryCategory(category);
+const exportHistoryCategoryDetail = (category) => getHistoryModule().exportHistoryCategoryDetail(category);
+const exportHistoryPatients = () => getHistoryModule().exportHistoryPatients();
 
 const exportReceiptHistory = (start = "", end = "", query = "") => {
   const rows = filteredReceipts(start, end, query)

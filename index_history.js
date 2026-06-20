@@ -47,6 +47,84 @@
       `;
     };
 
+    const historyFilterValues = () => ({
+      start: document.getElementById("historyStart")?.value || "",
+      end: document.getElementById("historyEnd")?.value || "",
+      query: document.getElementById("historySearch")?.value || ""
+    });
+
+    const exportHistoryCategory = (category) => {
+      const { start, end, query } = historyFilterValues();
+      const period = context.reportPeriodFromFilters(start, end);
+      const periodText = context.reportPeriodLabel(period);
+      const rows = context.productStockFlowRows(category, period, query).map((item) => [
+        item.product.name,
+        context.productCategoryLabel(item.product.category),
+        item.basisStock,
+        periodText,
+        item.periodReceived,
+        item.periodUsed,
+        item.currentStock
+      ]);
+      context.downloadExcel(
+        `보고용_재고흐름_${context.productCategoryLabel(category)}_${periodText}.xlsx`,
+        ["제품명", "분류", "기준재고", "조회기간", "기간입고", "기간사용", "현재고"],
+        rows
+      );
+    };
+
+    const exportHistoryCategoryDetail = (category) => {
+      const { start, end, query } = historyFilterValues();
+      const period = context.reportPeriodFromFilters(start, end);
+      const periodText = context.reportPeriodLabel(period);
+      const rows = context.productStockFlowRows(category, period, query).map((item) => [
+        item.product.name,
+        context.productCategoryLabel(item.product.category),
+        item.basisStock,
+        periodText,
+        item.periodReceived,
+        item.periodUsed,
+        item.currentStock,
+        item.product.company || "",
+        item.latestReceiptDate,
+        item.initialStock,
+        item.totalReceived,
+        item.totalUsed,
+        item.systemCurrentStock
+      ]);
+      context.downloadExcel(
+        `상세_재고흐름_${context.productCategoryLabel(category)}_${periodText}.xlsx`,
+        ["제품명", "분류", "기준재고", "조회기간", "기간입고", "기간사용", "현재고", "업체명", "최근입고일", "초기재고", "누적입고", "누적사용", "시스템현재고"],
+        rows
+      );
+    };
+
+    const exportHistoryPatients = () => {
+      const { start, end, query } = historyFilterValues();
+      const rows = context.filteredHistoryUsages(start, end, query).slice().reverse().map((usage) => {
+        const doctor = context.departmentById(usage.doctorId);
+        const surgery = context.surgeryById(usage.surgeryId);
+        const productText = usage.productIds.map((id) => context.productById(id)?.name || "삭제된 제품").join(", ");
+        return [
+          context.historyPeriodText(start, end),
+          usage.date,
+          usage.patientName,
+          context.patientIdText(usage),
+          context.auditUserText(usage),
+          context.auditTimeText(usage),
+          doctor?.name || "",
+          surgery?.department || context.inferSurgeryDepartment(surgery?.name || ""),
+          surgery?.name || "",
+          productText
+        ];
+      });
+      context.downloadExcel(
+        `환자별_사용내역_${start || "all"}_${end || "all"}.xlsx`,
+        ["조회기간", "사용일", "환자명", "환자ID", "입력자", "입력시각", "원장코드", "과", "수술", "사용제품"],
+        rows
+      );
+    };
+
     const bindHistory = () => {
       const app = context.getApp();
       const startInput = document.getElementById("historyStart");
@@ -56,12 +134,12 @@
       const patientList = document.getElementById("historyPatientList");
       const bindHistoryExports = () => {
         app.querySelectorAll("[data-export-history-category]").forEach((button) => {
-          button.addEventListener("click", () => context.exportHistoryCategory(button.dataset.exportHistoryCategory));
+          button.addEventListener("click", () => exportHistoryCategory(button.dataset.exportHistoryCategory));
         });
         app.querySelectorAll("[data-export-history-category-detail]").forEach((button) => {
-          button.addEventListener("click", () => context.exportHistoryCategoryDetail(button.dataset.exportHistoryCategoryDetail));
+          button.addEventListener("click", () => exportHistoryCategoryDetail(button.dataset.exportHistoryCategoryDetail));
         });
-        document.getElementById("exportHistoryPatients")?.addEventListener("click", context.exportHistoryPatients);
+        document.getElementById("exportHistoryPatients")?.addEventListener("click", exportHistoryPatients);
       };
       const updateHistory = () => {
         const start = startInput.value;
@@ -106,7 +184,10 @@
 
     return {
       renderHistory,
-      bindHistory
+      bindHistory,
+      exportHistoryCategory,
+      exportHistoryCategoryDetail,
+      exportHistoryPatients
     };
   };
 })();
