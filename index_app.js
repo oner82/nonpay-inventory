@@ -1221,44 +1221,36 @@ const bindView = () => {
   handlers[currentView]?.();
 };
 
-const renderSettings = () => {
-  if (!canManageSettings()) return `<div class="empty">관리자와 책임사용자만 설정을 사용할 수 있습니다.</div>`;
-  const views = {
-    products: renderProducts,
-    doctors: renderDoctors,
-    surgeries: renderSurgeries,
-    usageRules: renderUsageRules,
-    implantVendors: renderImplantVendors,
-    backup: renderBackup
-  };
-  return `
-    <section>
-      <div class="settings-tabs">
-        ${settingsMenus.map(([key, label]) => `<button class="settings-tab ${currentSettingsView === key ? "active" : ""}" data-settings-view="${key}" type="button">${label}</button>`).join("")}
-      </div>
-      ${views[currentSettingsView]()}
-    </section>
-  `;
+let settingsModule = null;
+const getSettingsModule = () => {
+  if (!window.createSettingsModule) throw new Error("설정 모듈을 불러오지 못했습니다.");
+  if (!settingsModule) {
+    settingsModule = window.createSettingsModule({
+      getApp: () => app,
+      getCurrentSettingsView: () => currentSettingsView,
+      setCurrentSettingsView: (view) => { currentSettingsView = view; },
+      settingsMenus,
+      canManageSettings,
+      render,
+      renderProducts,
+      renderDoctors,
+      renderSurgeries,
+      renderUsageRules,
+      renderImplantVendors,
+      renderBackup,
+      bindProducts,
+      bindDoctors,
+      bindSurgeries,
+      bindUsageRules,
+      bindImplantVendors,
+      bindBackup
+    });
+  }
+  return settingsModule;
 };
 
-const bindSettings = () => {
-  if (!canManageSettings()) return;
-  app.querySelectorAll("[data-settings-view]").forEach((button) => {
-    button.addEventListener("click", () => {
-      currentSettingsView = button.dataset.settingsView;
-      render();
-    });
-  });
-  const handlers = {
-    products: bindProducts,
-    doctors: bindDoctors,
-    surgeries: bindSurgeries,
-    usageRules: bindUsageRules,
-    implantVendors: bindImplantVendors,
-    backup: bindBackup
-  };
-  handlers[currentSettingsView]?.();
-};
+const renderSettings = () => getSettingsModule().renderSettings();
+const bindSettings = () => getSettingsModule().bindSettings();
 
 let dashboardModule = null;
 const getDashboardModule = () => {
