@@ -31,7 +31,7 @@
           <div class="card">
             <details class="item">
               <summary><span>제품군별 제품 사용내역</span><span class="pill">3</span></summary>
-              <div class="details-body" id="historyProductSummary">${context.productUsageSummaryHtml()}</div>
+              <div class="details-body" id="historyProductSummary">${productUsageSummaryHtml()}</div>
             </details>
           </div>
           <div class="card">
@@ -67,6 +67,67 @@
     };
 
     const reportPeriodLabel = (period) => period.start === period.end ? period.start : `${period.start} ~ ${period.end}`;
+
+    const productUsageSummaryHtml = (start = "", end = "", query = "") => {
+      const defaultsToToday = !start && !end;
+      const effectiveStart = defaultsToToday ? context.today() : start;
+      const effectiveEnd = defaultsToToday ? context.today() : end;
+      const periodText = defaultsToToday
+        ? reportPeriodLabel({ start: effectiveStart, end: effectiveEnd })
+        : historyPeriodText(start, end);
+      const groups = context.productCategories.map((category) => {
+        const productRows = context.productUsageSummaryRows(category, effectiveStart, effectiveEnd, query);
+        const rows = productRows.map(({ product, received, used }) => {
+          const isNonpay = context.productCategory(product.category) === "비급여";
+          const patientRows = context.productUsagePatientRows(product.id, effectiveStart, effectiveEnd);
+          return `
+            <details class="summary-row ${isNonpay ? "nonpay" : ""}">
+              <summary>
+                <div class="summary-headline">
+                  <span class="summary-name">${context.escapeHtml(product.name)}</span>
+                  ${product.company || product.subcategory ? `<span class="summary-sub">${product.company ? `${context.escapeHtml(product.company)}` : ""}${product.subcategory ? `${product.company ? " · " : ""}${context.escapeHtml(product.subcategory)}` : ""}</span>` : ""}
+                </div>
+                <div class="summary-metrics">
+                  <div class="metric"><span>기간입고</span> <strong>${received}</strong></div>
+                  <div class="metric"><span>기간사용</span> <strong>${used}</strong></div>
+                  <div class="metric ${context.stockStatusClass(product)}"><strong>${context.num(product.stock)}</strong><span>재고</span></div>
+                </div>
+              </summary>
+              <div class="details-body">
+                ${patientRows.length ? patientRows.map(({ usage, qty, doctor, surgery }) => `
+                  <div class="item">
+                    <div class="item-title"><span>${context.escapeHtml(context.patientDisplayName(usage))}</span><span class="pill">${qty}개</span></div>
+                    <div class="meta">
+                      <span>사용일: ${context.escapeHtml(usage.date)}</span>
+                      ${context.auditMetaHtml(usage, "입력")}
+                      <span>과/원장 코드: ${context.escapeHtml(doctor?.name || "-")} · 수술: ${context.escapeHtml(surgery?.department || context.inferSurgeryDepartment(surgery?.name || ""))} - ${context.escapeHtml(surgery?.name || "-")}</span>
+                    </div>
+                  </div>
+                `).join("") : `<div class="empty">해당 기간 사용 환자가 없습니다.</div>`}
+              </div>
+            </details>
+          `;
+        }).join("");
+        return `
+          <details class="item">
+            <summary><span>${context.escapeHtml(context.productCategoryLabel(category))} 제품 사용내역</span><span class="pill">${productRows.length}</span></summary>
+            <div class="details-body">
+              <div class="actions">
+                <button class="secondary" type="button" data-export-history-category="${context.escapeHtml(category)}">보고용 엑셀</button>
+                <button class="secondary" type="button" data-export-history-category-detail="${context.escapeHtml(category)}">상세 엑셀</button>
+              </div>
+              <div class="summary-table">${rows || `<div class="empty">해당 제품 사용내역이 없습니다.</div>`}</div>
+            </div>
+          </details>
+        `;
+      }).join("");
+      return `
+        <div class="meta" style="margin-bottom:10px;">
+          <span>조회 기간: ${context.escapeHtml(periodText)}${query ? ` · 검색어: ${context.escapeHtml(query)}` : ""}</span>
+        </div>
+        ${groups}
+      `;
+    };
 
     const exportHistoryCategory = (category) => {
       const { start, end, query } = historyFilterValues();
@@ -160,7 +221,7 @@
         const start = startInput.value;
         const end = endInput.value;
         const query = searchInput.value;
-        summary.innerHTML = context.productUsageSummaryHtml(start, end, query);
+        summary.innerHTML = productUsageSummaryHtml(start, end, query);
         const usages = context.filteredHistoryUsages(start, end, query).slice().reverse();
         patientList.innerHTML = usages.map(context.usageItem).join("") || `<div class="empty">사용내역이 없습니다.</div>`;
         bindHistoryDeleteButtons();
@@ -201,6 +262,7 @@
       historyPeriodText,
       reportPeriodFromFilters,
       reportPeriodLabel,
+      productUsageSummaryHtml,
       renderHistory,
       bindHistory,
       exportHistoryCategory,

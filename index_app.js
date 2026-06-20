@@ -5123,62 +5123,7 @@ const productUsagePatientRows = (productId, start = "", end = "") => filteredHis
   .filter(Boolean)
   .sort((a, b) => alphaFirstCompare(b.usage.date, a.usage.date) || alphaFirstCompare(a.usage.patientName, b.usage.patientName));
 
-const productUsageSummaryHtml = (start = "", end = "", query = "") => {
-  const periodText = historyPeriodText(start, end);
-  const categories = PRODUCT_CATEGORIES;
-  const groups = categories.map((category) => {
-    const productRows = productUsageSummaryRows(category, start, end, query);
-    const rows = productRows.map(({ product, received, used }) => {
-      const isNonpay = productCategory(product.category) === "비급여";
-      const patientRows = productUsagePatientRows(product.id, start, end);
-      return `
-        <details class="summary-row ${isNonpay ? "nonpay" : ""}">
-          <summary>
-            <div class="summary-headline">
-              <span class="summary-name">${escapeHtml(product.name)}</span>
-              ${product.company || product.subcategory ? `<span class="summary-sub">${product.company ? `${escapeHtml(product.company)}` : ""}${product.subcategory ? `${product.company ? " · " : ""}${escapeHtml(product.subcategory)}` : ""}</span>` : ""}
-            </div>
-            <div class="summary-metrics">
-              <div class="metric"><span>기간입고</span> <strong>${received}</strong></div>
-              <div class="metric"><span>기간사용</span> <strong>${used}</strong></div>
-              <div class="metric ${stockStatusClass(product)}"><strong>${num(product.stock)}</strong><span>재고</span></div>
-            </div>
-          </summary>
-          <div class="details-body">
-            ${patientRows.length ? patientRows.map(({ usage, qty, doctor, surgery }) => `
-              <div class="item">
-                <div class="item-title"><span>${escapeHtml(patientDisplayName(usage))}</span><span class="pill">${qty}개</span></div>
-                <div class="meta">
-                  <span>사용일: ${escapeHtml(usage.date)}</span>
-                  ${auditMetaHtml(usage, "입력")}
-                  <span>과/원장 코드: ${escapeHtml(doctor?.name || "-")} · 수술: ${escapeHtml(surgery?.department || inferSurgeryDepartment(surgery?.name || ""))} - ${escapeHtml(surgery?.name || "-")}</span>
-                </div>
-              </div>
-            `).join("") : `<div class="empty">해당 기간 사용 환자가 없습니다.</div>`}
-          </div>
-        </details>
-      `;
-    }).join("");
-    return `
-      <details class="item">
-        <summary><span>${escapeHtml(productCategoryLabel(category))} 제품 사용내역</span><span class="pill">${productRows.length}</span></summary>
-        <div class="details-body">
-          <div class="actions">
-            <button class="secondary" type="button" data-export-history-category="${escapeHtml(category)}">보고용 엑셀</button>
-            <button class="secondary" type="button" data-export-history-category-detail="${escapeHtml(category)}">상세 엑셀</button>
-          </div>
-          <div class="summary-table">${rows || `<div class="empty">해당 제품 사용내역이 없습니다.</div>`}</div>
-        </div>
-      </details>
-    `;
-  }).join("");
-  return `
-    <div class="meta" style="margin-bottom:10px;">
-      <span>조회 기간: ${escapeHtml(periodText)}${query ? ` · 검색어: ${escapeHtml(query)}` : ""}</span>
-    </div>
-    ${groups}
-  `;
-};
+const productUsageSummaryHtml = (start = "", end = "", query = "") => getHistoryModule().productUsageSummaryHtml(start, end, query);
 
 let historyModule = null;
 const getHistoryModule = () => {
@@ -5192,7 +5137,14 @@ const getHistoryModule = () => {
       render,
       byName,
       escapeHtml,
-      productUsageSummaryHtml,
+      productCategories: PRODUCT_CATEGORIES,
+      productCategory,
+      productUsageSummaryRows,
+      productUsagePatientRows,
+      stockStatusClass,
+      num,
+      patientDisplayName,
+      auditMetaHtml,
       filteredHistoryUsages,
       usageItem,
       productStockFlowRows,
