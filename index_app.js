@@ -2167,6 +2167,7 @@ const noRecommendationHtml = (hasSurgerySelection) => getUsageEntryModule().noRe
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
 const commonImplantPhotosHtml = (photos) => getUsageEntryModule().commonImplantPhotosHtml(photos);
 const emptyImplantDraft = () => getUsageEntryModule().emptyImplantDraft();
+const commonImplantPhotoFromFile = (file) => getUsageEntryModule().commonImplantPhotoFromFile(file);
 const cloneCommonImplantPhoto = (photo) => getUsageEntryModule().cloneCommonImplantPhoto(photo);
 const commonImplantPhotoById = (photos, id) => getUsageEntryModule().commonImplantPhotoById(photos, id);
 const implantDraftByIdFromList = (drafts, id) => getUsageEntryModule().implantDraftById(drafts, id);
@@ -3835,16 +3836,7 @@ const bindUse = () => {
   };
   const addCommonImplantPhotos = (files = []) => {
     files.filter((file) => file.type.startsWith("image/")).forEach((file) => {
-      commonImplantPhotos.push({
-        id: uid(),
-        file,
-        preview: URL.createObjectURL(file),
-        name: file.name || "implant.jpg",
-        size: file.size,
-        contentType: file.type || "image/jpeg",
-        rotation: 0,
-        cropped: false
-      });
+      commonImplantPhotos.push(commonImplantPhotoFromFile(file));
     });
     renderCommonImplantPhotos();
   };

@@ -267,6 +267,17 @@
 
     const emptyImplantDraft = () => ({ id: context.uid(), vendorId: "", customVendor: "", description: "", photos: [] });
 
+    const commonImplantPhotoFromFile = (file) => ({
+      id: context.uid(),
+      file,
+      preview: URL.createObjectURL(file),
+      name: file.name || "implant.jpg",
+      size: file.size,
+      contentType: file.type || "image/jpeg",
+      rotation: 0,
+      cropped: false
+    });
+
     const cloneCommonImplantPhoto = (photo) => ({
       id: context.uid(),
       file: photo.file || null,
@@ -437,6 +448,7 @@
       useRecommendationHtml,
       commonImplantPhotosHtml,
       emptyImplantDraft,
+      commonImplantPhotoFromFile,
       cloneCommonImplantPhoto,
       commonImplantPhotoById,
       implantDraftById,
