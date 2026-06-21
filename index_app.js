@@ -2148,6 +2148,9 @@ const usageProductItems = (usage) => Array.from((usage?.productIds || []).reduce
 }, new Map()).entries()).map(([productId, qty]) => ({ productId, qty }));
 
 const renderUseItemsList = (items, target) => getUsageEntryModule().renderUseItemsList(items, target);
+const useDraftSummaryHtml = (snapshot) => getUsageEntryModule().useDraftSummaryHtml(snapshot);
+const selectedUseItemsFromScope = (scope) => getUsageEntryModule().selectedUseItemsFromScope(scope);
+const selectedUseListHtml = (items) => getUsageEntryModule().selectedUseListHtml(items);
 
 const editUsagePatientsForDate = (date) => getUsageEntryModule().editUsagePatientsForDate(date);
 const editUsagePatientCardHtml = (usage, selectedId = "") => getUsageEntryModule().editUsagePatientCardHtml(usage, selectedId);
@@ -3753,10 +3756,13 @@ const bindUse = () => {
     rule.doctorId === departmentSelect.value &&
     rule.surgeryId === surgerySelect.value
   );
-  const selectedUseItems = () => Array.from(app.querySelectorAll("[data-use-product]:checked")).map((input) => ({
-    productId: input.value,
-    qty: Math.max(1, num(form.querySelector(`[data-use-qty="${input.value}"]`)?.value))
-  }));
+  const selectedUseItems = () => selectedUseItemsFromScope(form);
+  const syncRecommendControl = (productId, checked, qty = "") => {
+    const recommend = app.querySelector(`[data-recommend-product="${productId}"]`);
+    const recommendQty = app.querySelector(`[data-recommend-qty="${productId}"]`);
+    if (recommend) recommend.checked = checked;
+    if (recommendQty && qty !== "") recommendQty.value = Math.max(1, num(qty));
+  };
   const renderSelectedUseList = () => {
     const items = selectedUseItems();
     if (!items.length) {
@@ -3764,39 +3770,12 @@ const bindUse = () => {
       syncImplantDraftsFromSelectedProducts();
       return;
     }
-    const chipClass = (category) => {
-      const key = productCategory(category);
-      if (key === "비급여") return "nonpay";
-      if (key === "인체조직") return "tissue";
-      if (["ANCHOR", "URO_LANDING", "GS_LANDING", "IMPLANT"].includes(key)) return "anchor";
-      return "";
-    };
-    selectedUseList.innerHTML = `
-      <div class="selected-use-buttons">
-        ${items.map((item) => {
-          const product = productById(item.productId);
-          if (!product) return "";
-          const meta = [productCategoryLabel(product.category), product.company, product.subcategory].filter(Boolean).join(" · ");
-          return `
-            <div class="selected-use-chip ${chipClass(product.category)}">
-              <div class="selected-use-name" title="${escapeHtml(product.name)}">
-                ${escapeHtml(product.name)}<span>${escapeHtml(meta)}</span>
-              </div>
-              <div class="selected-use-controls">
-                <button type="button" class="secondary" data-selected-dec="${item.productId}" aria-label="수량 줄이기">−</button>
-                <input type="number" min="1" max="${Math.max(1, num(product.stock) + item.qty)}" value="${item.qty}" data-selected-qty="${item.productId}" aria-label="${escapeHtml(product.name)} 수량" readonly>
-                <button type="button" class="secondary" data-selected-inc="${item.productId}" aria-label="수량 늘리기">+</button>
-                <button type="button" class="remove-selected" data-selected-remove="${item.productId}">삭제</button>
-              </div>
-            </div>
-          `;
-        }).join("")}
-      </div>
-    `;
+    selectedUseList.innerHTML = selectedUseListHtml(items);
     selectedUseList.querySelectorAll("[data-selected-remove]").forEach((button) => {
       button.addEventListener("click", () => {
         const checkbox = app.querySelector(`[data-use-product="${button.dataset.selectedRemove}"]`);
         if (checkbox) checkbox.checked = false;
+        syncRecommendControl(button.dataset.selectedRemove, false);
         renderSelectedUseList();
       });
     });
@@ -3807,6 +3786,7 @@ const bindUse = () => {
         const value = Math.max(1, num(input.value));
         if (linked) linked.value = value;
         if (checkbox) checkbox.checked = true;
+        syncRecommendControl(input.dataset.selectedQty, true, value);
       });
       input.addEventListener("change", renderSelectedUseList);
     });
@@ -3819,6 +3799,7 @@ const bindUse = () => {
         const nextQty = button.dataset.selectedDec ? Math.max(1, currentQty - 1) : currentQty + 1;
         if (linked) linked.value = nextQty;
         if (checkbox) checkbox.checked = true;
+        syncRecommendControl(productId, true, nextQty);
         renderSelectedUseList();
       });
     });
@@ -3829,6 +3810,7 @@ const bindUse = () => {
     const qtyInput = form.querySelector(`[data-use-qty="${productId}"]`);
     if (checkbox) checkbox.checked = true;
     if (qtyInput) qtyInput.value = Math.max(1, num(qty));
+    syncRecommendControl(productId, true, qty);
     renderSelectedUseList();
   };
   const addImplantDraft = () => {
@@ -4163,11 +4145,6 @@ const bindUse = () => {
       if (useDraftPanel) useDraftPanel.hidden = true;
       return;
     }
-    const productLines = useDraftSnapshot.useItems.map((item) => {
-      const product = productById(item.productId);
-      return `${product?.name || "삭제된 제품"} ${item.qty}개`;
-    });
-    const implantPhotoCount = useDraftSnapshot.implantDraftPayload.reduce((sum, draft) => sum + (draft.photos || []).length, 0);
     useDraftPanel.hidden = false;
     if (useDraftStatus) {
       useDraftStatus.textContent = useDraftDirty ? "수정 중 · 임시저장 갱신 필요" : "임시저장 완료";
@@ -4175,14 +4152,7 @@ const bindUse = () => {
     }
     if (finalSaveUseDraftButton) finalSaveUseDraftButton.disabled = useDraftDirty;
     if (saveUseDraftButton) saveUseDraftButton.textContent = useDraftSnapshot ? "임시저장 갱신" : "임시저장";
-    useDraftSummary.innerHTML = `
-      <div><span>환자</span> ${escapeHtml(useDraftSnapshot.patientName || "-")} ${useDraftSnapshot.patientId ? `(${escapeHtml(useDraftSnapshot.patientId)})` : ""}</div>
-      <div><span>사용일</span> ${escapeHtml(useDraftSnapshot.date || today())}</div>
-      <div><span>수술</span> ${escapeHtml(useDraftSnapshot.doctorText)} · ${escapeHtml(useDraftSnapshot.surgeryText)}</div>
-      <div><span>사용제품</span> ${escapeHtml(productLines.join(", ") || "-")}</div>
-      <div><span>임플란트</span> ${useDraftSnapshot.implantDraftPayload.length ? `${useDraftSnapshot.implantDraftPayload.length}개 업체 · 사진 ${implantPhotoCount}장` : "기록 없음"}</div>
-      <div><span>임시저장</span> ${escapeHtml(useDraftSnapshot.enteredBy)} · ${escapeHtml(formatDateTime(useDraftSnapshot.enteredAt))}</div>
-    `;
+    useDraftSummary.innerHTML = useDraftSummaryHtml(useDraftSnapshot);
   };
   const markUseDraftDirty = () => {
     if (!useDraftSnapshot || useDraftDirty) return;
@@ -4304,6 +4274,7 @@ const bindUse = () => {
         const qtyInput = form.querySelector(`[data-use-qty="${input.value}"]`);
         if (linked) linked.checked = false;
         if (qtyInput) qtyInput.value = 1;
+        syncRecommendControl(input.value, false);
         renderSelectedUseList();
       });
     });
@@ -4401,8 +4372,19 @@ const bindUse = () => {
     renderUseRecommendation();
   });
   form.querySelectorAll("[data-use-product], [data-use-qty]").forEach((input) => {
-    input.addEventListener("change", renderSelectedUseList);
-    input.addEventListener("input", renderSelectedUseList);
+    const syncAndRender = () => {
+      if (input.dataset.useProduct) {
+        const qtyInput = form.querySelector(`[data-use-qty="${input.dataset.useProduct}"]`);
+        syncRecommendControl(input.dataset.useProduct, input.checked, qtyInput?.value || 1);
+      }
+      if (input.dataset.useQty) {
+        const checkbox = form.querySelector(`[data-use-product="${input.dataset.useQty}"]`);
+        syncRecommendControl(input.dataset.useQty, Boolean(checkbox?.checked), input.value);
+      }
+      renderSelectedUseList();
+    };
+    input.addEventListener("change", syncAndRender);
+    input.addEventListener("input", syncAndRender);
   });
   app.querySelectorAll("[data-load-pending-usage]").forEach((button) => {
     button.addEventListener("click", () => {

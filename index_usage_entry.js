@@ -7,6 +7,24 @@
       return { productCount, implantCount, photoCount };
     };
 
+    const useDraftSummaryHtml = (snapshot) => {
+      const useItems = snapshot.useItems || [];
+      const implantDrafts = snapshot.implantDraftPayload || [];
+      const productLines = useItems.map((item) => {
+        const product = context.productById(item.productId);
+        return `${product?.name || "삭제된 제품"} ${context.num(item.qty)}개`;
+      });
+      const implantPhotoCount = implantDrafts.reduce((sum, draft) => sum + (draft.photos || []).length, 0);
+      return `
+        <div><span>환자</span> ${context.escapeHtml(snapshot.patientName || "-")} ${snapshot.patientId ? `(${context.escapeHtml(snapshot.patientId)})` : ""}</div>
+        <div><span>사용일</span> ${context.escapeHtml(snapshot.date || context.today())}</div>
+        <div><span>수술</span> ${context.escapeHtml(snapshot.doctorText)} · ${context.escapeHtml(snapshot.surgeryText)}</div>
+        <div><span>사용제품</span> ${context.escapeHtml(productLines.join(", ") || "-")}</div>
+        <div><span>임플란트</span> ${implantDrafts.length ? `${implantDrafts.length}개 업체 · 사진 ${implantPhotoCount}장` : "기록 없음"}</div>
+        <div><span>임시저장</span> ${context.escapeHtml(snapshot.enteredBy)} · ${context.escapeHtml(context.formatDateTime(snapshot.enteredAt))}</div>
+      `;
+    };
+
     const renderPendingUsageList = () => {
       const items = context.pendingUsagesOpen();
       if (!items.length) return "";
@@ -124,6 +142,44 @@
       });
     };
 
+    const selectedUseItemsFromScope = (scope) => Array.from(scope.querySelectorAll("[data-use-product]:checked")).map((input) => ({
+      productId: input.value,
+      qty: Math.max(1, context.num(scope.querySelector(`[data-use-qty="${input.value}"]`)?.value))
+    }));
+
+    const selectedUseListHtml = (items) => {
+      if (!items.length) return `<span>선택된 제품이 없습니다.</span>`;
+      const chipClass = (category) => {
+        const key = context.productCategory(category);
+        if (key === "비급여") return "nonpay";
+        if (key === "인체조직") return "tissue";
+        if (["ANCHOR", "URO_LANDING", "GS_LANDING", "IMPLANT"].includes(key)) return "anchor";
+        return "";
+      };
+      return `
+        <div class="selected-use-buttons">
+          ${items.map((item) => {
+            const product = context.productById(item.productId);
+            if (!product) return "";
+            const meta = [context.productCategoryLabel(product.category), product.company, product.subcategory].filter(Boolean).join(" · ");
+            return `
+              <div class="selected-use-chip ${chipClass(product.category)}">
+                <div class="selected-use-name" title="${context.escapeHtml(product.name)}">
+                  ${context.escapeHtml(product.name)}<span>${context.escapeHtml(meta)}</span>
+                </div>
+                <div class="selected-use-controls">
+                  <button type="button" class="secondary" data-selected-dec="${item.productId}" aria-label="수량 줄이기">−</button>
+                  <input type="number" min="1" max="${Math.max(1, context.num(product.stock) + item.qty)}" value="${item.qty}" data-selected-qty="${item.productId}" aria-label="${context.escapeHtml(product.name)} 수량" readonly>
+                  <button type="button" class="secondary" data-selected-inc="${item.productId}" aria-label="수량 늘리기">+</button>
+                  <button type="button" class="remove-selected" data-selected-remove="${item.productId}">삭제</button>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    };
+
     const editUsagePatientsForDate = (date) => context.getState().usages
       .filter((usage) => (usage.date || "") === date)
       .slice()
@@ -208,8 +264,11 @@
 
     return {
       pendingUsageSummary,
+      useDraftSummaryHtml,
       renderPendingUsageList,
       renderUseItemsList,
+      selectedUseItemsFromScope,
+      selectedUseListHtml,
       editUsagePatientsForDate,
       editUsagePatientCardHtml,
       editUsagePatientListHtml,
