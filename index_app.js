@@ -3844,9 +3844,6 @@ const bindUse = () => {
     renderCommonImplantPhotos();
   };
   const findCommonImplantPhoto = (id) => commonImplantPhotoById(commonImplantPhotos, id);
-  const mergeImplantDescription = (left = "", right = "") => {
-    return mergeImplantDescriptionLines(left, right);
-  };
   const mergeDuplicateImplantDrafts = () => {
     const kept = [];
     let changed = false;
@@ -3862,8 +3859,8 @@ const bindUse = () => {
       existing.vendor = existing.vendor || draft.vendor || "";
       existing.autoSource = existing.autoSource || draft.autoSource;
       existing.autoCompanyKey = existing.autoCompanyKey || draft.autoCompanyKey || "";
-      existing.description = mergeImplantDescription(existing.description, draft.description);
-      existing.autoDescription = mergeImplantDescription(existing.autoDescription, draft.autoDescription);
+      existing.description = mergeImplantDescriptionLines(existing.description, draft.description);
+      existing.autoDescription = mergeImplantDescriptionLines(existing.autoDescription, draft.autoDescription);
       const existingPhotoIds = new Set((existing.photos || []).map((photo) => photo.id));
       (draft.photos || []).forEach((photo) => {
         if (!existingPhotoIds.has(photo.id)) {
