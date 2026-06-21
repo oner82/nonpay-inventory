@@ -336,6 +336,38 @@
       return true;
     };
 
+    const mergeDuplicateImplantDrafts = (drafts = []) => {
+      const kept = [];
+      let changed = false;
+      for (let index = 0; index < drafts.length; index += 1) {
+        const draft = drafts[index];
+        const existing = kept.find((item) => context.implantVendorEntriesMatch(item, draft));
+        if (!existing) {
+          kept.push(draft);
+          continue;
+        }
+        existing.vendorId = existing.vendorId || draft.vendorId || "";
+        existing.customVendor = existing.customVendor || draft.customVendor || "";
+        existing.vendor = existing.vendor || draft.vendor || "";
+        existing.autoSource = existing.autoSource || draft.autoSource;
+        existing.autoCompanyKey = existing.autoCompanyKey || draft.autoCompanyKey || "";
+        existing.description = context.mergeImplantDescriptionLines(existing.description, draft.description);
+        existing.autoDescription = context.mergeImplantDescriptionLines(existing.autoDescription, draft.autoDescription);
+        const existingPhotoIds = new Set((existing.photos || []).map((photo) => photo.id));
+        (draft.photos || []).forEach((photo) => {
+          if (!existingPhotoIds.has(photo.id)) {
+            existing.photos = existing.photos || [];
+            existing.photos.push(photo);
+            existingPhotoIds.add(photo.id);
+          }
+        });
+        drafts.splice(index, 1);
+        index -= 1;
+        changed = true;
+      }
+      return changed;
+    };
+
     const implantDraftPhotoPair = (drafts = [], value = "") => {
       const [draftId, photoId] = String(value || "").split("::");
       const draft = implantDraftById(drafts, draftId);
@@ -496,6 +528,7 @@
       implantDraftById,
       addImplantDraftPhotosFromFiles,
       removeImplantDraftById,
+      mergeDuplicateImplantDrafts,
       implantDraftPhotoPair,
       implantDraftsHtml,
       editUsagePatientsForDate,

@@ -2031,7 +2031,9 @@ const getUsageEntryModule = () => {
       patientIdText,
       inferSurgeryDepartment,
       usageProductItems,
-      canModifyUsageRecord
+      canModifyUsageRecord,
+      implantVendorEntriesMatch,
+      mergeImplantDescriptionLines
     });
   }
   return usageEntryModule;
@@ -2174,6 +2176,7 @@ const removeCommonImplantPhotoById = (photos, id) => getUsageEntryModule().remov
 const implantDraftByIdFromList = (drafts, id) => getUsageEntryModule().implantDraftById(drafts, id);
 const addImplantDraftPhotosFromFiles = (draft, files) => getUsageEntryModule().addImplantDraftPhotosFromFiles(draft, files);
 const removeImplantDraftById = (drafts, id) => getUsageEntryModule().removeImplantDraftById(drafts, id);
+const mergeDuplicateImplantDraftsInList = (drafts) => getUsageEntryModule().mergeDuplicateImplantDrafts(drafts);
 const implantDraftPhotoPair = (drafts, value) => getUsageEntryModule().implantDraftPhotoPair(drafts, value);
 const implantDraftsHtml = (drafts, commonPhotoCount) => getUsageEntryModule().implantDraftsHtml(drafts, commonPhotoCount);
 
@@ -3842,37 +3845,7 @@ const bindUse = () => {
     renderCommonImplantPhotos();
   };
   const findCommonImplantPhoto = (id) => commonImplantPhotoById(commonImplantPhotos, id);
-  const mergeDuplicateImplantDrafts = () => {
-    const kept = [];
-    let changed = false;
-    for (let index = 0; index < implantDrafts.length; index += 1) {
-      const draft = implantDrafts[index];
-      const existing = kept.find((item) => implantVendorEntriesMatch(item, draft));
-      if (!existing) {
-        kept.push(draft);
-        continue;
-      }
-      existing.vendorId = existing.vendorId || draft.vendorId || "";
-      existing.customVendor = existing.customVendor || draft.customVendor || "";
-      existing.vendor = existing.vendor || draft.vendor || "";
-      existing.autoSource = existing.autoSource || draft.autoSource;
-      existing.autoCompanyKey = existing.autoCompanyKey || draft.autoCompanyKey || "";
-      existing.description = mergeImplantDescriptionLines(existing.description, draft.description);
-      existing.autoDescription = mergeImplantDescriptionLines(existing.autoDescription, draft.autoDescription);
-      const existingPhotoIds = new Set((existing.photos || []).map((photo) => photo.id));
-      (draft.photos || []).forEach((photo) => {
-        if (!existingPhotoIds.has(photo.id)) {
-          existing.photos = existing.photos || [];
-          existing.photos.push(photo);
-          existingPhotoIds.add(photo.id);
-        }
-      });
-      implantDrafts.splice(index, 1);
-      index -= 1;
-      changed = true;
-    }
-    return changed;
-  };
+  const mergeDuplicateImplantDrafts = () => mergeDuplicateImplantDraftsInList(implantDrafts);
   const syncImplantDraftsFromSelectedProducts = () => {
     const targets = implantVendorTargetsFromUseItems(selectedUseItems());
     const targetKeys = new Set(targets.map((target) => target.key));
