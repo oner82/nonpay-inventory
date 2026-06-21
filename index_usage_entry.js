@@ -386,6 +386,14 @@
       !String(implantDraftVendorText(draft) || "").trim() || (!draft.description && !(draft.photos || []).length)
     );
 
+    const useDraftValidationMessage = (useItems = [], implantDraftPayload = []) => {
+      if (!useItems.length && !implantDraftPayload.length) return "제품을 선택하거나 임플란트 장부를 작성해 주세요.";
+      const unavailable = useItems.find((item) => context.num(context.productById(item.productId)?.stock) < item.qty);
+      if (unavailable) return "재고가 부족한 제품이 있습니다.";
+      if (invalidImplantDraft(implantDraftPayload)) return "임플란트 장부가 작성되지 않았습니다. 업체명과 사용내용 또는 사진을 확인해 주세요.";
+      return "";
+    };
+
     const implantDraftPhotoPair = (drafts = [], value = "") => {
       const [draftId, photoId] = String(value || "").split("::");
       const draft = implantDraftById(drafts, draftId);
@@ -549,6 +557,7 @@
       mergeDuplicateImplantDrafts,
       implantDraftPayloadFromList,
       invalidImplantDraft,
+      useDraftValidationMessage,
       implantDraftPhotoPair,
       implantDraftsHtml,
       editUsagePatientsForDate,

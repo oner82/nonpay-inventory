@@ -2179,7 +2179,7 @@ const addImplantDraftPhotosFromFiles = (draft, files) => getUsageEntryModule().a
 const removeImplantDraftById = (drafts, id) => getUsageEntryModule().removeImplantDraftById(drafts, id);
 const mergeDuplicateImplantDraftsInList = (drafts) => getUsageEntryModule().mergeDuplicateImplantDrafts(drafts);
 const implantDraftPayloadFromList = (drafts, enabled) => getUsageEntryModule().implantDraftPayloadFromList(drafts, enabled);
-const invalidImplantDraftFromPayload = (payload) => getUsageEntryModule().invalidImplantDraft(payload);
+const useDraftValidationMessage = (useItems, implantDraftPayload) => getUsageEntryModule().useDraftValidationMessage(useItems, implantDraftPayload);
 const implantDraftPhotoPair = (drafts, value) => getUsageEntryModule().implantDraftPhotoPair(drafts, value);
 const implantDraftsHtml = (drafts, commonPhotoCount) => getUsageEntryModule().implantDraftsHtml(drafts, commonPhotoCount);
 
@@ -3926,7 +3926,6 @@ const bindUse = () => {
     if (implantWillSave) mergeDuplicateImplantDrafts();
     return implantDraftPayloadFromList(implantDrafts, implantWillSave);
   };
-  const invalidImplantDraft = (payload) => invalidImplantDraftFromPayload(payload);
   const renderImplantDrafts = () => {
     implantEntriesWrap.innerHTML = implantDraftsHtml(implantDrafts, commonImplantPhotos.length);
   };
@@ -3934,17 +3933,9 @@ const bindUse = () => {
     if (!form.reportValidity()) return null;
     const useItems = selectedUseItems();
     const implantDraftPayload = currentImplantDraftPayload();
-    if (!useItems.length && !implantDraftPayload.length) {
-      alert("제품을 선택하거나 임플란트 장부를 작성해 주세요.");
-      return null;
-    }
-    const unavailable = useItems.find((item) => num(productById(item.productId)?.stock) < item.qty);
-    if (unavailable) {
-      alert("재고가 부족한 제품이 있습니다.");
-      return null;
-    }
-    if (invalidImplantDraft(implantDraftPayload)) {
-      alert("임플란트 장부가 작성되지 않았습니다. 업체명과 사용내용 또는 사진을 확인해 주세요.");
+    const validationMessage = useDraftValidationMessage(useItems, implantDraftPayload);
+    if (validationMessage) {
+      alert(validationMessage);
       return null;
     }
     return {
