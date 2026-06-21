@@ -161,13 +161,60 @@
       return patients.map((usage) => editUsagePatientCardHtml(usage, selectedId)).join("");
     };
 
+    const renderUseProductSearchModal = () => `
+      <div class="modal-backdrop" id="useProductSearchModal" hidden role="dialog" aria-modal="true" aria-labelledby="useProductSearchTitle">
+        <div class="search-modal-panel">
+          <div class="search-modal-head">
+            <h3 id="useProductSearchTitle">제품 검색</h3>
+            <button class="search-modal-close" type="button" id="closeUseProductSearch" aria-label="제품 검색 닫기">×</button>
+          </div>
+          <div>
+            <label for="useProductSearch">제품명 검색</label>
+            <input id="useProductSearch" autocomplete="off" placeholder="제품명, 업체, 종류를 입력하세요">
+          </div>
+          <div id="useProductSearchResults" class="product-picker search-modal-results"></div>
+        </div>
+      </div>
+    `;
+
+    const renderImplantPhotoModal = () => `
+      <div class="modal-backdrop" id="implantPhotoModal" hidden role="dialog" aria-modal="true" aria-label="임플란트 사진 확대">
+        <div class="search-modal-panel">
+          <div class="search-modal-head">
+            <h3>사진 확인</h3>
+            <button class="search-modal-close" type="button" id="closeImplantPhotoModal" aria-label="사진 닫기">×</button>
+          </div>
+          <div class="implant-crop-stage" id="implantCropStage">
+            <img class="implant-modal-image" id="implantPhotoModalImage" alt="임플란트 사진 확대">
+            <div class="implant-crop-frame" id="implantCropFrame" hidden>
+              <span class="implant-crop-handle" data-crop-handle="nw"></span>
+              <span class="implant-crop-handle" data-crop-handle="n"></span>
+              <span class="implant-crop-handle" data-crop-handle="ne"></span>
+              <span class="implant-crop-handle" data-crop-handle="e"></span>
+              <span class="implant-crop-handle" data-crop-handle="se"></span>
+              <span class="implant-crop-handle" data-crop-handle="s"></span>
+              <span class="implant-crop-handle" data-crop-handle="sw"></span>
+              <span class="implant-crop-handle" data-crop-handle="w"></span>
+            </div>
+          </div>
+          <div class="actions" id="implantPhotoEditTools" hidden>
+            <button class="secondary" type="button" id="implantModalRotate">회전</button>
+            <button class="secondary" type="button" id="implantModalCrop">자르기</button>
+            <button type="button" id="implantModalDone">완료</button>
+          </div>
+        </div>
+      </div>
+    `;
+
     return {
       pendingUsageSummary,
       renderPendingUsageList,
       renderUseItemsList,
       editUsagePatientsForDate,
       editUsagePatientCardHtml,
-      editUsagePatientListHtml
+      editUsagePatientListHtml,
+      renderUseProductSearchModal,
+      renderImplantPhotoModal
     };
   };
 })();

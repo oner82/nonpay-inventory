@@ -2090,45 +2090,8 @@ const renderUse = () => `
         </div>
         <div id="selectedUseList" class="meta"><span>선택된 제품이 없습니다.</span></div>
       </div>
-      <div class="modal-backdrop" id="useProductSearchModal" hidden role="dialog" aria-modal="true" aria-labelledby="useProductSearchTitle">
-        <div class="search-modal-panel">
-          <div class="search-modal-head">
-            <h3 id="useProductSearchTitle">제품 검색</h3>
-            <button class="search-modal-close" type="button" id="closeUseProductSearch" aria-label="제품 검색 닫기">×</button>
-          </div>
-          <div>
-            <label for="useProductSearch">제품명 검색</label>
-            <input id="useProductSearch" autocomplete="off" placeholder="제품명, 업체, 종류를 입력하세요">
-          </div>
-          <div id="useProductSearchResults" class="product-picker search-modal-results"></div>
-        </div>
-      </div>
-      <div class="modal-backdrop" id="implantPhotoModal" hidden role="dialog" aria-modal="true" aria-label="임플란트 사진 확대">
-        <div class="search-modal-panel">
-          <div class="search-modal-head">
-            <h3>사진 확인</h3>
-            <button class="search-modal-close" type="button" id="closeImplantPhotoModal" aria-label="사진 닫기">×</button>
-          </div>
-          <div class="implant-crop-stage" id="implantCropStage">
-            <img class="implant-modal-image" id="implantPhotoModalImage" alt="임플란트 사진 확대">
-            <div class="implant-crop-frame" id="implantCropFrame" hidden>
-              <span class="implant-crop-handle" data-crop-handle="nw"></span>
-              <span class="implant-crop-handle" data-crop-handle="n"></span>
-              <span class="implant-crop-handle" data-crop-handle="ne"></span>
-              <span class="implant-crop-handle" data-crop-handle="e"></span>
-              <span class="implant-crop-handle" data-crop-handle="se"></span>
-              <span class="implant-crop-handle" data-crop-handle="s"></span>
-              <span class="implant-crop-handle" data-crop-handle="sw"></span>
-              <span class="implant-crop-handle" data-crop-handle="w"></span>
-            </div>
-          </div>
-          <div class="actions" id="implantPhotoEditTools" hidden>
-            <button class="secondary" type="button" id="implantModalRotate">회전</button>
-            <button class="secondary" type="button" id="implantModalCrop">자르기</button>
-            <button type="button" id="implantModalDone">완료</button>
-          </div>
-        </div>
-      </div>
+      ${renderUseProductSearchModal()}
+      ${renderImplantPhotoModal()}
       <label>제품 여러 개 선택</label>
       <div class="product-picker">
         ${renderGroupedProducts(false)}
@@ -2189,6 +2152,8 @@ const renderUseItemsList = (items, target) => getUsageEntryModule().renderUseIte
 const editUsagePatientsForDate = (date) => getUsageEntryModule().editUsagePatientsForDate(date);
 const editUsagePatientCardHtml = (usage, selectedId = "") => getUsageEntryModule().editUsagePatientCardHtml(usage, selectedId);
 const editUsagePatientListHtml = (date, selectedId = "") => getUsageEntryModule().editUsagePatientListHtml(date, selectedId);
+const renderUseProductSearchModal = () => getUsageEntryModule().renderUseProductSearchModal();
+const renderImplantPhotoModal = () => getUsageEntryModule().renderImplantPhotoModal();
 
 const renderEditUsage = () => {
   if (!canEditUsage()) return `<div class="empty">사용내역 수정은 관리자, 책임사용자, 일반사용자만 가능합니다.</div>`;
@@ -4073,9 +4038,7 @@ const bindUse = () => {
             <div class="implant-photo" data-implant-photo="${escapeHtml(photo.id)}">
               <img class="${photo.cropped ? "cropped" : ""}" src="${escapeHtml(implantPhotoViewSrc(photo))}" alt="임플란트 사진 미리보기" data-preview-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}" style="${implantPhotoRotationStyle(photo)} cursor:pointer;">
               <div class="implant-photo-actions">
-                <button class="secondary" type="button" data-preview-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}">확대</button>
                 <button class="secondary" type="button" data-edit-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}">편집</button>
-                <button class="secondary" type="button" data-rotate-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}">회전</button>
                 <button class="secondary" type="button" data-move-implant-photo-up="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}" ${photoIndex === 0 ? "disabled" : ""}>앞</button>
                 <button class="secondary" type="button" data-move-implant-photo-down="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}" ${photoIndex === draft.photos.length - 1 ? "disabled" : ""}>뒤</button>
                 <button class="danger" type="button" data-remove-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}">삭제</button>
@@ -4333,7 +4296,15 @@ const bindUse = () => {
     productSearchResults.querySelectorAll("[data-search-product]").forEach((input) => {
       input.addEventListener("change", () => {
         const qty = productSearchResults.querySelector(`[data-search-qty="${input.value}"]`)?.value;
-        if (input.checked) selectUseProduct(input.value, qty);
+        if (input.checked) {
+          selectUseProduct(input.value, qty);
+          return;
+        }
+        const linked = form.querySelector(`[data-use-product="${input.value}"]`);
+        const qtyInput = form.querySelector(`[data-use-qty="${input.value}"]`);
+        if (linked) linked.checked = false;
+        if (qtyInput) qtyInput.value = 1;
+        renderSelectedUseList();
       });
     });
     productSearchResults.querySelectorAll("[data-search-qty]").forEach((input) => {
