@@ -2008,6 +2008,7 @@ const getUsageEntryModule = () => {
   if (!window.createUsageEntryModule) throw new Error("사용입력 모듈을 불러오지 못했습니다.");
   if (!usageEntryModule) {
     usageEntryModule = window.createUsageEntryModule({
+      getState: () => state,
       pendingUsagesOpen,
       getApp: () => app,
       num,
@@ -2019,7 +2020,12 @@ const getUsageEntryModule = () => {
       formatDateTime,
       productCategory,
       productById,
-      productCategoryLabel
+      productCategoryLabel,
+      alphaFirstCompare,
+      patientIdText,
+      inferSurgeryDepartment,
+      usageProductItems,
+      canModifyUsageRecord
     });
   }
   return usageEntryModule;
@@ -2180,42 +2186,9 @@ const usageProductItems = (usage) => Array.from((usage?.productIds || []).reduce
 
 const renderUseItemsList = (items, target) => getUsageEntryModule().renderUseItemsList(items, target);
 
-const editUsagePatientsForDate = (date) => state.usages
-  .filter((usage) => (usage.date || "") === date)
-  .slice()
-  .sort((a, b) => alphaFirstCompare(a.patientName, b.patientName) || alphaFirstCompare(patientIdText(a), patientIdText(b)));
-
-const editUsagePatientCardHtml = (usage, selectedId = "") => {
-  const doctor = departmentById(usage.doctorId);
-  const surgery = surgeryById(usage.surgeryId);
-  const surgeryDepartment = surgery ? (surgery.department || inferSurgeryDepartment(surgery.name)) : "-";
-  const productItems = usageProductItems(usage);
-  const productSummary = productItems
-    .slice(0, 3)
-    .map((item) => `${productById(item.productId)?.name || "삭제된 제품"}${item.qty > 1 ? ` ${item.qty}개` : ""}`)
-    .join(", ");
-  const extraCount = Math.max(0, productItems.length - 3);
-  const locked = !canModifyUsageRecord(usage);
-  return `
-    <button class="edit-patient-card ${selectedId === usage.id ? "active" : ""} ${locked ? "locked" : ""}" type="button" data-edit-usage-card="${escapeHtml(usage.id)}">
-      <div class="edit-patient-card-head">
-        <span>${escapeHtml(patientDisplayName(usage) || "이름 없음")}</span>
-        <span class="pill ${locked ? "low" : ""}">${locked ? "관리자 전용" : "수정 가능"}</span>
-      </div>
-      <div class="edit-patient-card-meta">
-        <span>원장: ${escapeHtml(doctor?.name || "-")}</span>
-        <span>수술: ${escapeHtml(surgeryDepartment)} - ${escapeHtml(surgery?.name || "-")}</span>
-        <span>제품: ${productItems.reduce((sum, item) => sum + item.qty, 0)}개${productSummary ? ` · ${escapeHtml(productSummary)}${extraCount ? ` 외 ${extraCount}종` : ""}` : ""}</span>
-      </div>
-    </button>
-  `;
-};
-
-const editUsagePatientListHtml = (date, selectedId = "") => {
-  const patients = editUsagePatientsForDate(date);
-  if (!patients.length) return `<div class="empty">선택한 날짜에 사용내역이 없습니다.</div>`;
-  return patients.map((usage) => editUsagePatientCardHtml(usage, selectedId)).join("");
-};
+const editUsagePatientsForDate = (date) => getUsageEntryModule().editUsagePatientsForDate(date);
+const editUsagePatientCardHtml = (usage, selectedId = "") => getUsageEntryModule().editUsagePatientCardHtml(usage, selectedId);
+const editUsagePatientListHtml = (date, selectedId = "") => getUsageEntryModule().editUsagePatientListHtml(date, selectedId);
 
 const renderEditUsage = () => {
   if (!canEditUsage()) return `<div class="empty">사용내역 수정은 관리자, 책임사용자, 일반사용자만 가능합니다.</div>`;

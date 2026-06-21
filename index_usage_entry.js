@@ -124,10 +124,50 @@
       });
     };
 
+    const editUsagePatientsForDate = (date) => context.getState().usages
+      .filter((usage) => (usage.date || "") === date)
+      .slice()
+      .sort((a, b) => context.alphaFirstCompare(a.patientName, b.patientName) || context.alphaFirstCompare(context.patientIdText(a), context.patientIdText(b)));
+
+    const editUsagePatientCardHtml = (usage, selectedId = "") => {
+      const doctor = context.departmentById(usage.doctorId);
+      const surgery = context.surgeryById(usage.surgeryId);
+      const surgeryDepartment = surgery ? (surgery.department || context.inferSurgeryDepartment(surgery.name)) : "-";
+      const productItems = context.usageProductItems(usage);
+      const productSummary = productItems
+        .slice(0, 3)
+        .map((item) => `${context.productById(item.productId)?.name || "삭제된 제품"}${item.qty > 1 ? ` ${item.qty}개` : ""}`)
+        .join(", ");
+      const extraCount = Math.max(0, productItems.length - 3);
+      const locked = !context.canModifyUsageRecord(usage);
+      return `
+        <button class="edit-patient-card ${selectedId === usage.id ? "active" : ""} ${locked ? "locked" : ""}" type="button" data-edit-usage-card="${context.escapeHtml(usage.id)}">
+          <div class="edit-patient-card-head">
+            <span>${context.escapeHtml(context.patientDisplayName(usage) || "이름 없음")}</span>
+            <span class="pill ${locked ? "low" : ""}">${locked ? "관리자 전용" : "수정 가능"}</span>
+          </div>
+          <div class="edit-patient-card-meta">
+            <span>원장: ${context.escapeHtml(doctor?.name || "-")}</span>
+            <span>수술: ${context.escapeHtml(surgeryDepartment)} - ${context.escapeHtml(surgery?.name || "-")}</span>
+            <span>제품: ${productItems.reduce((sum, item) => sum + item.qty, 0)}개${productSummary ? ` · ${context.escapeHtml(productSummary)}${extraCount ? ` 외 ${extraCount}종` : ""}` : ""}</span>
+          </div>
+        </button>
+      `;
+    };
+
+    const editUsagePatientListHtml = (date, selectedId = "") => {
+      const patients = editUsagePatientsForDate(date);
+      if (!patients.length) return `<div class="empty">선택한 날짜에 사용내역이 없습니다.</div>`;
+      return patients.map((usage) => editUsagePatientCardHtml(usage, selectedId)).join("");
+    };
+
     return {
       pendingUsageSummary,
       renderPendingUsageList,
-      renderUseItemsList
+      renderUseItemsList,
+      editUsagePatientsForDate,
+      editUsagePatientCardHtml,
+      editUsagePatientListHtml
     };
   };
 })();
