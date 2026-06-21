@@ -2022,6 +2022,7 @@ const getUsageEntryModule = () => {
       productById,
       productCategoryLabel,
       qtyStepper,
+      implantPhotoViewSrc,
       alphaFirstCompare,
       patientIdText,
       inferSurgeryDepartment,
@@ -2154,6 +2155,7 @@ const selectedUseItemsFromScope = (scope) => getUsageEntryModule().selectedUseIt
 const selectedUseListHtml = (items) => getUsageEntryModule().selectedUseListHtml(items);
 const productSearchResultsHtml = (results, selectedItems) => getUsageEntryModule().productSearchResultsHtml(results, selectedItems);
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
+const commonImplantPhotosHtml = (photos) => getUsageEntryModule().commonImplantPhotosHtml(photos);
 
 const editUsagePatientsForDate = (date) => getUsageEntryModule().editUsagePatientsForDate(date);
 const editUsagePatientCardHtml = (usage, selectedId = "") => getUsageEntryModule().editUsagePatientCardHtml(usage, selectedId);
@@ -3836,18 +3838,7 @@ const bindUse = () => {
   });
   const renderCommonImplantPhotos = () => {
     if (!commonImplantPhotoList) return;
-    commonImplantPhotoList.innerHTML = commonImplantPhotos.map((photo, index) => {
-      const src = implantPhotoViewSrc(photo);
-      return `
-        <div class="implant-common-photo" data-common-implant-photo="${escapeHtml(photo.id)}">
-          ${src ? `<img src="${escapeHtml(src)}" alt="공용 임플란트 사진 ${index + 1}" data-preview-common-implant-photo="${escapeHtml(photo.id)}">` : ""}
-          <div class="implant-photo-actions">
-            <button class="secondary" type="button" data-preview-common-implant-photo="${escapeHtml(photo.id)}">확대</button>
-            <button class="danger" type="button" data-remove-common-implant-photo="${escapeHtml(photo.id)}">삭제</button>
-          </div>
-        </div>
-      `;
-    }).join("") || `<div class="empty">공용 사진을 먼저 촬영하거나 선택해 주세요.</div>`;
+    commonImplantPhotoList.innerHTML = commonImplantPhotosHtml(commonImplantPhotos);
   };
   const addCommonImplantPhotos = (files = []) => {
     files.filter((file) => file.type.startsWith("image/")).forEach((file) => {

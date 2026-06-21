@@ -220,6 +220,19 @@
       `;
     };
 
+    const commonImplantPhotosHtml = (photos = []) => photos.map((photo, index) => {
+      const src = context.implantPhotoViewSrc(photo);
+      return `
+        <div class="implant-common-photo" data-common-implant-photo="${context.escapeHtml(photo.id)}">
+          ${src ? `<img src="${context.escapeHtml(src)}" alt="공용 임플란트 사진 ${index + 1}" data-preview-common-implant-photo="${context.escapeHtml(photo.id)}">` : ""}
+          <div class="implant-photo-actions">
+            <button class="secondary" type="button" data-preview-common-implant-photo="${context.escapeHtml(photo.id)}">확대</button>
+            <button class="danger" type="button" data-remove-common-implant-photo="${context.escapeHtml(photo.id)}">삭제</button>
+          </div>
+        </div>
+      `;
+    }).join("") || `<div class="empty">공용 사진을 먼저 촬영하거나 선택해 주세요.</div>`;
+
     const editUsagePatientsForDate = (date) => context.getState().usages
       .filter((usage) => (usage.date || "") === date)
       .slice()
@@ -311,6 +324,7 @@
       selectedUseListHtml,
       productSearchResultsHtml,
       useRecommendationHtml,
+      commonImplantPhotosHtml,
       editUsagePatientsForDate,
       editUsagePatientCardHtml,
       editUsagePatientListHtml,
