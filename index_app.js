@@ -2021,6 +2021,7 @@ const getUsageEntryModule = () => {
       productCategory,
       productById,
       productCategoryLabel,
+      qtyStepper,
       alphaFirstCompare,
       patientIdText,
       inferSurgeryDepartment,
@@ -2151,6 +2152,7 @@ const renderUseItemsList = (items, target) => getUsageEntryModule().renderUseIte
 const useDraftSummaryHtml = (snapshot) => getUsageEntryModule().useDraftSummaryHtml(snapshot);
 const selectedUseItemsFromScope = (scope) => getUsageEntryModule().selectedUseItemsFromScope(scope);
 const selectedUseListHtml = (items) => getUsageEntryModule().selectedUseListHtml(items);
+const productSearchResultsHtml = (results, selectedItems) => getUsageEntryModule().productSearchResultsHtml(results, selectedItems);
 
 const editUsagePatientsForDate = (date) => getUsageEntryModule().editUsagePatientsForDate(date);
 const editUsagePatientCardHtml = (usage, selectedId = "") => getUsageEntryModule().editUsagePatientCardHtml(usage, selectedId);
@@ -4256,13 +4258,7 @@ const bindUse = () => {
       .filter((item) => normalizedName(`${item.name} ${item.company || ""} ${item.subcategory || ""} ${productCategoryLabel(item.category)}`).includes(query))
       .sort(byName)
       .slice(0, 12);
-    productSearchResults.innerHTML = results.length ? results.map((item) => `
-      <label class="check-card use-card">
-        <input type="checkbox" value="${item.id}" data-search-product="${item.id}" ${form.querySelector(`[data-use-product="${item.id}"]`)?.checked ? "checked" : ""}>
-        <span>${escapeHtml(item.name)}<br><span class="muted">${escapeHtml(productCategoryLabel(item.category))}${item.company ? ` · ${escapeHtml(item.company)}` : ""}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ""} · 현재고 ${num(item.stock)}</span></span>
-        ${qtyStepper(`data-search-qty="${item.id}" aria-label="${escapeHtml(item.name)} 검색 사용 수량"`, Math.max(1, num(form.querySelector(`[data-use-qty="${item.id}"]`)?.value) || 1), Math.max(1, num(item.stock)))}
-      </label>
-    `).join("") : `<div class="empty">검색 결과가 없습니다.</div>`;
+    productSearchResults.innerHTML = productSearchResultsHtml(results, selectedUseItems());
     productSearchResults.querySelectorAll("[data-search-product]").forEach((input) => {
       input.addEventListener("change", () => {
         const qty = productSearchResults.querySelector(`[data-search-qty="${input.value}"]`)?.value;

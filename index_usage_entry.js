@@ -180,6 +180,21 @@
       `;
     };
 
+    const productSearchResultsHtml = (results, selectedItems = []) => {
+      if (!results.length) return `<div class="empty">검색 결과가 없습니다.</div>`;
+      const selectedQtyById = new Map(selectedItems.map((item) => [item.productId, Math.max(1, context.num(item.qty))]));
+      return results.map((item) => {
+        const selectedQty = selectedQtyById.get(item.id);
+        return `
+          <label class="check-card use-card">
+            <input type="checkbox" value="${item.id}" data-search-product="${item.id}" ${selectedQty ? "checked" : ""}>
+            <span>${context.escapeHtml(item.name)}<br><span class="muted">${context.escapeHtml(context.productCategoryLabel(item.category))}${item.company ? ` · ${context.escapeHtml(item.company)}` : ""}${item.subcategory ? ` · ${context.escapeHtml(item.subcategory)}` : ""} · 현재고 ${context.num(item.stock)}</span></span>
+            ${context.qtyStepper(`data-search-qty="${item.id}" aria-label="${context.escapeHtml(item.name)} 검색 사용 수량"`, selectedQty || 1, Math.max(1, context.num(item.stock)))}
+          </label>
+        `;
+      }).join("");
+    };
+
     const editUsagePatientsForDate = (date) => context.getState().usages
       .filter((usage) => (usage.date || "") === date)
       .slice()
@@ -269,6 +284,7 @@
       renderUseItemsList,
       selectedUseItemsFromScope,
       selectedUseListHtml,
+      productSearchResultsHtml,
       editUsagePatientsForDate,
       editUsagePatientCardHtml,
       editUsagePatientListHtml,
