@@ -221,6 +221,8 @@
       }).join("");
     };
 
+    const productSearchEmptyQueryHtml = () => `<div class="empty">제품명을 입력해 주세요.</div>`;
+
     const useRecommendationHtml = (recommended, restrictActive, selectedItems = []) => {
       const selectedQtyById = new Map(selectedItems.map((item) => [item.productId, Math.max(1, context.num(item.qty))]));
       const visibleItems = recommended.filter((item) => !(restrictActive && context.productCategory(item.product.category) === "비급여"));
@@ -424,6 +426,7 @@
       draftUserText,
       selectedUseListHtml,
       productSearchResultsHtml,
+      productSearchEmptyQueryHtml,
       useRecommendationHtml,
       commonImplantPhotosHtml,
       cloneCommonImplantPhoto,

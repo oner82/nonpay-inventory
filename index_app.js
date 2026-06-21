@@ -2162,6 +2162,7 @@ const setUseDraftPanelState = (options) => getUsageEntryModule().setUseDraftPane
 const draftUserText = () => getUsageEntryModule().draftUserText();
 const selectedUseListHtml = (items) => getUsageEntryModule().selectedUseListHtml(items);
 const productSearchResultsHtml = (results, selectedItems) => getUsageEntryModule().productSearchResultsHtml(results, selectedItems);
+const productSearchEmptyQueryHtml = () => getUsageEntryModule().productSearchEmptyQueryHtml();
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
 const commonImplantPhotosHtml = (photos) => getUsageEntryModule().commonImplantPhotosHtml(photos);
 const cloneCommonImplantPhoto = (photo) => getUsageEntryModule().cloneCommonImplantPhoto(photo);
@@ -2744,7 +2745,7 @@ const bindEditUsage = () => {
   const renderSearch = () => {
     const query = normalizedName(productSearch.value);
     if (!query) {
-      productSearchResults.innerHTML = `<div class="empty">제품명을 입력해 주세요.</div>`;
+      productSearchResults.innerHTML = productSearchEmptyQueryHtml();
       return;
     }
     const results = state.products
