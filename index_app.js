@@ -2163,6 +2163,7 @@ const draftUserText = () => getUsageEntryModule().draftUserText();
 const selectedUseListHtml = (items) => getUsageEntryModule().selectedUseListHtml(items);
 const productSearchResultsHtml = (results, selectedItems) => getUsageEntryModule().productSearchResultsHtml(results, selectedItems);
 const productSearchEmptyQueryHtml = () => getUsageEntryModule().productSearchEmptyQueryHtml();
+const noRecommendationHtml = (hasSurgerySelection) => getUsageEntryModule().noRecommendationHtml(hasSurgerySelection);
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
 const commonImplantPhotosHtml = (photos) => getUsageEntryModule().commonImplantPhotosHtml(photos);
 const cloneCommonImplantPhoto = (photo) => getUsageEntryModule().cloneCommonImplantPhoto(photo);
@@ -4217,9 +4218,7 @@ const bindUse = () => {
     const restrictActive = isRestrictOn();
     if (!rule) {
       const hasSurgerySelection = useDepartment.value && departmentSelect.value && surgerySelect.value;
-      recommendation.innerHTML = hasSurgerySelection
-        ? `<div class="empty">추천 비급여가 등록되지 않은 수술입니다. 수술은 저장할 수 있으며, 필요한 제품은 아래에서 직접 선택해 주세요.</div>`
-        : "";
+      recommendation.innerHTML = noRecommendationHtml(hasSurgerySelection);
       app.querySelectorAll("[data-use-product]").forEach((input) => input.closest(".check-card").style.display = "");
       renderSelectedUseList();
       return;
