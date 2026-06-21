@@ -2167,11 +2167,13 @@ const noRecommendationHtml = (hasSurgerySelection) => getUsageEntryModule().noRe
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
 const commonImplantPhotosHtml = (photos) => getUsageEntryModule().commonImplantPhotosHtml(photos);
 const emptyImplantDraft = () => getUsageEntryModule().emptyImplantDraft();
-const commonImplantPhotoFromFile = (file) => getUsageEntryModule().commonImplantPhotoFromFile(file);
-const implantDraftPhotoFromFile = (file) => getUsageEntryModule().implantDraftPhotoFromFile(file);
+const addCommonImplantPhotosFromFiles = (photos, files) => getUsageEntryModule().addCommonImplantPhotosFromFiles(photos, files);
 const cloneCommonImplantPhoto = (photo) => getUsageEntryModule().cloneCommonImplantPhoto(photo);
 const commonImplantPhotoById = (photos, id) => getUsageEntryModule().commonImplantPhotoById(photos, id);
+const removeCommonImplantPhotoById = (photos, id) => getUsageEntryModule().removeCommonImplantPhotoById(photos, id);
 const implantDraftByIdFromList = (drafts, id) => getUsageEntryModule().implantDraftById(drafts, id);
+const addImplantDraftPhotosFromFiles = (draft, files) => getUsageEntryModule().addImplantDraftPhotosFromFiles(draft, files);
+const removeImplantDraftById = (drafts, id) => getUsageEntryModule().removeImplantDraftById(drafts, id);
 const implantDraftPhotoPair = (drafts, value) => getUsageEntryModule().implantDraftPhotoPair(drafts, value);
 const implantDraftsHtml = (drafts, commonPhotoCount) => getUsageEntryModule().implantDraftsHtml(drafts, commonPhotoCount);
 
@@ -3836,9 +3838,7 @@ const bindUse = () => {
     commonImplantPhotoList.innerHTML = commonImplantPhotosHtml(commonImplantPhotos);
   };
   const addCommonImplantPhotos = (files = []) => {
-    files.filter((file) => file.type.startsWith("image/")).forEach((file) => {
-      commonImplantPhotos.push(commonImplantPhotoFromFile(file));
-    });
+    addCommonImplantPhotosFromFiles(commonImplantPhotos, files);
     renderCommonImplantPhotos();
   };
   const findCommonImplantPhoto = (id) => commonImplantPhotoById(commonImplantPhotos, id);
@@ -4428,10 +4428,7 @@ const bindUse = () => {
     }
     const remove = event.target.closest("[data-remove-common-implant-photo]");
     if (remove) {
-      const index = commonImplantPhotos.findIndex((photo) => photo.id === remove.dataset.removeCommonImplantPhoto);
-      if (index >= 0) {
-        URL.revokeObjectURL(commonImplantPhotos[index].preview);
-        commonImplantPhotos.splice(index, 1);
+      if (removeCommonImplantPhotoById(commonImplantPhotos, remove.dataset.removeCommonImplantPhoto)) {
         renderCommonImplantPhotos();
         renderImplantDrafts();
       }
@@ -4451,8 +4448,7 @@ const bindUse = () => {
     if (target.matches("[data-implant-photo-input], [data-implant-camera-input]")) {
       const draft = implantDraftById(target.dataset.implantPhotoInput || target.dataset.implantCameraInput);
       if (!draft) return;
-      const files = Array.from(target.files || []).filter((file) => file.type.startsWith("image/"));
-      files.forEach((file) => draft.photos.push(implantDraftPhotoFromFile(file)));
+      addImplantDraftPhotosFromFiles(draft, Array.from(target.files || []));
       target.value = "";
       renderImplantDrafts();
     }
@@ -4482,10 +4478,7 @@ const bindUse = () => {
     }
     const removeDraft = event.target.closest("[data-remove-implant-draft]");
     if (removeDraft) {
-      const index = implantDrafts.findIndex((item) => item.id === removeDraft.dataset.removeImplantDraft);
-      if (index >= 0) {
-        (implantDrafts[index].photos || []).forEach((photo) => URL.revokeObjectURL(photo.preview));
-        implantDrafts.splice(index, 1);
+      if (removeImplantDraftById(implantDrafts, removeDraft.dataset.removeImplantDraft)) {
         renderImplantDrafts();
       }
       return;

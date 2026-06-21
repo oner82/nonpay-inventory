@@ -286,6 +286,13 @@
       cropped: false
     });
 
+    const addCommonImplantPhotosFromFiles = (photos = [], files = []) => {
+      files
+        .filter((file) => file.type.startsWith("image/"))
+        .forEach((file) => photos.push(commonImplantPhotoFromFile(file)));
+      return photos;
+    };
+
     const cloneCommonImplantPhoto = (photo) => ({
       id: context.uid(),
       file: photo.file || null,
@@ -303,7 +310,31 @@
 
     const commonImplantPhotoById = (photos = [], id = "") => photos.find((photo) => photo.id === id);
 
+    const removeCommonImplantPhotoById = (photos = [], id = "") => {
+      const index = photos.findIndex((photo) => photo.id === id);
+      if (index < 0) return false;
+      URL.revokeObjectURL(photos[index].preview);
+      photos.splice(index, 1);
+      return true;
+    };
+
     const implantDraftById = (drafts = [], id = "") => drafts.find((draft) => draft.id === id);
+
+    const addImplantDraftPhotosFromFiles = (draft, files = []) => {
+      if (!draft) return draft;
+      files
+        .filter((file) => file.type.startsWith("image/"))
+        .forEach((file) => draft.photos.push(implantDraftPhotoFromFile(file)));
+      return draft;
+    };
+
+    const removeImplantDraftById = (drafts = [], id = "") => {
+      const index = drafts.findIndex((item) => item.id === id);
+      if (index < 0) return false;
+      (drafts[index].photos || []).forEach((photo) => URL.revokeObjectURL(photo.preview));
+      drafts.splice(index, 1);
+      return true;
+    };
 
     const implantDraftPhotoPair = (drafts = [], value = "") => {
       const [draftId, photoId] = String(value || "").split("::");
@@ -458,9 +489,13 @@
       emptyImplantDraft,
       commonImplantPhotoFromFile,
       implantDraftPhotoFromFile,
+      addCommonImplantPhotosFromFiles,
       cloneCommonImplantPhoto,
       commonImplantPhotoById,
+      removeCommonImplantPhotoById,
       implantDraftById,
+      addImplantDraftPhotosFromFiles,
+      removeImplantDraftById,
       implantDraftPhotoPair,
       implantDraftsHtml,
       editUsagePatientsForDate,
