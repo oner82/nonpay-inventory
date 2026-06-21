@@ -2168,6 +2168,7 @@ const useRecommendationHtml = (recommended, restrictActive, selectedItems) => ge
 const commonImplantPhotosHtml = (photos) => getUsageEntryModule().commonImplantPhotosHtml(photos);
 const emptyImplantDraft = () => getUsageEntryModule().emptyImplantDraft();
 const commonImplantPhotoFromFile = (file) => getUsageEntryModule().commonImplantPhotoFromFile(file);
+const implantDraftPhotoFromFile = (file) => getUsageEntryModule().implantDraftPhotoFromFile(file);
 const cloneCommonImplantPhoto = (photo) => getUsageEntryModule().cloneCommonImplantPhoto(photo);
 const commonImplantPhotoById = (photos, id) => getUsageEntryModule().commonImplantPhotoById(photos, id);
 const implantDraftByIdFromList = (drafts, id) => getUsageEntryModule().implantDraftById(drafts, id);
@@ -4451,13 +4452,7 @@ const bindUse = () => {
       const draft = implantDraftById(target.dataset.implantPhotoInput || target.dataset.implantCameraInput);
       if (!draft) return;
       const files = Array.from(target.files || []).filter((file) => file.type.startsWith("image/"));
-      files.forEach((file) => draft.photos.push({
-        id: uid(),
-        file,
-        preview: URL.createObjectURL(file),
-        rotation: 0,
-        cropped: false
-      }));
+      files.forEach((file) => draft.photos.push(implantDraftPhotoFromFile(file)));
       target.value = "";
       renderImplantDrafts();
     }

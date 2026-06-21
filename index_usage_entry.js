@@ -278,6 +278,14 @@
       cropped: false
     });
 
+    const implantDraftPhotoFromFile = (file) => ({
+      id: context.uid(),
+      file,
+      preview: URL.createObjectURL(file),
+      rotation: 0,
+      cropped: false
+    });
+
     const cloneCommonImplantPhoto = (photo) => ({
       id: context.uid(),
       file: photo.file || null,
@@ -449,6 +457,7 @@
       commonImplantPhotosHtml,
       emptyImplantDraft,
       commonImplantPhotoFromFile,
+      implantDraftPhotoFromFile,
       cloneCommonImplantPhoto,
       commonImplantPhotoById,
       implantDraftById,
