@@ -265,6 +265,8 @@
       `;
     }).join("") || `<div class="empty">공용 사진을 먼저 촬영하거나 선택해 주세요.</div>`;
 
+    const emptyImplantDraft = () => ({ id: context.uid(), vendorId: "", customVendor: "", description: "", photos: [] });
+
     const cloneCommonImplantPhoto = (photo) => ({
       id: context.uid(),
       file: photo.file || null,
@@ -434,6 +436,7 @@
       noRecommendationHtml,
       useRecommendationHtml,
       commonImplantPhotosHtml,
+      emptyImplantDraft,
       cloneCommonImplantPhoto,
       commonImplantPhotoById,
       implantDraftById,

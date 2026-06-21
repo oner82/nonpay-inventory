@@ -2166,6 +2166,7 @@ const productSearchEmptyQueryHtml = () => getUsageEntryModule().productSearchEmp
 const noRecommendationHtml = (hasSurgerySelection) => getUsageEntryModule().noRecommendationHtml(hasSurgerySelection);
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
 const commonImplantPhotosHtml = (photos) => getUsageEntryModule().commonImplantPhotosHtml(photos);
+const emptyImplantDraft = () => getUsageEntryModule().emptyImplantDraft();
 const cloneCommonImplantPhoto = (photo) => getUsageEntryModule().cloneCommonImplantPhoto(photo);
 const commonImplantPhotoById = (photos, id) => getUsageEntryModule().commonImplantPhotoById(photos, id);
 const implantDraftByIdFromList = (drafts, id) => getUsageEntryModule().implantDraftById(drafts, id);
@@ -3825,7 +3826,7 @@ const bindUse = () => {
     renderSelectedUseList();
   };
   const addImplantDraft = () => {
-    implantDrafts.push({ id: uid(), vendorId: "", customVendor: "", description: "", photos: [] });
+    implantDrafts.push(emptyImplantDraft());
     renderImplantDrafts();
   };
   const renderCommonImplantPhotos = () => {
