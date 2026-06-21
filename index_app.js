@@ -2033,7 +2033,8 @@ const getUsageEntryModule = () => {
       usageProductItems,
       canModifyUsageRecord,
       implantVendorEntriesMatch,
-      mergeImplantDescriptionLines
+      mergeImplantDescriptionLines,
+      implantVendorById
     });
   }
   return usageEntryModule;
@@ -2177,6 +2178,8 @@ const implantDraftByIdFromList = (drafts, id) => getUsageEntryModule().implantDr
 const addImplantDraftPhotosFromFiles = (draft, files) => getUsageEntryModule().addImplantDraftPhotosFromFiles(draft, files);
 const removeImplantDraftById = (drafts, id) => getUsageEntryModule().removeImplantDraftById(drafts, id);
 const mergeDuplicateImplantDraftsInList = (drafts) => getUsageEntryModule().mergeDuplicateImplantDrafts(drafts);
+const implantDraftPayloadFromList = (drafts, enabled) => getUsageEntryModule().implantDraftPayloadFromList(drafts, enabled);
+const invalidImplantDraftFromPayload = (payload) => getUsageEntryModule().invalidImplantDraft(payload);
 const implantDraftPhotoPair = (drafts, value) => getUsageEntryModule().implantDraftPhotoPair(drafts, value);
 const implantDraftsHtml = (drafts, commonPhotoCount) => getUsageEntryModule().implantDraftsHtml(drafts, commonPhotoCount);
 
@@ -3921,20 +3924,9 @@ const bindUse = () => {
   const currentImplantDraftPayload = () => {
     const implantWillSave = implantEnabled?.checked;
     if (implantWillSave) mergeDuplicateImplantDrafts();
-    return implantWillSave ? implantDrafts.map((draft) => ({
-      ...draft,
-      vendorId: draft.vendorId || "",
-      customVendor: String(draft.customVendor || "").trim(),
-      description: String(draft.description || "").trim()
-    })).filter((draft) => {
-      const vendor = draft.vendorId === "__custom__" ? draft.customVendor : implantVendorById(draft.vendorId)?.name;
-      return String(vendor || "").trim() || draft.description || (draft.photos || []).length;
-    }) : [];
+    return implantDraftPayloadFromList(implantDrafts, implantWillSave);
   };
-  const invalidImplantDraft = (payload) => payload.find((draft) => {
-    const vendor = draft.vendorId === "__custom__" ? draft.customVendor : implantVendorById(draft.vendorId)?.name;
-    return !String(vendor || "").trim() || (!draft.description && !(draft.photos || []).length);
-  });
+  const invalidImplantDraft = (payload) => invalidImplantDraftFromPayload(payload);
   const renderImplantDrafts = () => {
     implantEntriesWrap.innerHTML = implantDraftsHtml(implantDrafts, commonImplantPhotos.length);
   };

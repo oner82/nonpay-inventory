@@ -368,6 +368,24 @@
       return changed;
     };
 
+    const implantDraftVendorText = (draft = {}) => {
+      if (draft.vendorId === "__custom__") return draft.customVendor;
+      return context.implantVendorById(draft.vendorId)?.name;
+    };
+
+    const implantDraftPayloadFromList = (drafts = [], enabled = false) => enabled ? drafts.map((draft) => ({
+      ...draft,
+      vendorId: draft.vendorId || "",
+      customVendor: String(draft.customVendor || "").trim(),
+      description: String(draft.description || "").trim()
+    })).filter((draft) =>
+      String(implantDraftVendorText(draft) || "").trim() || draft.description || (draft.photos || []).length
+    ) : [];
+
+    const invalidImplantDraft = (payload = []) => payload.find((draft) =>
+      !String(implantDraftVendorText(draft) || "").trim() || (!draft.description && !(draft.photos || []).length)
+    );
+
     const implantDraftPhotoPair = (drafts = [], value = "") => {
       const [draftId, photoId] = String(value || "").split("::");
       const draft = implantDraftById(drafts, draftId);
@@ -529,6 +547,8 @@
       addImplantDraftPhotosFromFiles,
       removeImplantDraftById,
       mergeDuplicateImplantDrafts,
+      implantDraftPayloadFromList,
+      invalidImplantDraft,
       implantDraftPhotoPair,
       implantDraftsHtml,
       editUsagePatientsForDate,
