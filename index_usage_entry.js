@@ -263,6 +263,8 @@
       sourceCommonPhotoId: photo.id
     });
 
+    const commonImplantPhotoById = (photos = [], id = "") => photos.find((photo) => photo.id === id);
+
     const implantDraftPhotoPair = (drafts = [], value = "") => {
       const [draftId, photoId] = String(value || "").split("::");
       const draft = drafts.find((item) => item.id === draftId);
@@ -410,6 +412,7 @@
       useRecommendationHtml,
       commonImplantPhotosHtml,
       cloneCommonImplantPhoto,
+      commonImplantPhotoById,
       implantDraftPhotoPair,
       implantDraftsHtml,
       editUsagePatientsForDate,

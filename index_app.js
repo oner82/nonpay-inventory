@@ -2162,6 +2162,7 @@ const productSearchResultsHtml = (results, selectedItems) => getUsageEntryModule
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
 const commonImplantPhotosHtml = (photos) => getUsageEntryModule().commonImplantPhotosHtml(photos);
 const cloneCommonImplantPhoto = (photo) => getUsageEntryModule().cloneCommonImplantPhoto(photo);
+const commonImplantPhotoById = (photos, id) => getUsageEntryModule().commonImplantPhotoById(photos, id);
 const implantDraftPhotoPair = (drafts, value) => getUsageEntryModule().implantDraftPhotoPair(drafts, value);
 const implantDraftsHtml = (drafts, commonPhotoCount) => getUsageEntryModule().implantDraftsHtml(drafts, commonPhotoCount);
 
@@ -3840,7 +3841,7 @@ const bindUse = () => {
     });
     renderCommonImplantPhotos();
   };
-  const commonImplantPhotoById = (id) => commonImplantPhotos.find((photo) => photo.id === id);
+  const findCommonImplantPhoto = (id) => commonImplantPhotoById(commonImplantPhotos, id);
   const mergeImplantDescription = (left = "", right = "") => {
     return mergeImplantDescriptionLines(left, right);
   };
@@ -4420,7 +4421,7 @@ const bindUse = () => {
   commonImplantPhotoList?.addEventListener("click", (event) => {
     const preview = event.target.closest("[data-preview-common-implant-photo]");
     if (preview) {
-      const photo = commonImplantPhotoById(preview.dataset.previewCommonImplantPhoto);
+      const photo = findCommonImplantPhoto(preview.dataset.previewCommonImplantPhoto);
       if (photo) {
         activeImplantEditPair = "";
         const image = document.getElementById("implantPhotoModalImage");
