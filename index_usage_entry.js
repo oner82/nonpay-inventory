@@ -147,6 +147,13 @@
       qty: Math.max(1, context.num(scope.querySelector(`[data-use-qty="${input.value}"]`)?.value))
     }));
 
+    const syncRecommendControl = (productId, checked, qty = "") => {
+      const recommend = context.getApp().querySelector(`[data-recommend-product="${productId}"]`);
+      const recommendQty = context.getApp().querySelector(`[data-recommend-qty="${productId}"]`);
+      if (recommend) recommend.checked = checked;
+      if (recommendQty && qty !== "") recommendQty.value = Math.max(1, context.num(qty));
+    };
+
     const selectedUseListHtml = (items) => {
       if (!items.length) return `<span>선택된 제품이 없습니다.</span>`;
       const chipClass = (category) => {
@@ -366,6 +373,7 @@
       renderPendingUsageList,
       renderUseItemsList,
       selectedUseItemsFromScope,
+      syncRecommendControl,
       selectedUseListHtml,
       productSearchResultsHtml,
       useRecommendationHtml,

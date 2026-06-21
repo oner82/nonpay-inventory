@@ -2154,6 +2154,7 @@ const usageProductItems = (usage) => Array.from((usage?.productIds || []).reduce
 const renderUseItemsList = (items, target) => getUsageEntryModule().renderUseItemsList(items, target);
 const useDraftSummaryHtml = (snapshot) => getUsageEntryModule().useDraftSummaryHtml(snapshot);
 const selectedUseItemsFromScope = (scope) => getUsageEntryModule().selectedUseItemsFromScope(scope);
+const syncRecommendControl = (productId, checked, qty = "") => getUsageEntryModule().syncRecommendControl(productId, checked, qty);
 const selectedUseListHtml = (items) => getUsageEntryModule().selectedUseListHtml(items);
 const productSearchResultsHtml = (results, selectedItems) => getUsageEntryModule().productSearchResultsHtml(results, selectedItems);
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
@@ -3765,12 +3766,6 @@ const bindUse = () => {
     rule.surgeryId === surgerySelect.value
   );
   const selectedUseItems = () => selectedUseItemsFromScope(form);
-  const syncRecommendControl = (productId, checked, qty = "") => {
-    const recommend = app.querySelector(`[data-recommend-product="${productId}"]`);
-    const recommendQty = app.querySelector(`[data-recommend-qty="${productId}"]`);
-    if (recommend) recommend.checked = checked;
-    if (recommendQty && qty !== "") recommendQty.value = Math.max(1, num(qty));
-  };
   const renderSelectedUseList = () => {
     const items = selectedUseItems();
     if (!items.length) {
