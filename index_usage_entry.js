@@ -195,6 +195,31 @@
       }).join("");
     };
 
+    const useRecommendationHtml = (recommended, restrictActive, selectedItems = []) => {
+      const selectedQtyById = new Map(selectedItems.map((item) => [item.productId, Math.max(1, context.num(item.qty))]));
+      const visibleItems = recommended.filter((item) => !(restrictActive && context.productCategory(item.product.category) === "비급여"));
+      return `
+        <div class="item ${restrictActive ? "landing-line pending" : ""}">
+          <div class="item-title">
+            <span>${restrictActive ? "비급여 제한" : "추천 항목"}</span>
+            <span class="pill ${restrictActive ? "low" : ""}">${recommended.length}</span>
+          </div>
+          <div class="meta"><span>${context.escapeHtml(restrictActive ? "이 환자는 비급여 제한으로 선택되어 있습니다. 추천 비급여만 숨겨지고, 인체조직/ANCHOR 추천은 선택할 수 있습니다." : "추천 항목을 선택하고 수량을 조절해 사용내용에 넣을 수 있습니다.")}</span></div>
+          ${visibleItems.map((item) => {
+            const selectedQty = selectedQtyById.get(item.productId);
+            const qty = selectedQty || Math.max(1, context.num(item.qty));
+            return `
+              <label class="check-card use-card">
+                <input type="checkbox" value="${item.productId}" data-recommend-product="${item.productId}" ${selectedQty ? "checked" : ""}>
+                <span>${context.escapeHtml(item.product.name)}<br><span class="muted">추천 ${Math.max(1, context.num(item.qty))}개 · 현재고 ${context.num(item.product.stock)}</span></span>
+                ${context.qtyStepper(`data-recommend-qty="${item.productId}" aria-label="${context.escapeHtml(item.product.name)} 추천 사용 수량"`, qty, Math.max(1, context.num(item.product.stock)))}
+              </label>
+            `;
+          }).join("")}
+        </div>
+      `;
+    };
+
     const editUsagePatientsForDate = (date) => context.getState().usages
       .filter((usage) => (usage.date || "") === date)
       .slice()
@@ -285,6 +310,7 @@
       selectedUseItemsFromScope,
       selectedUseListHtml,
       productSearchResultsHtml,
+      useRecommendationHtml,
       editUsagePatientsForDate,
       editUsagePatientCardHtml,
       editUsagePatientListHtml,

@@ -2153,6 +2153,7 @@ const useDraftSummaryHtml = (snapshot) => getUsageEntryModule().useDraftSummaryH
 const selectedUseItemsFromScope = (scope) => getUsageEntryModule().selectedUseItemsFromScope(scope);
 const selectedUseListHtml = (items) => getUsageEntryModule().selectedUseListHtml(items);
 const productSearchResultsHtml = (results, selectedItems) => getUsageEntryModule().productSearchResultsHtml(results, selectedItems);
+const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
 
 const editUsagePatientsForDate = (date) => getUsageEntryModule().editUsagePatientsForDate(date);
 const editUsagePatientCardHtml = (usage, selectedId = "") => getUsageEntryModule().editUsagePatientCardHtml(usage, selectedId);
@@ -4292,22 +4293,7 @@ const bindUse = () => {
     }
     const recommendedItems = ruleItems(rule);
     const recommended = recommendedItems.map((item) => ({ ...item, product: productById(item.productId) })).filter((item) => item.product);
-    recommendation.innerHTML = `
-      <div class="item ${restrictActive ? "landing-line pending" : ""}">
-        <div class="item-title">
-          <span>${restrictActive ? "비급여 제한" : "추천 항목"}</span>
-          <span class="pill ${restrictActive ? "low" : ""}">${recommended.length}</span>
-        </div>
-        <div class="meta"><span>${escapeHtml(restrictActive ? "이 환자는 비급여 제한으로 선택되어 있습니다. 추천 비급여만 숨겨지고, 인체조직/ANCHOR 추천은 선택할 수 있습니다." : "추천 항목을 선택하고 수량을 조절해 사용내용에 넣을 수 있습니다.")}</span></div>
-        ${recommended.filter((item) => !(restrictActive && productCategory(item.product.category) === "비급여")).map((item) => `
-          <label class="check-card use-card">
-            <input type="checkbox" value="${item.productId}" data-recommend-product="${item.productId}">
-            <span>${escapeHtml(item.product.name)}<br><span class="muted">추천 ${Math.max(1, num(item.qty))}개 · 현재고 ${num(item.product.stock)}</span></span>
-            ${qtyStepper(`data-recommend-qty="${item.productId}" aria-label="${escapeHtml(item.product.name)} 추천 사용 수량"`, Math.max(1, num(item.qty)), Math.max(1, num(item.product.stock)))}
-          </label>
-        `).join("")}
-      </div>
-    `;
+    recommendation.innerHTML = useRecommendationHtml(recommended, restrictActive, selectedUseItems());
     form.querySelectorAll("[data-use-product]").forEach((input) => {
       const product = productById(input.value);
       const recommendedItem = recommendedItems.find((item) => item.productId === input.value);
