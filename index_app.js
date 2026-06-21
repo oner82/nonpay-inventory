@@ -2026,6 +2026,7 @@ const getUsageEntryModule = () => {
       implantPhotoRotationStyle,
       implantVendorOptions,
       uid,
+      currentAuditUser,
       alphaFirstCompare,
       patientIdText,
       inferSurgeryDepartment,
@@ -2158,6 +2159,7 @@ const selectedUseItemsFromScope = (scope) => getUsageEntryModule().selectedUseIt
 const syncRecommendControl = (productId, checked, qty = "") => getUsageEntryModule().syncRecommendControl(productId, checked, qty);
 const setRestrictButtonState = (button, value) => getUsageEntryModule().setRestrictButtonState(button, value);
 const setUseDraftPanelState = (options) => getUsageEntryModule().setUseDraftPanelState(options);
+const draftUserText = () => getUsageEntryModule().draftUserText();
 const selectedUseListHtml = (items) => getUsageEntryModule().selectedUseListHtml(items);
 const productSearchResultsHtml = (results, selectedItems) => getUsageEntryModule().productSearchResultsHtml(results, selectedItems);
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
@@ -3967,7 +3969,6 @@ const bindUse = () => {
   const renderImplantDrafts = () => {
     implantEntriesWrap.innerHTML = implantDraftsHtml(implantDrafts, commonImplantPhotos.length);
   };
-  const draftUserText = () => currentAuditUser()?.name || currentAuditUser()?.loginId || "현재 사용자";
   const collectUseDraftSnapshot = () => {
     if (!form.reportValidity()) return null;
     const useItems = selectedUseItems();

@@ -171,6 +171,8 @@
       if (saveButton) saveButton.textContent = hasSnapshot ? "임시저장 갱신" : "임시저장";
     };
 
+    const draftUserText = () => context.currentAuditUser()?.name || context.currentAuditUser()?.loginId || "현재 사용자";
+
     const selectedUseListHtml = (items) => {
       if (!items.length) return `<span>선택된 제품이 없습니다.</span>`;
       const chipClass = (category) => {
@@ -419,6 +421,7 @@
       syncRecommendControl,
       setRestrictButtonState,
       setUseDraftPanelState,
+      draftUserText,
       selectedUseListHtml,
       productSearchResultsHtml,
       useRecommendationHtml,
