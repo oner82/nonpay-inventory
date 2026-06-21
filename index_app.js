@@ -2156,6 +2156,7 @@ const renderUseItemsList = (items, target) => getUsageEntryModule().renderUseIte
 const useDraftSummaryHtml = (snapshot) => getUsageEntryModule().useDraftSummaryHtml(snapshot);
 const selectedUseItemsFromScope = (scope) => getUsageEntryModule().selectedUseItemsFromScope(scope);
 const syncRecommendControl = (productId, checked, qty = "") => getUsageEntryModule().syncRecommendControl(productId, checked, qty);
+const setRestrictButtonState = (button, value) => getUsageEntryModule().setRestrictButtonState(button, value);
 const selectedUseListHtml = (items) => getUsageEntryModule().selectedUseListHtml(items);
 const productSearchResultsHtml = (results, selectedItems) => getUsageEntryModule().productSearchResultsHtml(results, selectedItems);
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
@@ -3756,10 +3757,7 @@ const bindUse = () => {
   const selectedUseDate = () => useDate?.value || today();
   const setRestrictButton = (value) => {
     manualRestrictNonpay = Boolean(value);
-    useRestrictNonpay.dataset.restrict = value ? "true" : "false";
-    useRestrictNonpay.textContent = value ? "비급여 제한 켜짐" : "비급여 제한 꺼짐";
-    useRestrictNonpay.classList.toggle("danger", Boolean(value));
-    useRestrictNonpay.classList.toggle("secondary", !value);
+    setRestrictButtonState(useRestrictNonpay, value);
   };
   const isRestrictOn = () => manualRestrictNonpay;
   const currentUseRule = () => state.usageRules.find((rule) =>

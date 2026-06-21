@@ -154,6 +154,14 @@
       if (recommendQty && qty !== "") recommendQty.value = Math.max(1, context.num(qty));
     };
 
+    const setRestrictButtonState = (button, value) => {
+      if (!button) return;
+      button.dataset.restrict = value ? "true" : "false";
+      button.textContent = value ? "비급여 제한 켜짐" : "비급여 제한 꺼짐";
+      button.classList.toggle("danger", Boolean(value));
+      button.classList.toggle("secondary", !value);
+    };
+
     const selectedUseListHtml = (items) => {
       if (!items.length) return `<span>선택된 제품이 없습니다.</span>`;
       const chipClass = (category) => {
@@ -389,6 +397,7 @@
       renderUseItemsList,
       selectedUseItemsFromScope,
       syncRecommendControl,
+      setRestrictButtonState,
       selectedUseListHtml,
       productSearchResultsHtml,
       useRecommendationHtml,
