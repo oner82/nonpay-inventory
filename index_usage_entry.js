@@ -240,6 +240,21 @@
       `;
     }).join("") || `<div class="empty">공용 사진을 먼저 촬영하거나 선택해 주세요.</div>`;
 
+    const cloneCommonImplantPhoto = (photo) => ({
+      id: context.uid(),
+      file: photo.file || null,
+      preview: photo.file ? URL.createObjectURL(photo.file) : (photo.preview || ""),
+      url: photo.url || "",
+      dataUrl: photo.dataUrl || "",
+      name: photo.name || photo.file?.name || "",
+      size: context.num(photo.size || photo.file?.size),
+      contentType: photo.contentType || photo.file?.type || "image/jpeg",
+      rotation: 0,
+      cropped: false,
+      cropRect: null,
+      sourceCommonPhotoId: photo.id
+    });
+
     const implantDraftsHtml = (drafts = [], commonPhotoCount = 0) => drafts.map((draft, index) => `
       <div class="implant-vendor-card" data-implant-draft="${context.escapeHtml(draft.id)}">
         <div class="implant-vendor-head">
@@ -378,6 +393,7 @@
       productSearchResultsHtml,
       useRecommendationHtml,
       commonImplantPhotosHtml,
+      cloneCommonImplantPhoto,
       implantDraftsHtml,
       editUsagePatientsForDate,
       editUsagePatientCardHtml,

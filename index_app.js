@@ -2025,6 +2025,7 @@ const getUsageEntryModule = () => {
       implantPhotoViewSrc,
       implantPhotoRotationStyle,
       implantVendorOptions,
+      uid,
       alphaFirstCompare,
       patientIdText,
       inferSurgeryDepartment,
@@ -2159,6 +2160,7 @@ const selectedUseListHtml = (items) => getUsageEntryModule().selectedUseListHtml
 const productSearchResultsHtml = (results, selectedItems) => getUsageEntryModule().productSearchResultsHtml(results, selectedItems);
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
 const commonImplantPhotosHtml = (photos) => getUsageEntryModule().commonImplantPhotosHtml(photos);
+const cloneCommonImplantPhoto = (photo) => getUsageEntryModule().cloneCommonImplantPhoto(photo);
 const implantDraftsHtml = (drafts, commonPhotoCount) => getUsageEntryModule().implantDraftsHtml(drafts, commonPhotoCount);
 
 const editUsagePatientsForDate = (date) => getUsageEntryModule().editUsagePatientsForDate(date);
@@ -3820,20 +3822,6 @@ const bindUse = () => {
     implantDrafts.push({ id: uid(), vendorId: "", customVendor: "", description: "", photos: [] });
     renderImplantDrafts();
   };
-  const cloneCommonImplantPhoto = (photo) => ({
-    id: uid(),
-    file: photo.file || null,
-    preview: photo.file ? URL.createObjectURL(photo.file) : (photo.preview || ""),
-    url: photo.url || "",
-    dataUrl: photo.dataUrl || "",
-    name: photo.name || photo.file?.name || "",
-    size: num(photo.size || photo.file?.size),
-    contentType: photo.contentType || photo.file?.type || "image/jpeg",
-    rotation: 0,
-    cropped: false,
-    cropRect: null,
-    sourceCommonPhotoId: photo.id
-  });
   const renderCommonImplantPhotos = () => {
     if (!commonImplantPhotoList) return;
     commonImplantPhotoList.innerHTML = commonImplantPhotosHtml(commonImplantPhotos);
