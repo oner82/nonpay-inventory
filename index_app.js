@@ -2009,13 +2009,17 @@ const getUsageEntryModule = () => {
   if (!usageEntryModule) {
     usageEntryModule = window.createUsageEntryModule({
       pendingUsagesOpen,
+      getApp: () => app,
       num,
       departmentById,
       surgeryById,
       escapeHtml,
       patientDisplayName,
       today,
-      formatDateTime
+      formatDateTime,
+      productCategory,
+      productById,
+      productCategoryLabel
     });
   }
   return usageEntryModule;
@@ -2174,79 +2178,7 @@ const usageProductItems = (usage) => Array.from((usage?.productIds || []).reduce
   return map;
 }, new Map()).entries()).map(([productId, qty]) => ({ productId, qty }));
 
-const renderUseItemsList = (items, target) => {
-  if (!items.length) {
-    target.innerHTML = `<span>선택된 제품이 없습니다.</span>`;
-    return;
-  }
-  const chipClass = (category) => {
-    const key = productCategory(category);
-    if (key === "비급여") return "nonpay";
-    if (key === "인체조직") return "tissue";
-    if (["ANCHOR", "URO_LANDING", "GS_LANDING", "IMPLANT"].includes(key)) return "anchor";
-    return "";
-  };
-  const safeItems = items
-    .map((item) => ({ ...item, product: productById(item.productId) }))
-    .filter((item) => item.product && num(item.qty) > 0);
-  if (!safeItems.length) {
-    target.innerHTML = `<span>선택된 제품이 없습니다.</span>`;
-    return;
-  }
-  target.innerHTML = `
-    <div class="selected-use-buttons">
-      ${safeItems.map((item) => {
-        const product = item.product;
-        const linkedQty = app.querySelector(`[data-use-qty="${item.productId}"]`);
-        const maxQty = Math.max(1, num(linkedQty?.max || product.stock || 999));
-        const meta = [productCategoryLabel(product.category), product.company, product.subcategory].filter(Boolean).join(" · ");
-        return `
-          <div class="selected-use-chip ${chipClass(product.category)}">
-            <div class="selected-use-name" title="${escapeHtml(product.name)}">
-              ${escapeHtml(product.name)}<span>${escapeHtml(meta)}</span>
-            </div>
-            <div class="selected-use-controls">
-              <button type="button" class="secondary" data-edit-selected-dec="${item.productId}" aria-label="수량 줄이기">−</button>
-              <input type="number" min="0" max="${maxQty}" value="${Math.max(1, num(item.qty))}" data-edit-selected-qty="${item.productId}" aria-label="${escapeHtml(product.name)} 수량" readonly>
-              <button type="button" class="secondary" data-edit-selected-inc="${item.productId}" aria-label="수량 늘리기">+</button>
-              <button type="button" class="remove-selected" data-edit-selected-remove="${item.productId}">삭제</button>
-            </div>
-          </div>
-        `;
-      }).join("")}
-    </div>
-  `;
-  const syncProductQty = (productId, nextQty) => {
-    const scope = target.closest("form") || app;
-    const checkbox = scope.querySelector(`[data-use-product="${productId}"]`);
-    const qtyInput = scope.querySelector(`[data-use-qty="${productId}"]`);
-    const maxQty = Math.max(1, num(qtyInput?.max || 999));
-    const safeQty = Math.min(maxQty, Math.max(0, num(nextQty)));
-    if (safeQty <= 0) {
-      if (checkbox) checkbox.checked = false;
-      if (qtyInput) qtyInput.value = 1;
-    } else {
-      if (checkbox) checkbox.checked = true;
-      if (qtyInput) qtyInput.value = safeQty;
-    }
-    renderUseItemsList(Array.from(scope.querySelectorAll("[data-use-product]:checked")).map((input) => ({
-      productId: input.value,
-      qty: Math.max(1, num(scope.querySelector(`[data-use-qty="${input.value}"]`)?.value))
-    })), target);
-  };
-  target.querySelectorAll("[data-edit-selected-remove]").forEach((button) => {
-    button.addEventListener("click", () => syncProductQty(button.dataset.editSelectedRemove, 0));
-  });
-  target.querySelectorAll("[data-edit-selected-dec], [data-edit-selected-inc]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const productId = button.dataset.editSelectedDec || button.dataset.editSelectedInc;
-      const linked = app.querySelector(`[data-use-qty="${productId}"]`);
-      const currentQty = Math.max(1, num(linked?.value || 1));
-      const nextQty = button.dataset.editSelectedDec ? currentQty - 1 : currentQty + 1;
-      syncProductQty(productId, nextQty);
-    });
-  });
-};
+const renderUseItemsList = (items, target) => getUsageEntryModule().renderUseItemsList(items, target);
 
 const editUsagePatientsForDate = (date) => state.usages
   .filter((usage) => (usage.date || "") === date)
