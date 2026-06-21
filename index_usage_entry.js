@@ -233,6 +233,51 @@
       `;
     }).join("") || `<div class="empty">공용 사진을 먼저 촬영하거나 선택해 주세요.</div>`;
 
+    const implantDraftsHtml = (drafts = [], commonPhotoCount = 0) => drafts.map((draft, index) => `
+      <div class="implant-vendor-card" data-implant-draft="${context.escapeHtml(draft.id)}">
+        <div class="implant-vendor-head">
+          <strong>업체 ${index + 1}</strong>
+          <button class="danger" type="button" data-remove-implant-draft="${context.escapeHtml(draft.id)}">업체 삭제</button>
+        </div>
+        <div class="row two">
+          <div>
+            <label for="implantVendorSelect-${context.escapeHtml(draft.id)}">업체명</label>
+            <select id="implantVendorSelect-${context.escapeHtml(draft.id)}" data-implant-vendor-select="${context.escapeHtml(draft.id)}">
+              ${context.implantVendorOptions(draft.vendorId)}
+            </select>
+          </div>
+          <div ${draft.vendorId === "__custom__" ? "" : "hidden"}>
+            <label for="implantVendorCustom-${context.escapeHtml(draft.id)}">직접 입력</label>
+            <input id="implantVendorCustom-${context.escapeHtml(draft.id)}" data-implant-vendor-custom="${context.escapeHtml(draft.id)}" value="${context.escapeHtml(draft.customVendor || "")}" autocomplete="off">
+          </div>
+        </div>
+        <label for="implantDescription-${context.escapeHtml(draft.id)}">사용내용</label>
+        <textarea id="implantDescription-${context.escapeHtml(draft.id)}" data-implant-description="${context.escapeHtml(draft.id)}" placeholder="Plate 255-209-L&#10;Screw 22mm 3ea">${context.escapeHtml(draft.description || "")}</textarea>
+        <label for="implantPhotos-${context.escapeHtml(draft.id)}">사진첨부</label>
+        <div class="implant-photo-pickers">
+          <button class="secondary" type="button" data-open-implant-gallery="${context.escapeHtml(draft.id)}">파일 선택</button>
+          <button type="button" data-open-implant-camera="${context.escapeHtml(draft.id)}">사진 찍기</button>
+          <button class="secondary" type="button" data-use-common-implant-photo="${context.escapeHtml(draft.id)}" ${commonPhotoCount ? "" : "disabled"}>공용 사진 사용</button>
+          <span class="muted">Android/iPad 카메라와 갤러리를 지원합니다.</span>
+          <input id="implantGallery-${context.escapeHtml(draft.id)}" type="file" accept="image/*" multiple data-implant-photo-input="${context.escapeHtml(draft.id)}">
+          <input id="implantCamera-${context.escapeHtml(draft.id)}" type="file" accept="image/*" capture="environment" data-implant-camera-input="${context.escapeHtml(draft.id)}">
+        </div>
+        <div class="implant-photo-grid">
+          ${(draft.photos || []).map((photo, photoIndex) => `
+            <div class="implant-photo" data-implant-photo="${context.escapeHtml(photo.id)}">
+              <img class="${photo.cropped ? "cropped" : ""}" src="${context.escapeHtml(context.implantPhotoViewSrc(photo))}" alt="임플란트 사진 미리보기" data-preview-implant-photo="${context.escapeHtml(draft.id)}::${context.escapeHtml(photo.id)}" style="${context.implantPhotoRotationStyle(photo)} cursor:pointer;">
+              <div class="implant-photo-actions">
+                <button class="secondary" type="button" data-edit-implant-photo="${context.escapeHtml(draft.id)}::${context.escapeHtml(photo.id)}">편집</button>
+                <button class="secondary" type="button" data-move-implant-photo-up="${context.escapeHtml(draft.id)}::${context.escapeHtml(photo.id)}" ${photoIndex === 0 ? "disabled" : ""}>앞</button>
+                <button class="secondary" type="button" data-move-implant-photo-down="${context.escapeHtml(draft.id)}::${context.escapeHtml(photo.id)}" ${photoIndex === draft.photos.length - 1 ? "disabled" : ""}>뒤</button>
+                <button class="danger" type="button" data-remove-implant-photo="${context.escapeHtml(draft.id)}::${context.escapeHtml(photo.id)}">삭제</button>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `).join("") || `<div class="empty">임플란트 업체를 추가해 주세요.</div>`;
+
     const editUsagePatientsForDate = (date) => context.getState().usages
       .filter((usage) => (usage.date || "") === date)
       .slice()
@@ -325,6 +370,7 @@
       productSearchResultsHtml,
       useRecommendationHtml,
       commonImplantPhotosHtml,
+      implantDraftsHtml,
       editUsagePatientsForDate,
       editUsagePatientCardHtml,
       editUsagePatientListHtml,

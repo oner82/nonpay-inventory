@@ -2023,6 +2023,8 @@ const getUsageEntryModule = () => {
       productCategoryLabel,
       qtyStepper,
       implantPhotoViewSrc,
+      implantPhotoRotationStyle,
+      implantVendorOptions,
       alphaFirstCompare,
       patientIdText,
       inferSurgeryDepartment,
@@ -2156,6 +2158,7 @@ const selectedUseListHtml = (items) => getUsageEntryModule().selectedUseListHtml
 const productSearchResultsHtml = (results, selectedItems) => getUsageEntryModule().productSearchResultsHtml(results, selectedItems);
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
 const commonImplantPhotosHtml = (photos) => getUsageEntryModule().commonImplantPhotosHtml(photos);
+const implantDraftsHtml = (drafts, commonPhotoCount) => getUsageEntryModule().implantDraftsHtml(drafts, commonPhotoCount);
 
 const editUsagePatientsForDate = (date) => getUsageEntryModule().editUsagePatientsForDate(date);
 const editUsagePatientCardHtml = (usage, selectedId = "") => getUsageEntryModule().editUsagePatientCardHtml(usage, selectedId);
@@ -3980,50 +3983,7 @@ const bindUse = () => {
     return !String(vendor || "").trim() || (!draft.description && !(draft.photos || []).length);
   });
   const renderImplantDrafts = () => {
-    implantEntriesWrap.innerHTML = implantDrafts.map((draft, index) => `
-      <div class="implant-vendor-card" data-implant-draft="${escapeHtml(draft.id)}">
-        <div class="implant-vendor-head">
-          <strong>업체 ${index + 1}</strong>
-          <button class="danger" type="button" data-remove-implant-draft="${escapeHtml(draft.id)}">업체 삭제</button>
-        </div>
-        <div class="row two">
-          <div>
-            <label for="implantVendorSelect-${escapeHtml(draft.id)}">업체명</label>
-            <select id="implantVendorSelect-${escapeHtml(draft.id)}" data-implant-vendor-select="${escapeHtml(draft.id)}">
-              ${implantVendorOptions(draft.vendorId)}
-            </select>
-          </div>
-          <div ${draft.vendorId === "__custom__" ? "" : "hidden"}>
-            <label for="implantVendorCustom-${escapeHtml(draft.id)}">직접 입력</label>
-            <input id="implantVendorCustom-${escapeHtml(draft.id)}" data-implant-vendor-custom="${escapeHtml(draft.id)}" value="${escapeHtml(draft.customVendor || "")}" autocomplete="off">
-          </div>
-        </div>
-        <label for="implantDescription-${escapeHtml(draft.id)}">사용내용</label>
-        <textarea id="implantDescription-${escapeHtml(draft.id)}" data-implant-description="${escapeHtml(draft.id)}" placeholder="Plate 255-209-L&#10;Screw 22mm 3ea">${escapeHtml(draft.description || "")}</textarea>
-        <label for="implantPhotos-${escapeHtml(draft.id)}">사진첨부</label>
-        <div class="implant-photo-pickers">
-          <button class="secondary" type="button" data-open-implant-gallery="${escapeHtml(draft.id)}">파일 선택</button>
-          <button type="button" data-open-implant-camera="${escapeHtml(draft.id)}">사진 찍기</button>
-          <button class="secondary" type="button" data-use-common-implant-photo="${escapeHtml(draft.id)}" ${commonImplantPhotos.length ? "" : "disabled"}>공용 사진 사용</button>
-          <span class="muted">Android/iPad 카메라와 갤러리를 지원합니다.</span>
-          <input id="implantGallery-${escapeHtml(draft.id)}" type="file" accept="image/*" multiple data-implant-photo-input="${escapeHtml(draft.id)}">
-          <input id="implantCamera-${escapeHtml(draft.id)}" type="file" accept="image/*" capture="environment" data-implant-camera-input="${escapeHtml(draft.id)}">
-        </div>
-        <div class="implant-photo-grid">
-          ${(draft.photos || []).map((photo, photoIndex) => `
-            <div class="implant-photo" data-implant-photo="${escapeHtml(photo.id)}">
-              <img class="${photo.cropped ? "cropped" : ""}" src="${escapeHtml(implantPhotoViewSrc(photo))}" alt="임플란트 사진 미리보기" data-preview-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}" style="${implantPhotoRotationStyle(photo)} cursor:pointer;">
-              <div class="implant-photo-actions">
-                <button class="secondary" type="button" data-edit-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}">편집</button>
-                <button class="secondary" type="button" data-move-implant-photo-up="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}" ${photoIndex === 0 ? "disabled" : ""}>앞</button>
-                <button class="secondary" type="button" data-move-implant-photo-down="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}" ${photoIndex === draft.photos.length - 1 ? "disabled" : ""}>뒤</button>
-                <button class="danger" type="button" data-remove-implant-photo="${escapeHtml(draft.id)}::${escapeHtml(photo.id)}">삭제</button>
-              </div>
-            </div>
-          `).join("")}
-        </div>
-      </div>
-    `).join("") || `<div class="empty">임플란트 업체를 추가해 주세요.</div>`;
+    implantEntriesWrap.innerHTML = implantDraftsHtml(implantDrafts, commonImplantPhotos.length);
   };
   const draftUserText = () => currentAuditUser()?.name || currentAuditUser()?.loginId || "현재 사용자";
   const collectUseDraftSnapshot = () => {
