@@ -2163,6 +2163,7 @@ const useRecommendationHtml = (recommended, restrictActive, selectedItems) => ge
 const commonImplantPhotosHtml = (photos) => getUsageEntryModule().commonImplantPhotosHtml(photos);
 const cloneCommonImplantPhoto = (photo) => getUsageEntryModule().cloneCommonImplantPhoto(photo);
 const commonImplantPhotoById = (photos, id) => getUsageEntryModule().commonImplantPhotoById(photos, id);
+const implantDraftByIdFromList = (drafts, id) => getUsageEntryModule().implantDraftById(drafts, id);
 const implantDraftPhotoPair = (drafts, value) => getUsageEntryModule().implantDraftPhotoPair(drafts, value);
 const implantDraftsHtml = (drafts, commonPhotoCount) => getUsageEntryModule().implantDraftsHtml(drafts, commonPhotoCount);
 
@@ -3947,7 +3948,7 @@ const bindUse = () => {
     }
     if (changed) renderImplantDrafts();
   };
-  const implantDraftById = (id) => implantDrafts.find((item) => item.id === id);
+  const implantDraftById = (id) => implantDraftByIdFromList(implantDrafts, id);
   const currentImplantDraftPayload = () => {
     const implantWillSave = implantEnabled?.checked;
     if (implantWillSave) mergeDuplicateImplantDrafts();

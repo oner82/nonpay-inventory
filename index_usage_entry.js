@@ -265,9 +265,11 @@
 
     const commonImplantPhotoById = (photos = [], id = "") => photos.find((photo) => photo.id === id);
 
+    const implantDraftById = (drafts = [], id = "") => drafts.find((draft) => draft.id === id);
+
     const implantDraftPhotoPair = (drafts = [], value = "") => {
       const [draftId, photoId] = String(value || "").split("::");
-      const draft = drafts.find((item) => item.id === draftId);
+      const draft = implantDraftById(drafts, draftId);
       const photo = draft?.photos?.find((item) => item.id === photoId);
       return { draft, photo };
     };
@@ -413,6 +415,7 @@
       commonImplantPhotosHtml,
       cloneCommonImplantPhoto,
       commonImplantPhotoById,
+      implantDraftById,
       implantDraftPhotoPair,
       implantDraftsHtml,
       editUsagePatientsForDate,
