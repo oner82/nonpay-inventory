@@ -2180,6 +2180,7 @@ const removeImplantDraftById = (drafts, id) => getUsageEntryModule().removeImpla
 const mergeDuplicateImplantDraftsInList = (drafts) => getUsageEntryModule().mergeDuplicateImplantDrafts(drafts);
 const implantDraftPayloadFromList = (drafts, enabled) => getUsageEntryModule().implantDraftPayloadFromList(drafts, enabled);
 const useDraftValidationMessage = (useItems, implantDraftPayload) => getUsageEntryModule().useDraftValidationMessage(useItems, implantDraftPayload);
+const buildUseDraftSnapshot = (options) => getUsageEntryModule().buildUseDraftSnapshot(options);
 const implantDraftPhotoPair = (drafts, value) => getUsageEntryModule().implantDraftPhotoPair(drafts, value);
 const implantDraftsHtml = (drafts, commonPhotoCount) => getUsageEntryModule().implantDraftsHtml(drafts, commonPhotoCount);
 
@@ -3938,17 +3939,16 @@ const bindUse = () => {
       alert(validationMessage);
       return null;
     }
-    return {
+    return buildUseDraftSnapshot({
       date: selectedUseDate(),
       patientName: document.getElementById("patientName").value.trim(),
       patientId: document.getElementById("patientId").value.trim(),
       doctorText: departmentSelect.selectedOptions[0]?.textContent || "-",
       surgeryText: surgerySelect.selectedOptions[0]?.textContent || "-",
       enteredBy: draftUserText(),
-      enteredAt: new Date().toISOString(),
       useItems,
       implantDraftPayload
-    };
+    });
   };
   const pendingUsagePhotoPayload = async (pendingId, draft, photo, date, index, onProgress, cache = null) => {
     if (photo.url && photo.path && !photo.needsReupload) return cleanImplantPhotoPayload(photo);

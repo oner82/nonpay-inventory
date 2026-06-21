@@ -394,6 +394,27 @@
       return "";
     };
 
+    const buildUseDraftSnapshot = ({
+      date = context.today(),
+      patientName = "",
+      patientId = "",
+      doctorText = "-",
+      surgeryText = "-",
+      enteredBy = "",
+      useItems = [],
+      implantDraftPayload = []
+    } = {}) => ({
+      date,
+      patientName,
+      patientId,
+      doctorText,
+      surgeryText,
+      enteredBy,
+      enteredAt: new Date().toISOString(),
+      useItems,
+      implantDraftPayload
+    });
+
     const implantDraftPhotoPair = (drafts = [], value = "") => {
       const [draftId, photoId] = String(value || "").split("::");
       const draft = implantDraftById(drafts, draftId);
@@ -558,6 +579,7 @@
       implantDraftPayloadFromList,
       invalidImplantDraft,
       useDraftValidationMessage,
+      buildUseDraftSnapshot,
       implantDraftPhotoPair,
       implantDraftsHtml,
       editUsagePatientsForDate,
