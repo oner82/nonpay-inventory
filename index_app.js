@@ -2162,6 +2162,7 @@ const productSearchResultsHtml = (results, selectedItems) => getUsageEntryModule
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
 const commonImplantPhotosHtml = (photos) => getUsageEntryModule().commonImplantPhotosHtml(photos);
 const cloneCommonImplantPhoto = (photo) => getUsageEntryModule().cloneCommonImplantPhoto(photo);
+const implantDraftPhotoPair = (drafts, value) => getUsageEntryModule().implantDraftPhotoPair(drafts, value);
 const implantDraftsHtml = (drafts, commonPhotoCount) => getUsageEntryModule().implantDraftsHtml(drafts, commonPhotoCount);
 
 const editUsagePatientsForDate = (date) => getUsageEntryModule().editUsagePatientsForDate(date);
@@ -4153,10 +4154,7 @@ const bindUse = () => {
     }
   };
   const parseImplantPair = (value) => {
-    const [draftId, photoId] = String(value || "").split("::");
-    const draft = implantDraftById(draftId);
-    const photo = draft?.photos?.find((item) => item.id === photoId);
-    return { draft, photo };
+    return implantDraftPhotoPair(implantDrafts, value);
   };
   const refreshImplantPhotoEditor = () => {
     const { photo } = parseImplantPair(activeImplantEditPair);

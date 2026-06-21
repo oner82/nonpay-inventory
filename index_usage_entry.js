@@ -263,6 +263,13 @@
       sourceCommonPhotoId: photo.id
     });
 
+    const implantDraftPhotoPair = (drafts = [], value = "") => {
+      const [draftId, photoId] = String(value || "").split("::");
+      const draft = drafts.find((item) => item.id === draftId);
+      const photo = draft?.photos?.find((item) => item.id === photoId);
+      return { draft, photo };
+    };
+
     const implantDraftsHtml = (drafts = [], commonPhotoCount = 0) => drafts.map((draft, index) => `
       <div class="implant-vendor-card" data-implant-draft="${context.escapeHtml(draft.id)}">
         <div class="implant-vendor-head">
@@ -403,6 +410,7 @@
       useRecommendationHtml,
       commonImplantPhotosHtml,
       cloneCommonImplantPhoto,
+      implantDraftPhotoPair,
       implantDraftsHtml,
       editUsagePatientsForDate,
       editUsagePatientCardHtml,
