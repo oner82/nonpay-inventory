@@ -162,6 +162,15 @@
       button.classList.toggle("secondary", !value);
     };
 
+    const setUseDraftPanelState = ({ status, finalSaveButton, saveButton, dirty, hasSnapshot }) => {
+      if (status) {
+        status.textContent = dirty ? "수정 중 · 임시저장 갱신 필요" : "임시저장 완료";
+        status.classList.toggle("dirty", Boolean(dirty));
+      }
+      if (finalSaveButton) finalSaveButton.disabled = Boolean(dirty);
+      if (saveButton) saveButton.textContent = hasSnapshot ? "임시저장 갱신" : "임시저장";
+    };
+
     const selectedUseListHtml = (items) => {
       if (!items.length) return `<span>선택된 제품이 없습니다.</span>`;
       const chipClass = (category) => {
@@ -409,6 +418,7 @@
       selectedUseItemsFromScope,
       syncRecommendControl,
       setRestrictButtonState,
+      setUseDraftPanelState,
       selectedUseListHtml,
       productSearchResultsHtml,
       useRecommendationHtml,

@@ -2157,6 +2157,7 @@ const useDraftSummaryHtml = (snapshot) => getUsageEntryModule().useDraftSummaryH
 const selectedUseItemsFromScope = (scope) => getUsageEntryModule().selectedUseItemsFromScope(scope);
 const syncRecommendControl = (productId, checked, qty = "") => getUsageEntryModule().syncRecommendControl(productId, checked, qty);
 const setRestrictButtonState = (button, value) => getUsageEntryModule().setRestrictButtonState(button, value);
+const setUseDraftPanelState = (options) => getUsageEntryModule().setUseDraftPanelState(options);
 const selectedUseListHtml = (items) => getUsageEntryModule().selectedUseListHtml(items);
 const productSearchResultsHtml = (results, selectedItems) => getUsageEntryModule().productSearchResultsHtml(results, selectedItems);
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
@@ -4084,12 +4085,13 @@ const bindUse = () => {
       return;
     }
     useDraftPanel.hidden = false;
-    if (useDraftStatus) {
-      useDraftStatus.textContent = useDraftDirty ? "수정 중 · 임시저장 갱신 필요" : "임시저장 완료";
-      useDraftStatus.classList.toggle("dirty", useDraftDirty);
-    }
-    if (finalSaveUseDraftButton) finalSaveUseDraftButton.disabled = useDraftDirty;
-    if (saveUseDraftButton) saveUseDraftButton.textContent = useDraftSnapshot ? "임시저장 갱신" : "임시저장";
+    setUseDraftPanelState({
+      status: useDraftStatus,
+      finalSaveButton: finalSaveUseDraftButton,
+      saveButton: saveUseDraftButton,
+      dirty: useDraftDirty,
+      hasSnapshot: Boolean(useDraftSnapshot)
+    });
     useDraftSummary.innerHTML = useDraftSummaryHtml(useDraftSnapshot);
   };
   const markUseDraftDirty = () => {
