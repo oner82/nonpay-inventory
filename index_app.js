@@ -2181,6 +2181,8 @@ const mergeDuplicateImplantDraftsInList = (drafts) => getUsageEntryModule().merg
 const implantDraftPayloadFromList = (drafts, enabled) => getUsageEntryModule().implantDraftPayloadFromList(drafts, enabled);
 const useDraftValidationMessage = (useItems, implantDraftPayload) => getUsageEntryModule().useDraftValidationMessage(useItems, implantDraftPayload);
 const buildUseDraftSnapshot = (options) => getUsageEntryModule().buildUseDraftSnapshot(options);
+const pendingUsagePhotoCount = (implantDraftPayload) => getUsageEntryModule().pendingUsagePhotoCount(implantDraftPayload);
+const pendingUsagePhotoProgressMessage = (done, total, failed) => getUsageEntryModule().pendingUsagePhotoProgressMessage(done, total, failed);
 const implantDraftPhotoPair = (drafts, value) => getUsageEntryModule().implantDraftPhotoPair(drafts, value);
 const implantDraftsHtml = (drafts, commonPhotoCount) => getUsageEntryModule().implantDraftsHtml(drafts, commonPhotoCount);
 
@@ -4015,14 +4017,13 @@ const bindUse = () => {
       return null;
     }
     const pendingId = loadedPendingUsageId || uid();
-    const totalPhotos = snapshot.implantDraftPayload.reduce((sum, draft) => sum + (draft.photos || []).filter((photo) => !(photo.url || photo.dataUrl)).length, 0);
+    const totalPhotos = pendingUsagePhotoCount(snapshot.implantDraftPayload);
     let donePhotos = 0;
     let failedPhotos = 0;
     const payload = await buildPendingUsagePayload(snapshot, pendingId, (failed) => {
       donePhotos += 1;
       if (failed) failedPhotos += 1;
-      const failText = failedPhotos ? ` · 실패 ${failedPhotos}장` : "";
-      showSaveToast(`임시저장 사진 처리 중 ${donePhotos}/${totalPhotos}${failText}`, failedPhotos ? "error" : "saving", { hold: donePhotos < totalPhotos });
+      showSaveToast(pendingUsagePhotoProgressMessage(donePhotos, totalPhotos, failedPhotos), failedPhotos ? "error" : "saving", { hold: donePhotos < totalPhotos });
     });
     suppressPendingUsagesRender = true;
     await setDoc(doc(db, "pendingUsages", pendingId), payload, { merge: true });

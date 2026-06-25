@@ -415,6 +415,16 @@
       implantDraftPayload
     });
 
+    const pendingUsagePhotoCount = (implantDraftPayload = []) =>
+      implantDraftPayload.reduce((sum, draft) =>
+        sum + (draft.photos || []).filter((photo) => !(photo.url || photo.dataUrl)).length
+      , 0);
+
+    const pendingUsagePhotoProgressMessage = (done = 0, total = 0, failed = 0) => {
+      const failText = failed ? ` · 실패 ${failed}장` : "";
+      return `임시저장 사진 처리 중 ${done}/${total}${failText}`;
+    };
+
     const implantDraftPhotoPair = (drafts = [], value = "") => {
       const [draftId, photoId] = String(value || "").split("::");
       const draft = implantDraftById(drafts, draftId);
@@ -580,6 +590,8 @@
       invalidImplantDraft,
       useDraftValidationMessage,
       buildUseDraftSnapshot,
+      pendingUsagePhotoCount,
+      pendingUsagePhotoProgressMessage,
       implantDraftPhotoPair,
       implantDraftsHtml,
       editUsagePatientsForDate,
