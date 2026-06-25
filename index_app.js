@@ -2185,6 +2185,7 @@ const buildUseDraftSnapshot = (options) => getUsageEntryModule().buildUseDraftSn
 const pendingUsagePhotoCount = (implantDraftPayload) => getUsageEntryModule().pendingUsagePhotoCount(implantDraftPayload);
 const pendingUsagePhotoProgressMessage = (done, total, failed) => getUsageEntryModule().pendingUsagePhotoProgressMessage(done, total, failed);
 const pendingImplantDraftsFromRecord = (pending) => getUsageEntryModule().pendingImplantDraftsFromRecord(pending);
+const invalidImplantDraft = (payload) => getUsageEntryModule().invalidImplantDraft(payload);
 const implantDraftPhotoPair = (drafts, value) => getUsageEntryModule().implantDraftPhotoPair(drafts, value);
 const implantDraftsHtml = (drafts, commonPhotoCount) => getUsageEntryModule().implantDraftsHtml(drafts, commonPhotoCount);
 
