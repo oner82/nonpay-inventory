@@ -2034,7 +2034,8 @@ const getUsageEntryModule = () => {
       canModifyUsageRecord,
       implantVendorEntriesMatch,
       mergeImplantDescriptionLines,
-      implantVendorById
+      implantVendorById,
+      cleanImplantPhotoPayload
     });
   }
   return usageEntryModule;
@@ -2183,6 +2184,7 @@ const useDraftValidationMessage = (useItems, implantDraftPayload) => getUsageEnt
 const buildUseDraftSnapshot = (options) => getUsageEntryModule().buildUseDraftSnapshot(options);
 const pendingUsagePhotoCount = (implantDraftPayload) => getUsageEntryModule().pendingUsagePhotoCount(implantDraftPayload);
 const pendingUsagePhotoProgressMessage = (done, total, failed) => getUsageEntryModule().pendingUsagePhotoProgressMessage(done, total, failed);
+const pendingImplantDraftsFromRecord = (pending) => getUsageEntryModule().pendingImplantDraftsFromRecord(pending);
 const implantDraftPhotoPair = (drafts, value) => getUsageEntryModule().implantDraftPhotoPair(drafts, value);
 const implantDraftsHtml = (drafts, commonPhotoCount) => getUsageEntryModule().implantDraftsHtml(drafts, commonPhotoCount);
 
@@ -4073,14 +4075,7 @@ const bindUse = () => {
       if (qtyInput) qtyInput.value = Math.max(1, num(item.qty));
     });
     renderSelectedUseList();
-    implantDrafts.splice(0, implantDrafts.length, ...(pending.implantDrafts || []).map((draft) => ({
-      id: draft.id || uid(),
-      vendorId: draft.vendorId || "",
-      customVendor: draft.customVendor || "",
-      vendor: draft.vendor || "",
-      description: draft.description || "",
-      photos: (draft.photos || []).map(cleanImplantPhotoPayload)
-    })));
+    implantDrafts.splice(0, implantDrafts.length, ...pendingImplantDraftsFromRecord(pending));
     if (implantEnabled) implantEnabled.checked = implantDrafts.length > 0;
     if (implantPanel) implantPanel.hidden = !implantDrafts.length;
     loadedPendingUsageId = pending.id || "";

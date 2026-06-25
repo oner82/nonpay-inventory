@@ -425,6 +425,15 @@
       return `임시저장 사진 처리 중 ${done}/${total}${failText}`;
     };
 
+    const pendingImplantDraftsFromRecord = (pending = {}) => (pending.implantDrafts || []).map((draft) => ({
+      id: draft.id || context.uid(),
+      vendorId: draft.vendorId || "",
+      customVendor: draft.customVendor || "",
+      vendor: draft.vendor || "",
+      description: draft.description || "",
+      photos: (draft.photos || []).map(context.cleanImplantPhotoPayload)
+    }));
+
     const implantDraftPhotoPair = (drafts = [], value = "") => {
       const [draftId, photoId] = String(value || "").split("::");
       const draft = implantDraftById(drafts, draftId);
@@ -592,6 +601,7 @@
       buildUseDraftSnapshot,
       pendingUsagePhotoCount,
       pendingUsagePhotoProgressMessage,
+      pendingImplantDraftsFromRecord,
       implantDraftPhotoPair,
       implantDraftsHtml,
       editUsagePatientsForDate,
