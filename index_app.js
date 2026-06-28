@@ -3880,6 +3880,9 @@ const bindUse = () => {
       const existing = findImplantEntryByVendorTarget(implantDrafts, target);
       if (existing) {
         if (!existing.autoCompanyKey) existing.autoCompanyKey = target.key;
+        const existingDescription = String(existing.description || "").trim();
+        const targetDescription = String(target.description || "").trim();
+        if (!existing.autoSource && (!existingDescription || existingDescription === targetDescription)) existing.autoSource = "product";
         if (existing.vendorId !== target.vendorId || existing.customVendor !== target.customVendor || existing.vendor !== target.vendor) {
           existing.vendorId = target.vendorId;
           existing.customVendor = target.customVendor;
@@ -4003,6 +4006,9 @@ const bindUse = () => {
         customVendor: draft.customVendor || "",
         vendor,
         description: draft.description || "",
+        autoSource: draft.autoSource || "",
+        autoDescription: draft.autoDescription || "",
+        autoCompanyKey: draft.autoCompanyKey || "",
         photos: photos.filter((photo) => photo.url || photo.dataUrl)
       });
     }
@@ -4082,6 +4088,7 @@ const bindUse = () => {
     if (implantEnabled) implantEnabled.checked = implantDrafts.length > 0;
     if (implantPanel) implantPanel.hidden = !implantDrafts.length;
     loadedPendingUsageId = pending.id || "";
+    syncImplantDraftsFromSelectedProducts();
     renderImplantDrafts();
     useDraftSnapshot = collectUseDraftSnapshot();
     if (useDraftSnapshot) {

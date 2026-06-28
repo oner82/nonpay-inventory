@@ -284,6 +284,7 @@
         const qtyInput = form?.querySelector(`[data-use-qty="${item.productId}"]`);
         if (checkbox) checkbox.checked = true;
         if (qtyInput) qtyInput.value = Math.max(1, context.num(item.qty));
+        syncRecommendControl(item.productId, true, item.qty);
       });
     };
 
@@ -491,6 +492,9 @@
       customVendor: draft.customVendor || "",
       vendor: draft.vendor || "",
       description: draft.description || "",
+      autoSource: draft.autoSource || "",
+      autoDescription: draft.autoDescription || "",
+      autoCompanyKey: draft.autoCompanyKey || "",
       photos: (draft.photos || []).map(context.cleanImplantPhotoPayload)
     }));
 
