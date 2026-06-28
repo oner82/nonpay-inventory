@@ -223,6 +223,15 @@
 
     const productSearchEmptyQueryHtml = () => `<div class="empty">제품명을 입력해 주세요.</div>`;
 
+    const useProductSearchResults = (products = [], query = "") => {
+      const normalizedQuery = context.normalizedName(query);
+      if (!normalizedQuery) return [];
+      return products
+        .filter((item) => context.normalizedName(`${item.name} ${item.company || ""} ${item.subcategory || ""} ${context.productCategoryLabel(item.category)}`).includes(normalizedQuery))
+        .sort((a, b) => context.alphaFirstCompare(a.name, b.name))
+        .slice(0, 12);
+    };
+
     const noRecommendationHtml = (hasSurgerySelection) => hasSurgerySelection
       ? `<div class="empty">추천 비급여가 등록되지 않은 수술입니다. 수술은 저장할 수 있으며, 필요한 제품은 아래에서 직접 선택해 주세요.</div>`
       : "";
@@ -579,6 +588,7 @@
       setUseDraftPanelState,
       draftUserText,
       selectedUseListHtml,
+      useProductSearchResults,
       productSearchResultsHtml,
       productSearchEmptyQueryHtml,
       noRecommendationHtml,

@@ -2028,6 +2028,7 @@ const getUsageEntryModule = () => {
       uid,
       currentAuditUser,
       alphaFirstCompare,
+      normalizedName,
       patientIdText,
       inferSurgeryDepartment,
       usageProductItems,
@@ -2165,6 +2166,7 @@ const setRestrictButtonState = (button, value) => getUsageEntryModule().setRestr
 const setUseDraftPanelState = (options) => getUsageEntryModule().setUseDraftPanelState(options);
 const draftUserText = () => getUsageEntryModule().draftUserText();
 const selectedUseListHtml = (items) => getUsageEntryModule().selectedUseListHtml(items);
+const useProductSearchResults = (products, query) => getUsageEntryModule().useProductSearchResults(products, query);
 const productSearchResultsHtml = (results, selectedItems) => getUsageEntryModule().productSearchResultsHtml(results, selectedItems);
 const productSearchEmptyQueryHtml = () => getUsageEntryModule().productSearchEmptyQueryHtml();
 const noRecommendationHtml = (hasSurgerySelection) => getUsageEntryModule().noRecommendationHtml(hasSurgerySelection);
@@ -4131,15 +4133,12 @@ const bindUse = () => {
     refreshImplantPhotoEditor();
   };
   const renderProductSearchResults = () => {
-    const query = normalizedName(productSearch.value);
+    const query = productSearch.value;
     if (!query) {
       productSearchResults.innerHTML = `<div class="empty">제품명을 입력해 주세요.</div>`;
       return;
     }
-    const results = state.products
-      .filter((item) => normalizedName(`${item.name} ${item.company || ""} ${item.subcategory || ""} ${productCategoryLabel(item.category)}`).includes(query))
-      .sort(byName)
-      .slice(0, 12);
+    const results = useProductSearchResults(state.products, query);
     productSearchResults.innerHTML = productSearchResultsHtml(results, selectedUseItems());
     productSearchResults.querySelectorAll("[data-search-product]").forEach((input) => {
       input.addEventListener("change", () => {
