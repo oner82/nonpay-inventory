@@ -246,6 +246,21 @@
       Boolean(restrictActive) &&
       recommendedItems.some((item) => item.productId === productId);
 
+    const syncRecommendProductToUseForm = (input, form) => {
+      const linked = form?.querySelector(`[data-use-product="${input.value}"]`);
+      const qtyInput = form?.querySelector(`[data-use-qty="${input.value}"]`);
+      const recommendQty = context.getApp().querySelector(`[data-recommend-qty="${input.value}"]`);
+      if (linked) linked.checked = input.checked;
+      if (qtyInput && recommendQty) qtyInput.value = Math.max(1, context.num(recommendQty.value));
+    };
+
+    const syncRecommendQtyToUseForm = (input) => {
+      const linked = context.getApp().querySelector(`[data-use-product="${input.dataset.recommendQty}"]`);
+      const qtyInput = context.getApp().querySelector(`[data-use-qty="${input.dataset.recommendQty}"]`);
+      if (linked) linked.checked = true;
+      if (qtyInput) qtyInput.value = Math.max(1, context.num(input.value));
+    };
+
     const useRecommendationHtml = (recommended, restrictActive, selectedItems = []) => {
       const selectedQtyById = new Map(selectedItems.map((item) => [item.productId, Math.max(1, context.num(item.qty))]));
       const visibleItems = recommended.filter((item) => !(restrictActive && context.productCategory(item.product.category) === "비급여"));
@@ -604,6 +619,8 @@
       noRecommendationHtml,
       useRecommendedItemsWithProducts,
       shouldHideUseProductForRestriction,
+      syncRecommendProductToUseForm,
+      syncRecommendQtyToUseForm,
       useRecommendationHtml,
       commonImplantPhotosHtml,
       emptyImplantDraft,

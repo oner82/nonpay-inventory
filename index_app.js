@@ -2172,6 +2172,8 @@ const productSearchEmptyQueryHtml = () => getUsageEntryModule().productSearchEmp
 const noRecommendationHtml = (hasSurgerySelection) => getUsageEntryModule().noRecommendationHtml(hasSurgerySelection);
 const useRecommendedItemsWithProducts = (items) => getUsageEntryModule().useRecommendedItemsWithProducts(items);
 const shouldHideUseProductForRestriction = (product, productId, recommendedItems, restrictActive) => getUsageEntryModule().shouldHideUseProductForRestriction(product, productId, recommendedItems, restrictActive);
+const syncRecommendProductToUseForm = (input, form) => getUsageEntryModule().syncRecommendProductToUseForm(input, form);
+const syncRecommendQtyToUseForm = (input) => getUsageEntryModule().syncRecommendQtyToUseForm(input);
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
 const commonImplantPhotosHtml = (photos) => getUsageEntryModule().commonImplantPhotosHtml(photos);
 const emptyImplantDraft = () => getUsageEntryModule().emptyImplantDraft();
@@ -4185,20 +4187,13 @@ const bindUse = () => {
     });
     app.querySelectorAll("[data-recommend-product]").forEach((input) => {
       input.addEventListener("change", () => {
-        const linked = form.querySelector(`[data-use-product="${input.value}"]`);
-        const qtyInput = form.querySelector(`[data-use-qty="${input.value}"]`);
-        const recommendQty = app.querySelector(`[data-recommend-qty="${input.value}"]`);
-        if (linked) linked.checked = input.checked;
-        if (qtyInput && recommendQty) qtyInput.value = Math.max(1, num(recommendQty.value));
+        syncRecommendProductToUseForm(input, form);
         renderSelectedUseList();
       });
     });
     app.querySelectorAll("[data-recommend-qty]").forEach((input) => {
       input.addEventListener("input", () => {
-        const linked = app.querySelector(`[data-use-product="${input.dataset.recommendQty}"]`);
-        const qtyInput = app.querySelector(`[data-use-qty="${input.dataset.recommendQty}"]`);
-        if (linked) linked.checked = true;
-        if (qtyInput) qtyInput.value = Math.max(1, num(input.value));
+        syncRecommendQtyToUseForm(input);
         renderSelectedUseList();
       });
     });
