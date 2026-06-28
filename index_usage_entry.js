@@ -272,6 +272,21 @@
       syncRecommendControl(productId, false);
     };
 
+    const resetUseProductControls = (form) => {
+      form?.querySelectorAll("[data-use-product]").forEach((input) => { input.checked = false; });
+      form?.querySelectorAll("[data-use-qty]").forEach((input) => { input.value = 1; });
+    };
+
+    const applyPendingProductItemsToForm = (form, productItems = []) => {
+      resetUseProductControls(form);
+      productItems.forEach((item) => {
+        const checkbox = form?.querySelector(`[data-use-product="${item.productId}"]`);
+        const qtyInput = form?.querySelector(`[data-use-qty="${item.productId}"]`);
+        if (checkbox) checkbox.checked = true;
+        if (qtyInput) qtyInput.value = Math.max(1, context.num(item.qty));
+      });
+    };
+
     const useRecommendationHtml = (recommended, restrictActive, selectedItems = []) => {
       const selectedQtyById = new Map(selectedItems.map((item) => [item.productId, Math.max(1, context.num(item.qty))]));
       const visibleItems = recommended.filter((item) => !(restrictActive && context.productCategory(item.product.category) === "비급여"));
@@ -634,6 +649,8 @@
       syncRecommendQtyToUseForm,
       searchProductQtyValue,
       clearSearchProductFromUseForm,
+      resetUseProductControls,
+      applyPendingProductItemsToForm,
       useRecommendationHtml,
       commonImplantPhotosHtml,
       emptyImplantDraft,

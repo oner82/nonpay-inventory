@@ -2176,6 +2176,7 @@ const syncRecommendProductToUseForm = (input, form) => getUsageEntryModule().syn
 const syncRecommendQtyToUseForm = (input) => getUsageEntryModule().syncRecommendQtyToUseForm(input);
 const searchProductQtyValue = (container, productId) => getUsageEntryModule().searchProductQtyValue(container, productId);
 const clearSearchProductFromUseForm = (productId, form) => getUsageEntryModule().clearSearchProductFromUseForm(productId, form);
+const applyPendingProductItemsToForm = (form, productItems) => getUsageEntryModule().applyPendingProductItemsToForm(form, productItems);
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
 const commonImplantPhotosHtml = (photos) => getUsageEntryModule().commonImplantPhotosHtml(photos);
 const emptyImplantDraft = () => getUsageEntryModule().emptyImplantDraft();
@@ -4075,14 +4076,7 @@ const bindUse = () => {
     }
     surgerySelect.value = pending.surgeryId || "";
     renderUseRecommendation();
-    form.querySelectorAll("[data-use-product]").forEach((input) => { input.checked = false; });
-    form.querySelectorAll("[data-use-qty]").forEach((input) => { input.value = 1; });
-    (pending.productItems || []).forEach((item) => {
-      const checkbox = form.querySelector(`[data-use-product="${item.productId}"]`);
-      const qtyInput = form.querySelector(`[data-use-qty="${item.productId}"]`);
-      if (checkbox) checkbox.checked = true;
-      if (qtyInput) qtyInput.value = Math.max(1, num(item.qty));
-    });
+    applyPendingProductItemsToForm(form, pending.productItems || []);
     renderSelectedUseList();
     implantDrafts.splice(0, implantDrafts.length, ...pendingImplantDraftsFromRecord(pending));
     if (implantEnabled) implantEnabled.checked = implantDrafts.length > 0;
