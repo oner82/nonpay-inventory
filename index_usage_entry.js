@@ -240,6 +240,12 @@
       .map((item) => ({ ...item, product: context.productById(item.productId) }))
       .filter((item) => item.product);
 
+    const shouldHideUseProductForRestriction = (product, productId, recommendedItems = [], restrictActive = false) =>
+      Boolean(product) &&
+      context.productCategory(product.category) === "비급여" &&
+      Boolean(restrictActive) &&
+      recommendedItems.some((item) => item.productId === productId);
+
     const useRecommendationHtml = (recommended, restrictActive, selectedItems = []) => {
       const selectedQtyById = new Map(selectedItems.map((item) => [item.productId, Math.max(1, context.num(item.qty))]));
       const visibleItems = recommended.filter((item) => !(restrictActive && context.productCategory(item.product.category) === "비급여"));
@@ -597,6 +603,7 @@
       productSearchEmptyQueryHtml,
       noRecommendationHtml,
       useRecommendedItemsWithProducts,
+      shouldHideUseProductForRestriction,
       useRecommendationHtml,
       commonImplantPhotosHtml,
       emptyImplantDraft,

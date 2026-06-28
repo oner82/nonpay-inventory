@@ -2171,6 +2171,7 @@ const productSearchResultsHtml = (results, selectedItems) => getUsageEntryModule
 const productSearchEmptyQueryHtml = () => getUsageEntryModule().productSearchEmptyQueryHtml();
 const noRecommendationHtml = (hasSurgerySelection) => getUsageEntryModule().noRecommendationHtml(hasSurgerySelection);
 const useRecommendedItemsWithProducts = (items) => getUsageEntryModule().useRecommendedItemsWithProducts(items);
+const shouldHideUseProductForRestriction = (product, productId, recommendedItems, restrictActive) => getUsageEntryModule().shouldHideUseProductForRestriction(product, productId, recommendedItems, restrictActive);
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
 const commonImplantPhotosHtml = (photos) => getUsageEntryModule().commonImplantPhotosHtml(photos);
 const emptyImplantDraft = () => getUsageEntryModule().emptyImplantDraft();
@@ -4175,9 +4176,7 @@ const bindUse = () => {
     recommendation.innerHTML = useRecommendationHtml(recommended, restrictActive, selectedUseItems());
     form.querySelectorAll("[data-use-product]").forEach((input) => {
       const product = productById(input.value);
-      const recommendedItem = recommendedItems.find((item) => item.productId === input.value);
-      const isRecommended = Boolean(recommendedItem);
-      if (product && productCategory(product.category) === "비급여" && restrictActive && isRecommended) {
+      if (shouldHideUseProductForRestriction(product, input.value, recommendedItems, restrictActive)) {
         input.checked = false;
         input.closest(".check-card").style.display = "none";
       } else {
