@@ -2170,6 +2170,7 @@ const useProductSearchResults = (products, query) => getUsageEntryModule().usePr
 const productSearchResultsHtml = (results, selectedItems) => getUsageEntryModule().productSearchResultsHtml(results, selectedItems);
 const productSearchEmptyQueryHtml = () => getUsageEntryModule().productSearchEmptyQueryHtml();
 const noRecommendationHtml = (hasSurgerySelection) => getUsageEntryModule().noRecommendationHtml(hasSurgerySelection);
+const useRecommendedItemsWithProducts = (items) => getUsageEntryModule().useRecommendedItemsWithProducts(items);
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
 const commonImplantPhotosHtml = (photos) => getUsageEntryModule().commonImplantPhotosHtml(photos);
 const emptyImplantDraft = () => getUsageEntryModule().emptyImplantDraft();
@@ -4170,7 +4171,7 @@ const bindUse = () => {
       return;
     }
     const recommendedItems = ruleItems(rule);
-    const recommended = recommendedItems.map((item) => ({ ...item, product: productById(item.productId) })).filter((item) => item.product);
+    const recommended = useRecommendedItemsWithProducts(recommendedItems);
     recommendation.innerHTML = useRecommendationHtml(recommended, restrictActive, selectedUseItems());
     form.querySelectorAll("[data-use-product]").forEach((input) => {
       const product = productById(input.value);
