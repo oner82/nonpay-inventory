@@ -2177,6 +2177,7 @@ const syncRecommendQtyToUseForm = (input) => getUsageEntryModule().syncRecommend
 const searchProductQtyValue = (container, productId) => getUsageEntryModule().searchProductQtyValue(container, productId);
 const clearSearchProductFromUseForm = (productId, form) => getUsageEntryModule().clearSearchProductFromUseForm(productId, form);
 const applyPendingProductItemsToForm = (form, productItems) => getUsageEntryModule().applyPendingProductItemsToForm(form, productItems);
+const finalSaveRecommendationCheck = (options) => getUsageEntryModule().finalSaveRecommendationCheck(options);
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
 const commonImplantPhotosHtml = (photos) => getUsageEntryModule().commonImplantPhotosHtml(photos);
 const emptyImplantDraft = () => getUsageEntryModule().emptyImplantDraft();
@@ -4535,29 +4536,20 @@ const bindUse = () => {
     if (restrictActive && selectedNonpayIds.length && !confirm("비급여 제한으로 설정된 수술입니다. 그래도 비급여를 사용할까요?")) {
       return;
     }
-    const expectedRecommendations = productIds.length && rule
-      ? ruleItems(rule).filter((item) => !(restrictActive && productCategory(productById(item.productId)?.category) === "비급여"))
-      : [];
-    const missingRecommended = expectedRecommendations
-      .map((item) => item.productId)
-      .filter((id) => !uniqueProductIds.includes(id));
-    if (missingRecommended.length) {
-      const missingNames = missingRecommended.map((id) => productById(id)?.name).filter(Boolean).join(", ");
-      if (!confirm(`추천 항목이 선택되지 않았습니다: ${missingNames}\n정말 사용하지 않겠습니까?\n확인을 누르면 사용안함으로 저장합니다.`)) {
+    const recommendationCheck = finalSaveRecommendationCheck({
+      ruleItems: rule ? ruleItems(rule) : [],
+      productIds,
+      uniqueProductIds,
+      useItems,
+      restrictActive
+    });
+    if (recommendationCheck.missingNames) {
+      if (!confirm(`추천 항목이 선택되지 않았습니다: ${recommendationCheck.missingNames}\n정말 사용하지 않겠습니까?\n확인을 누르면 사용안함으로 저장합니다.`)) {
         return;
       }
     }
-    const changedRecommended = expectedRecommendations.filter((item) => {
-        const selected = useItems.find((useItem) => useItem.productId === item.productId);
-        return selected && selected.qty !== Math.max(1, num(item.qty));
-      });
-    if (changedRecommended.length) {
-      const changedNames = changedRecommended.map((item) => {
-        const product = productById(item.productId);
-        const selected = useItems.find((useItem) => useItem.productId === item.productId);
-        return `${product?.name || "삭제된 제품"} 추천 ${Math.max(1, num(item.qty))}개 / 선택 ${selected?.qty || 0}개`;
-      }).join(", ");
-      if (!confirm(`추천 항목 수량과 다릅니다: ${changedNames}\n그래도 저장할까요?`)) {
+    if (recommendationCheck.changedNames) {
+      if (!confirm(`추천 항목 수량과 다릅니다: ${recommendationCheck.changedNames}\n그래도 저장할까요?`)) {
         return;
       }
     }

@@ -288,6 +288,26 @@
       });
     };
 
+    const finalSaveRecommendationCheck = ({ ruleItems = [], productIds = [], uniqueProductIds = [], useItems = [], restrictActive = false } = {}) => {
+      const expectedRecommendations = productIds.length
+        ? ruleItems.filter((item) => !(restrictActive && context.productCategory(context.productById(item.productId)?.category) === "비급여"))
+        : [];
+      const missingRecommended = expectedRecommendations
+        .map((item) => item.productId)
+        .filter((id) => !uniqueProductIds.includes(id));
+      const missingNames = missingRecommended.map((id) => context.productById(id)?.name).filter(Boolean).join(", ");
+      const changedRecommended = expectedRecommendations.filter((item) => {
+        const selected = useItems.find((useItem) => useItem.productId === item.productId);
+        return selected && selected.qty !== Math.max(1, context.num(item.qty));
+      });
+      const changedNames = changedRecommended.map((item) => {
+        const product = context.productById(item.productId);
+        const selected = useItems.find((useItem) => useItem.productId === item.productId);
+        return `${product?.name || "삭제된 제품"} 추천 ${Math.max(1, context.num(item.qty))}개 / 선택 ${selected?.qty || 0}개`;
+      }).join(", ");
+      return { missingNames, changedNames };
+    };
+
     const useRecommendationHtml = (recommended, restrictActive, selectedItems = []) => {
       const selectedQtyById = new Map(selectedItems.map((item) => [item.productId, Math.max(1, context.num(item.qty))]));
       const visibleItems = recommended.filter((item) => !(restrictActive && context.productCategory(item.product.category) === "비급여"));
@@ -655,6 +675,7 @@
       clearSearchProductFromUseForm,
       resetUseProductControls,
       applyPendingProductItemsToForm,
+      finalSaveRecommendationCheck,
       useRecommendationHtml,
       commonImplantPhotosHtml,
       emptyImplantDraft,
