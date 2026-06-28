@@ -2174,6 +2174,8 @@ const useRecommendedItemsWithProducts = (items) => getUsageEntryModule().useReco
 const shouldHideUseProductForRestriction = (product, productId, recommendedItems, restrictActive) => getUsageEntryModule().shouldHideUseProductForRestriction(product, productId, recommendedItems, restrictActive);
 const syncRecommendProductToUseForm = (input, form) => getUsageEntryModule().syncRecommendProductToUseForm(input, form);
 const syncRecommendQtyToUseForm = (input) => getUsageEntryModule().syncRecommendQtyToUseForm(input);
+const searchProductQtyValue = (container, productId) => getUsageEntryModule().searchProductQtyValue(container, productId);
+const clearSearchProductFromUseForm = (productId, form) => getUsageEntryModule().clearSearchProductFromUseForm(productId, form);
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
 const commonImplantPhotosHtml = (photos) => getUsageEntryModule().commonImplantPhotosHtml(photos);
 const emptyImplantDraft = () => getUsageEntryModule().emptyImplantDraft();
@@ -4146,16 +4148,12 @@ const bindUse = () => {
     productSearchResults.innerHTML = productSearchResultsHtml(results, selectedUseItems());
     productSearchResults.querySelectorAll("[data-search-product]").forEach((input) => {
       input.addEventListener("change", () => {
-        const qty = productSearchResults.querySelector(`[data-search-qty="${input.value}"]`)?.value;
+        const qty = searchProductQtyValue(productSearchResults, input.value);
         if (input.checked) {
           selectUseProduct(input.value, qty);
           return;
         }
-        const linked = form.querySelector(`[data-use-product="${input.value}"]`);
-        const qtyInput = form.querySelector(`[data-use-qty="${input.value}"]`);
-        if (linked) linked.checked = false;
-        if (qtyInput) qtyInput.value = 1;
-        syncRecommendControl(input.value, false);
+        clearSearchProductFromUseForm(input.value, form);
         renderSelectedUseList();
       });
     });

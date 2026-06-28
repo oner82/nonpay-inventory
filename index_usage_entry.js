@@ -261,6 +261,17 @@
       if (qtyInput) qtyInput.value = Math.max(1, context.num(input.value));
     };
 
+    const searchProductQtyValue = (container, productId) =>
+      container?.querySelector(`[data-search-qty="${productId}"]`)?.value;
+
+    const clearSearchProductFromUseForm = (productId, form) => {
+      const linked = form?.querySelector(`[data-use-product="${productId}"]`);
+      const qtyInput = form?.querySelector(`[data-use-qty="${productId}"]`);
+      if (linked) linked.checked = false;
+      if (qtyInput) qtyInput.value = 1;
+      syncRecommendControl(productId, false);
+    };
+
     const useRecommendationHtml = (recommended, restrictActive, selectedItems = []) => {
       const selectedQtyById = new Map(selectedItems.map((item) => [item.productId, Math.max(1, context.num(item.qty))]));
       const visibleItems = recommended.filter((item) => !(restrictActive && context.productCategory(item.product.category) === "비급여"));
@@ -621,6 +632,8 @@
       shouldHideUseProductForRestriction,
       syncRecommendProductToUseForm,
       syncRecommendQtyToUseForm,
+      searchProductQtyValue,
+      clearSearchProductFromUseForm,
       useRecommendationHtml,
       commonImplantPhotosHtml,
       emptyImplantDraft,
