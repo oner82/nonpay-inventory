@@ -2196,7 +2196,6 @@ const buildUseDraftSnapshot = (options) => getUsageEntryModule().buildUseDraftSn
 const pendingUsagePhotoCount = (implantDraftPayload) => getUsageEntryModule().pendingUsagePhotoCount(implantDraftPayload);
 const pendingUsagePhotoProgressMessage = (done, total, failed) => getUsageEntryModule().pendingUsagePhotoProgressMessage(done, total, failed);
 const pendingImplantDraftsFromRecord = (pending) => getUsageEntryModule().pendingImplantDraftsFromRecord(pending);
-const invalidImplantDraft = (payload) => getUsageEntryModule().invalidImplantDraft(payload);
 const implantDraftPhotoPair = (drafts, value) => getUsageEntryModule().implantDraftPhotoPair(drafts, value);
 const implantDraftsHtml = (drafts, commonPhotoCount) => getUsageEntryModule().implantDraftsHtml(drafts, commonPhotoCount);
 
@@ -4554,18 +4553,9 @@ const bindUse = () => {
         return;
       }
     }
-    if (!productIds.length && !implantDraftPayload.length) {
-      alert("제품을 선택하거나 임플란트 장부를 작성해 주세요.");
-      return;
-    }
-    const unavailable = useItems.find((item) => num(productById(item.productId)?.stock) < item.qty);
-    if (unavailable) {
-      alert("재고가 부족한 제품이 있습니다.");
-      return;
-    }
-    const invalidImplant = invalidImplantDraft(implantDraftPayload);
-    if (invalidImplant) {
-      alert("임플란트 장부가 작성되지 않았습니다. 업체명과 사용내용 또는 사진을 확인해 주세요.");
+    const validationMessage = useDraftValidationMessage(useItems, implantDraftPayload);
+    if (validationMessage) {
+      alert(validationMessage);
       return;
     }
     setButtonBusy(submitButton, true, "저장 중...");

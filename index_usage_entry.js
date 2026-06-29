@@ -722,7 +722,6 @@
       removeImplantDraftById,
       mergeDuplicateImplantDrafts,
       implantDraftPayloadFromList,
-      invalidImplantDraft,
       useDraftValidationMessage,
       buildUseDraftSnapshot,
       pendingUsagePhotoCount,
