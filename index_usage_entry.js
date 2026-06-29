@@ -308,6 +308,33 @@
       return { missingNames, changedNames };
     };
 
+    const sameDayPatientUsageWarning = ({ usageDate = "", patientName = "", patientId = "" } = {}) => {
+      const date = usageDate || context.today();
+      const patientIdKey = String(patientId || "").trim();
+      const patientNameKey = context.normalizedName(patientName || "");
+      if (!date || (!patientIdKey && !patientNameKey)) return "";
+      const matches = context.getState().usages.filter((usage) => {
+        if ((usage.date || "") !== date) return false;
+        if (patientIdKey) return String(usage.patientId || "").trim() === patientIdKey;
+        return context.normalizedName(usage.patientName || "") === patientNameKey;
+      });
+      if (!matches.length) return "";
+      const lines = matches.slice(0, 3).map((usage, index) => {
+        const doctor = context.departmentById(usage.doctorId)?.name || "-";
+        const surgery = context.surgeryById(usage.surgeryId)?.name || "-";
+        const productCount = (usage.productIds || []).length;
+        return `${index + 1}. ${doctor} · ${surgery} · 제품 ${productCount}개`;
+      });
+      const extra = matches.length > lines.length ? `\n외 ${matches.length - lines.length}건` : "";
+      return [
+        `${date}에 같은 환자${patientIdKey ? `ID(${patientIdKey})` : "명"} 사용기록이 이미 ${matches.length}건 있습니다.`,
+        ...lines,
+        extra,
+        "같은 환자의 추가 수술 또는 co-op 건이면 별도 기록으로 계속 저장하세요.",
+        "기존 기록을 수정해야 하는 경우 취소 후 수정 메뉴에서 고쳐 주세요."
+      ].filter(Boolean).join("\n");
+    };
+
     const buildFinalUsageRecord = ({
       patientName = "",
       patientId = "",
@@ -707,6 +734,7 @@
       resetUseProductControls,
       applyPendingProductItemsToForm,
       finalSaveRecommendationCheck,
+      sameDayPatientUsageWarning,
       buildFinalUsageRecord,
       useRecommendationHtml,
       commonImplantPhotosHtml,

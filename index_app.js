@@ -2178,6 +2178,7 @@ const searchProductQtyValue = (container, productId) => getUsageEntryModule().se
 const clearSearchProductFromUseForm = (productId, form) => getUsageEntryModule().clearSearchProductFromUseForm(productId, form);
 const applyPendingProductItemsToForm = (form, productItems) => getUsageEntryModule().applyPendingProductItemsToForm(form, productItems);
 const finalSaveRecommendationCheck = (options) => getUsageEntryModule().finalSaveRecommendationCheck(options);
+const sameDayPatientUsageWarning = (options) => getUsageEntryModule().sameDayPatientUsageWarning(options);
 const buildFinalUsageRecord = (options) => getUsageEntryModule().buildFinalUsageRecord(options);
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
 const commonImplantPhotosHtml = (photos) => getUsageEntryModule().commonImplantPhotosHtml(photos);
@@ -4527,6 +4528,8 @@ const bindUse = () => {
     const useItems = selectedUseItems();
     const implantDraftPayload = currentImplantDraftPayload();
     const usageDate = useDraftSnapshot.date || selectedUseDate();
+    const patientName = document.getElementById("patientName").value.trim();
+    const patientId = document.getElementById("patientId").value.trim();
     if (usageDate !== today() && !confirm(`${usageDate} 사용분으로 저장합니다. 계속할까요?`)) {
       return;
     }
@@ -4558,6 +4561,10 @@ const bindUse = () => {
       alert(validationMessage);
       return;
     }
+    const duplicatePatientWarning = sameDayPatientUsageWarning({ usageDate, patientName, patientId });
+    if (duplicatePatientWarning && !confirm(duplicatePatientWarning)) {
+      return;
+    }
     setButtonBusy(submitButton, true, "저장 중...");
     useItems.forEach((item) => {
       const product = productById(item.productId);
@@ -4565,8 +4572,8 @@ const bindUse = () => {
     });
     const finalSavedAt = new Date().toISOString();
     const usageRecord = buildFinalUsageRecord({
-      patientName: document.getElementById("patientName").value.trim(),
-      patientId: document.getElementById("patientId").value.trim(),
+      patientName,
+      patientId,
       doctorId: document.getElementById("useDoctor").value,
       surgeryId: document.getElementById("useSurgery").value,
       productIds,
