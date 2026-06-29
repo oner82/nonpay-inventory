@@ -279,6 +279,10 @@ let implantVendors = [];
 let pendingUsages = [];
 let suppressPendingUsagesRender = false;
 let productCategoryToKeepOpen = "";
+let useEntryDirty = false;
+let deferredUseEntryRender = false;
+const useEntryAutosaveKey = "orInventoryUseEntryPatientDraft";
+const useEntryAutosaveMaxAgeMs = 12 * 60 * 60 * 1000;
 
 if (!window.ORInventoryUtils) throw new Error("공통 유틸 모듈을 불러오지 못했습니다.");
 const {
@@ -345,6 +349,18 @@ const setStatus = (message, type = "ok") => {
   status.className = type;
 };
 
+const isUseEntryProtected = () => currentView === "use" && useEntryDirty;
+
+const renderOrDeferForUseEntry = (message = "새 데이터가 들어왔습니다. 입력 중인 사용입력을 보호하고 있습니다.") => {
+  if (isUseEntryProtected()) {
+    deferredUseEntryRender = true;
+    setStatus(message, "ok");
+    return false;
+  }
+  render();
+  return true;
+};
+
 const userStorageKey = "orInventoryUser";
 
 const readStoredUser = () => {
@@ -379,6 +395,48 @@ const clearStoredUser = () => {
       console.info(`${storageName} user clear failed`, error);
     }
   }
+};
+
+const readUseEntryAutosave = () => {
+  try {
+    const raw = localStorage.getItem(useEntryAutosaveKey);
+    if (!raw) return null;
+    const payload = JSON.parse(raw);
+    if (!payload?.savedAt) return null;
+    if (Date.now() - new Date(payload.savedAt).getTime() > useEntryAutosaveMaxAgeMs) {
+      localStorage.removeItem(useEntryAutosaveKey);
+      return null;
+    }
+    return payload;
+  } catch (error) {
+    console.info("use entry autosave read failed", error);
+    return null;
+  }
+};
+
+const writeUseEntryAutosave = (payload) => {
+  try {
+    localStorage.setItem(useEntryAutosaveKey, JSON.stringify({
+      ...payload,
+      savedAt: new Date().toISOString()
+    }));
+  } catch (error) {
+    console.info("use entry autosave write failed", error);
+  }
+};
+
+const clearUseEntryAutosave = () => {
+  try {
+    localStorage.removeItem(useEntryAutosaveKey);
+  } catch (error) {
+    console.info("use entry autosave clear failed", error);
+  }
+};
+
+const resetUseEntryProtection = ({ clearAutosave = true } = {}) => {
+  useEntryDirty = false;
+  deferredUseEntryRender = false;
+  if (clearAutosave) clearUseEntryAutosave();
 };
 
 const currentAuditUser = () => {
@@ -3799,6 +3857,29 @@ const bindUse = () => {
   let loadedPendingUsageId = "";
   if (useDate && !useDate.value) useDate.value = today();
   const selectedUseDate = () => useDate?.value || today();
+  const useEntryPatientFields = () => ({
+    date: selectedUseDate(),
+    patientName: document.getElementById("patientName")?.value.trim() || "",
+    patientId: document.getElementById("patientId")?.value.trim() || "",
+    department: useDepartment?.value || "",
+    doctorId: departmentSelect?.value || "",
+    surgeryId: surgerySelect?.value || "",
+    restrictNonpay: isRestrictOn()
+  });
+  const saveUseEntryPatientAutosave = () => {
+    const payload = useEntryPatientFields();
+    const hasContent = payload.patientName || payload.patientId || payload.department || payload.doctorId || payload.surgeryId;
+    if (hasContent) {
+      writeUseEntryAutosave(payload);
+    } else {
+      clearUseEntryAutosave();
+    }
+  };
+  const markUseEntryDirty = () => {
+    if (currentView !== "use") return;
+    useEntryDirty = true;
+    saveUseEntryPatientAutosave();
+  };
   const setRestrictButton = (value) => {
     manualRestrictNonpay = Boolean(value);
     setRestrictButtonState(useRestrictNonpay, value);
@@ -3823,6 +3904,7 @@ const bindUse = () => {
         const checkbox = app.querySelector(`[data-use-product="${button.dataset.selectedRemove}"]`);
         if (checkbox) checkbox.checked = false;
         syncRecommendControl(button.dataset.selectedRemove, false);
+        markUseEntryDirty();
         renderSelectedUseList();
       });
     });
@@ -3834,6 +3916,7 @@ const bindUse = () => {
         if (linked) linked.value = value;
         if (checkbox) checkbox.checked = true;
         syncRecommendControl(input.dataset.selectedQty, true, value);
+        markUseEntryDirty();
       });
       input.addEventListener("change", renderSelectedUseList);
     });
@@ -3847,6 +3930,7 @@ const bindUse = () => {
         if (linked) linked.value = nextQty;
         if (checkbox) checkbox.checked = true;
         syncRecommendControl(productId, true, nextQty);
+        markUseEntryDirty();
         renderSelectedUseList();
       });
     });
@@ -3858,6 +3942,7 @@ const bindUse = () => {
     if (checkbox) checkbox.checked = true;
     if (qtyInput) qtyInput.value = Math.max(1, num(qty));
     syncRecommendControl(productId, true, qty);
+    markUseEntryDirty();
     renderSelectedUseList();
   };
   const addImplantDraft = () => {
@@ -4113,6 +4198,8 @@ const bindUse = () => {
       useDraftSnapshot.enteredAt = pending.updatedAt || pending.createdAt || useDraftSnapshot.enteredAt;
     }
     useDraftDirty = false;
+    useEntryDirty = true;
+    saveUseEntryPatientAutosave();
     renderUseDraftPanel();
     useDraftPanel?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
@@ -4151,6 +4238,7 @@ const bindUse = () => {
     activeImplantCropPhoto = photo;
     activeImplantCropApply = async (changedPhoto) => {
       await refreshEditedImplantPreview(changedPhoto);
+      markUseEntryDirty();
       renderImplantDrafts();
       refreshImplantPhotoEditor();
     };
@@ -4172,6 +4260,7 @@ const bindUse = () => {
           return;
         }
         clearSearchProductFromUseForm(input.value, form);
+        markUseEntryDirty();
         renderSelectedUseList();
       });
     });
@@ -4204,12 +4293,14 @@ const bindUse = () => {
     app.querySelectorAll("[data-recommend-product]").forEach((input) => {
       input.addEventListener("change", () => {
         syncRecommendProductToUseForm(input, form);
+        markUseEntryDirty();
         renderSelectedUseList();
       });
     });
     app.querySelectorAll("[data-recommend-qty]").forEach((input) => {
       input.addEventListener("input", () => {
         syncRecommendQtyToUseForm(input);
+        markUseEntryDirty();
         renderSelectedUseList();
       });
     });
@@ -4235,11 +4326,44 @@ const bindUse = () => {
     if (surgeries.some((item) => item.id === currentSurgery)) surgerySelect.value = currentSurgery;
     renderUseRecommendation();
   };
-  useDepartment.addEventListener("change", filterUseOptions);
-  departmentSelect.addEventListener("change", filterUseOptions);
-  surgerySelect.addEventListener("change", renderUseRecommendation);
+  const restoreUseEntryPatientAutosave = () => {
+    const draft = readUseEntryAutosave();
+    if (!draft) return;
+    const hasCurrentInput = document.getElementById("patientName")?.value.trim() ||
+      document.getElementById("patientId")?.value.trim() ||
+      useDepartment.value ||
+      departmentSelect.value ||
+      surgerySelect.value;
+    if (hasCurrentInput) return;
+    if (useDate) useDate.value = draft.date || today();
+    document.getElementById("patientName").value = draft.patientName || "";
+    document.getElementById("patientId").value = draft.patientId || "";
+    useDepartment.value = draft.department || "";
+    filterUseOptions();
+    departmentSelect.value = draft.doctorId || "";
+    filterUseOptions();
+    surgerySelect.value = draft.surgeryId || "";
+    setRestrictButton(Boolean(draft.restrictNonpay));
+    renderUseRecommendation();
+    useEntryDirty = true;
+    setStatus("작성 중이던 환자 기본정보를 복원했습니다.", "ok");
+  };
+  restoreUseEntryPatientAutosave();
+  useDepartment.addEventListener("change", () => {
+    filterUseOptions();
+    markUseEntryDirty();
+  });
+  departmentSelect.addEventListener("change", () => {
+    filterUseOptions();
+    markUseEntryDirty();
+  });
+  surgerySelect.addEventListener("change", () => {
+    renderUseRecommendation();
+    markUseEntryDirty();
+  });
   useRestrictNonpay.addEventListener("click", () => {
     setRestrictButton(!isRestrictOn());
+    markUseEntryDirty();
     renderUseRecommendation();
   });
   form.querySelectorAll("[data-use-product], [data-use-qty]").forEach((input) => {
@@ -4252,6 +4376,7 @@ const bindUse = () => {
         const checkbox = form.querySelector(`[data-use-product="${input.dataset.useQty}"]`);
         syncRecommendControl(input.dataset.useQty, Boolean(checkbox?.checked), input.value);
       }
+      markUseEntryDirty();
       renderSelectedUseList();
     };
     input.addEventListener("change", syncAndRender);
@@ -4292,8 +4417,14 @@ const bindUse = () => {
       }
     });
   });
-  form.addEventListener("input", markUseDraftDirty, true);
-  form.addEventListener("change", markUseDraftDirty, true);
+  form.addEventListener("input", (event) => {
+    markUseEntryDirty();
+    markUseDraftDirty(event);
+  }, true);
+  form.addEventListener("change", (event) => {
+    markUseEntryDirty();
+    markUseDraftDirty(event);
+  }, true);
   saveUseDraftButton?.addEventListener("click", async () => {
     const snapshot = collectUseDraftSnapshot();
     if (!snapshot) return;
@@ -4309,6 +4440,8 @@ const bindUse = () => {
         implantDraftPayload: saved.implantDrafts || []
       };
       useDraftDirty = false;
+      useEntryDirty = true;
+      saveUseEntryPatientAutosave();
       renderUseDraftPanel();
       useDraftPanel?.scrollIntoView({ behavior: "smooth", block: "center" });
       saveDoneToast("임시저장 완료 · 스크럽 확인 대기");
@@ -4373,6 +4506,7 @@ const bindUse = () => {
       if (implantEnabled && !implantEnabled.checked) implantEnabled.checked = true;
       if (implantPanel) implantPanel.hidden = false;
       if (!implantDrafts.length) addImplantDraft();
+      markUseEntryDirty();
       renderImplantDrafts();
     });
   });
@@ -4392,6 +4526,7 @@ const bindUse = () => {
     const remove = event.target.closest("[data-remove-common-implant-photo]");
     if (remove) {
       if (removeCommonImplantPhotoById(commonImplantPhotos, remove.dataset.removeCommonImplantPhoto)) {
+        markUseEntryDirty();
         renderCommonImplantPhotos();
         renderImplantDrafts();
       }
@@ -4400,14 +4535,20 @@ const bindUse = () => {
   implantEnabled?.addEventListener("change", () => {
     implantPanel.hidden = !implantEnabled.checked;
     if (implantEnabled.checked && !implantDrafts.length) addImplantDraft();
+    markUseEntryDirty();
   });
-  addImplantVendorEntry?.addEventListener("click", addImplantDraft);
+  addImplantVendorEntry?.addEventListener("click", () => {
+    addImplantDraft();
+    markUseEntryDirty();
+  });
   implantEntriesWrap?.addEventListener("input", (event) => {
     updateImplantDraftFromInput(event.target);
+    markUseEntryDirty();
   });
   implantEntriesWrap?.addEventListener("change", async (event) => {
     const target = event.target;
     updateImplantDraftFromInput(target);
+    markUseEntryDirty();
     if (target.matches("[data-implant-photo-input], [data-implant-camera-input]")) {
       const draft = implantDraftById(target.dataset.implantPhotoInput || target.dataset.implantCameraInput);
       if (!draft) return;
@@ -4433,6 +4574,7 @@ const bindUse = () => {
       if (!draft || !commonImplantPhotos.length) return;
       const addedPhotos = commonImplantPhotos.map(cloneCommonImplantPhoto);
       draft.photos.push(...addedPhotos);
+      markUseEntryDirty();
       renderImplantDrafts();
       if (addedPhotos.length === 1) {
         openImplantPhotoEditor(`${draft.id}::${addedPhotos[0].id}`);
@@ -4442,6 +4584,7 @@ const bindUse = () => {
     const removeDraft = event.target.closest("[data-remove-implant-draft]");
     if (removeDraft) {
       if (removeImplantDraftById(implantDrafts, removeDraft.dataset.removeImplantDraft)) {
+        markUseEntryDirty();
         renderImplantDrafts();
       }
       return;
@@ -4470,6 +4613,7 @@ const bindUse = () => {
       if (photo) {
         photo.rotation = ((photo.rotation || 0) + 90) % 360;
         clearEditedImplantPreview(photo);
+        markUseEntryDirty();
         renderImplantDrafts();
       }
       return;
@@ -4480,6 +4624,7 @@ const bindUse = () => {
       if (draft && photo) {
         URL.revokeObjectURL(photo.preview);
         draft.photos = draft.photos.filter((item) => item.id !== photo.id);
+        markUseEntryDirty();
         renderImplantDrafts();
       }
       return;
@@ -4494,6 +4639,7 @@ const bindUse = () => {
       const nextIndex = moveUp ? index - 1 : index + 1;
       if (nextIndex < 0 || nextIndex >= draft.photos.length) return;
       [draft.photos[index], draft.photos[nextIndex]] = [draft.photos[nextIndex], draft.photos[index]];
+      markUseEntryDirty();
       renderImplantDrafts();
     }
   });
@@ -4506,6 +4652,7 @@ const bindUse = () => {
     if (!photo) return;
     photo.rotation = ((photo.rotation || 0) + 90) % 360;
     clearEditedImplantPreview(photo);
+    markUseEntryDirty();
     refreshImplantPhotoEditor();
     renderImplantDrafts();
     refreshImplantPhotoEditor();
@@ -4605,6 +4752,7 @@ const bindUse = () => {
       auditFields: auditCreateFields()
     });
     state.usages.push(usageRecord);
+    resetUseEntryProtection();
     currentView = "edit";
     pendingEditUsageId = state.usages[state.usages.length - 1]?.id || "";
     render();
@@ -4848,7 +4996,11 @@ const subscribeImplantCollections = () => {
   if (!implantVendorsUnsubscribe) {
     implantVendorsUnsubscribe = onSnapshot(collection(db, "implantVendors"), (snapshot) => {
       implantVendors = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
-      if (hydrated && (currentView === "use" || currentView === "edit" || (currentView === "settings" && currentSettingsView === "implantVendors"))) render();
+      if (hydrated && currentView === "use") {
+        renderOrDeferForUseEntry("임플란트 업체 정보가 갱신됐습니다. 입력 중인 사용입력을 보호하고 있습니다.");
+      } else if (hydrated && (currentView === "edit" || (currentView === "settings" && currentSettingsView === "implantVendors"))) {
+        render();
+      }
     }, (error) => {
       console.error(error);
       setStatus(`임플란트 업체 연결 오류: ${error.message}`, "error");
@@ -4861,7 +5013,7 @@ const subscribeImplantCollections = () => {
         if (suppressPendingUsagesRender) {
           suppressPendingUsagesRender = false;
         } else {
-          render();
+          renderOrDeferForUseEntry("임시저장 대기목록이 갱신됐습니다. 입력 중인 사용입력을 보호하고 있습니다.");
         }
       }
     }, (error) => {
@@ -4908,7 +5060,7 @@ const boot = async () => {
       if (!snapshot.exists() || saving) return;
       state = normalizeState(snapshot.data());
       reconcileProductStocks();
-      if (hydrated) render();
+      if (hydrated) renderOrDeferForUseEntry("Firebase 데이터가 갱신됐습니다. 입력 중인 사용입력을 보호하고 있습니다.");
     }, (error) => {
       console.error(error);
       setStatus(`Firebase 연결 오류: ${error.message}`, "error");
@@ -4959,7 +5111,7 @@ const loadFirebaseAndBoot = async () => {
 setInterval(() => {
   const nextDate = today();
   if (nextDate !== renderedDate) {
-    render();
+    renderOrDeferForUseEntry("날짜가 바뀌었지만 입력 중인 사용입력을 보호하고 있습니다.");
   } else {
     const pageDate = document.querySelector(".page-user span");
     if (pageDate) pageDate.textContent = nextDate;
