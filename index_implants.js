@@ -981,12 +981,13 @@ const implantSendStatementCardsHtml = (group) => `
         <section class="implant-send-statement">
           <div class="implant-statement-head">
             <div>
-              <div class="implant-statement-title">임플란트 사용 명세서</div>
+              <div class="implant-statement-title">임플란트 사용 내용</div>
               <div class="muted">환자명/환자ID 제외</div>
             </div>
           </div>
           <div class="implant-statement-meta">
-            <div><span>DATE / 환자번호</span><strong>${escapeHtml(implantRecordDate(record) || "-")} · 환자번호 #${escapeHtml(patientNo)}</strong></div>
+            <div><span>DATE</span><strong>${escapeHtml(implantRecordDate(record) || "-")}</strong></div>
+            <div><span>환자번호</span><strong>#${escapeHtml(patientNo)}</strong></div>
             <div><span>업체명</span><strong>${escapeHtml(group.vendor)}</strong></div>
             <div><span>원장코드</span><strong>${escapeHtml(doctorText)}</strong></div>
             <div><span>OP</span><strong>${escapeHtml(surgeryText)}</strong></div>
@@ -1017,7 +1018,7 @@ const implantSendStatementPrintHtml = (date, group) => `<!doctype html>
   <html lang="ko">
   <head>
     <meta charset="utf-8">
-    <title>${escapeHtml(date)} ${escapeHtml(group.vendor)} 임플란트 명세서</title>
+    <title>${escapeHtml(date)} ${escapeHtml(group.vendor)} 임플란트 사용 내용</title>
     <style>
       @page { size: A4 portrait; margin: 10mm; }
       * { box-sizing: border-box; }
@@ -1049,7 +1050,7 @@ const implantSendStatementPrintHtml = (date, group) => `<!doctype html>
         <section class="statement">
           <div class="head">
             <div>
-              <div class="title">임플란트 사용 명세서</div>
+              <div class="title">임플란트 사용 내용</div>
               <div class="note">${escapeHtml(date)} · ${escapeHtml(group.vendor)} · 환자명/환자ID 제외</div>
             </div>
             <div class="no">#${escapeHtml(patientNo)}</div>
@@ -1083,7 +1084,7 @@ const implantSendStatementPrintHtmlV2 = (date, group) => `<!doctype html>
   <html lang="ko">
   <head>
     <meta charset="utf-8">
-    <title>${escapeHtml(date)} ${escapeHtml(group.vendor)} 임플란트 사용 명세서</title>
+    <title>${escapeHtml(date)} ${escapeHtml(group.vendor)} 임플란트 사용 내용</title>
     <style>
       @page { size: A4 portrait; margin: 10mm; }
       * { box-sizing: border-box; }
@@ -1094,9 +1095,9 @@ const implantSendStatementPrintHtmlV2 = (date, group) => `<!doctype html>
       .title { font-size: 25px; font-weight: 900; letter-spacing: 0; }
       .note { margin-top: 2px; font-size: 12px; font-weight: 800; color: #374151; }
       .no { min-width: 112px; padding: 8px 12px; border: 3px solid #111827; border-radius: 6px; text-align: center; font-size: 36px; font-weight: 900; }
-      .meta { display: grid; grid-template-columns: 1.15fr .95fr .8fr 1.35fr; border: 2px solid #111827; border-bottom: 0; }
+      .meta { display: grid; grid-template-columns: .82fr .7fr .95fr .78fr 1.35fr; border: 2px solid #111827; border-bottom: 0; }
       .meta div { min-height: 48px; padding: 6px 7px; border-right: 2px solid #111827; border-bottom: 2px solid #111827; overflow: hidden; }
-      .meta div:nth-child(4n) { border-right: 0; }
+      .meta div:nth-child(5n) { border-right: 0; }
       .meta span { display: block; margin-bottom: 3px; color: #475569; font-size: 10px; font-weight: 900; }
       .meta strong { display: block; font-size: 15px; line-height: 1.16; font-weight: 900; word-break: keep-all; overflow-wrap: anywhere; }
       .section-title { margin: 2px 0 4px; font-size: 14px; font-weight: 900; }
@@ -1126,12 +1127,13 @@ const implantSendStatementPrintHtmlV2 = (date, group) => `<!doctype html>
           <section class="statement">
             <div class="head">
               <div>
-                <div class="title">임플란트 사용 명세서</div>
+                <div class="title">임플란트 사용 내용</div>
                 <div class="note">${escapeHtml(date)} · ${escapeHtml(group.vendor)} · 환자명/환자ID 제외</div>
               </div>
             </div>
             <div class="meta">
-              <div><span>DATE / 환자번호</span><strong>${escapeHtml(implantRecordDate(record) || "-")} · 환자번호 #${escapeHtml(patientNo)}${pageLabel ? ` · 사진 ${escapeHtml(pageLabel.trim())}` : ""}</strong></div>
+              <div><span>DATE</span><strong>${escapeHtml(implantRecordDate(record) || "-")}</strong></div>
+              <div><span>환자번호</span><strong>#${escapeHtml(patientNo)}${pageLabel ? ` · 사진 ${escapeHtml(pageLabel.trim())}` : ""}</strong></div>
               <div><span>업체명</span><strong>${escapeHtml(group.vendor)}</strong></div>
               <div><span>원장코드</span><strong>${escapeHtml(doctorText)}</strong></div>
               <div><span>OP</span><strong>${escapeHtml(surgeryText)}</strong></div>
@@ -1164,7 +1166,7 @@ const implantSendStatementPrintHtmlV2 = (date, group) => `<!doctype html>
   </html>`;
 
 const implantVendorStatementFileName = (date, vendor, extension = "html") =>
-  `임플란트명세서_${safeBackupFileName(date)}_${safeBackupFileName(vendor)}.${extension}`;
+  `임플란트사용내용_${safeBackupFileName(date)}_${safeBackupFileName(vendor)}.${extension}`;
 
 const implantPdfWrapText = (ctx, text, maxWidth, maxLines = 99) => {
   const output = [];
@@ -1258,7 +1260,7 @@ const implantStatementCanvasPage = async ({ date, group, record, photos, descrip
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = "#111827";
   ctx.font = '900 44px Arial, "Malgun Gothic", sans-serif';
-  ctx.fillText("임플란트 사용 명세서", margin, 82);
+  ctx.fillText("임플란트 사용 내용", margin, 82);
   ctx.fillStyle = "#475569";
   ctx.font = '800 20px Arial, "Malgun Gothic", sans-serif';
   ctx.fillText("환자명/환자ID 제외", margin, 116);
@@ -1271,15 +1273,16 @@ const implantStatementCanvasPage = async ({ date, group, record, photos, descrip
 
   const metaY = 160;
   const metaH = 118;
-  const widths = [300, 270, 220, contentWidth - 790];
+  const widths = [210, 200, 250, 190, contentWidth - 850];
   let metaX = margin;
   [
-    ["DATE / 환자번호", `${implantRecordDate(record) || date || "-"} · 환자번호 #${patientNo}${pageLabel}`],
+    ["DATE", implantRecordDate(record) || date || "-"],
+    ["환자번호", `#${patientNo}${pageLabel}`],
     ["업체명", group.vendor],
     ["원장코드", doctorText],
     ["OP", surgeryText]
   ].forEach(([label, value], index) => {
-    implantPdfDrawTextBox(ctx, label, value, metaX, metaY, widths[index], metaH, { valueSize: index === 0 ? 26 : 28 });
+    implantPdfDrawTextBox(ctx, label, value, metaX, metaY, widths[index], metaH, { valueSize: index <= 1 ? 26 : 28 });
     metaX += widths[index];
   });
 
@@ -1383,8 +1386,8 @@ const saveAndShareImplantVendorStatementPdf = async (date, group) => {
   downloadBlob(filename, blob);
   if (typeof File !== "function") return "saved-only";
   const file = new File([blob], filename, { type: "application/pdf" });
-  const title = `${date} ${group.vendor} 임플란트 명세서`;
-  const text = `${date} ${group.vendor} 임플란트 명세서 PDF`;
+  const title = `${date} ${group.vendor} 임플란트 사용 내용`;
+  const text = `${date} ${group.vendor} 임플란트 사용 내용 PDF`;
   if (navigator.share && navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ title, text, files: [file] });

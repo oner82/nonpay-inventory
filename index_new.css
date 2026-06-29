@@ -1947,7 +1947,7 @@
     }
     .implant-statement-meta {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: .8fr .7fr .95fr .8fr 1.25fr;
       border: 2px solid #111827;
       border-bottom: 0;
     }
@@ -1958,7 +1958,7 @@
       border-bottom: 2px solid #111827;
       background: #fff;
     }
-    .implant-statement-meta div:nth-child(4n) { border-right: 0; }
+    .implant-statement-meta div:nth-child(5n) { border-right: 0; }
     .implant-statement-meta span {
       display: block;
       margin-bottom: 4px;
@@ -1967,9 +1967,13 @@
       color: #475569;
     }
     .implant-statement-meta strong {
+      display: block;
       font-size: 18px;
+      line-height: 1.2;
       font-weight: 950;
       color: #111827;
+      word-break: keep-all;
+      overflow-wrap: anywhere;
     }
     .implant-statement-desc {
       min-height: 86px;
@@ -2027,6 +2031,7 @@
     @media (max-width: 720px) {
       .implant-statement-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .implant-statement-meta div:nth-child(2n) { border-right: 0; }
+      .implant-statement-meta div:nth-child(5n) { border-right: 2px solid #111827; }
       .implant-statement-photos { grid-template-columns: 1fr; }
       .implant-statement-photos img { max-height: 220px; height: auto; }
       .implant-statement-footer { grid-template-columns: 1fr; }
