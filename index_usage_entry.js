@@ -533,6 +533,12 @@
       return "";
     };
 
+    const patientIdValidationMessage = (patientId = "") => {
+      const value = String(patientId || "").trim();
+      if (/^\d{8}$/.test(value)) return "";
+      return "환자 등록번호는 숫자 8자리로 입력해 주세요.";
+    };
+
     const buildUseDraftSnapshot = ({
       date = context.today(),
       patientName = "",
@@ -751,6 +757,7 @@
       mergeDuplicateImplantDrafts,
       implantDraftPayloadFromList,
       useDraftValidationMessage,
+      patientIdValidationMessage,
       buildUseDraftSnapshot,
       pendingUsagePhotoCount,
       pendingUsagePhotoProgressMessage,

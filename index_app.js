@@ -2060,8 +2060,8 @@ const renderUse = () => `
           <input id="patientName" required autocomplete="off">
         </div>
         <div>
-          <label for="patientId">환자ID</label>
-          <input id="patientId" autocomplete="off">
+          <label for="patientId">환자 등록번호</label>
+          <input id="patientId" required inputmode="numeric" pattern="[0-9]{8}" autocomplete="off" placeholder="숫자 8자리">
         </div>
         <div>
           <label>비급여 제한</label>
@@ -2193,6 +2193,7 @@ const removeImplantDraftById = (drafts, id) => getUsageEntryModule().removeImpla
 const mergeDuplicateImplantDraftsInList = (drafts) => getUsageEntryModule().mergeDuplicateImplantDrafts(drafts);
 const implantDraftPayloadFromList = (drafts, enabled) => getUsageEntryModule().implantDraftPayloadFromList(drafts, enabled);
 const useDraftValidationMessage = (useItems, implantDraftPayload) => getUsageEntryModule().useDraftValidationMessage(useItems, implantDraftPayload);
+const patientIdValidationMessage = (patientId) => getUsageEntryModule().patientIdValidationMessage(patientId);
 const buildUseDraftSnapshot = (options) => getUsageEntryModule().buildUseDraftSnapshot(options);
 const pendingUsagePhotoCount = (implantDraftPayload) => getUsageEntryModule().pendingUsagePhotoCount(implantDraftPayload);
 const pendingUsagePhotoProgressMessage = (done, total, failed) => getUsageEntryModule().pendingUsagePhotoProgressMessage(done, total, failed);
@@ -2234,8 +2235,8 @@ const renderEditUsage = () => {
           <input id="editPatientName" required autocomplete="off">
         </div>
         <div>
-          <label for="editPatientId">환자ID</label>
-          <input id="editPatientId" autocomplete="off">
+          <label for="editPatientId">환자 등록번호</label>
+          <input id="editPatientId" required inputmode="numeric" pattern="[0-9]{8}" autocomplete="off" placeholder="숫자 8자리">
         </div>
         <div>
           <label for="editUsageDate">사용일</label>
@@ -3084,6 +3085,13 @@ const bindEditUsage = () => {
     }
     const newItems = selectedItems();
     const newProductIds = newItems.flatMap((item) => Array.from({ length: item.qty }, () => item.productId));
+    const editPatientId = document.getElementById("editPatientId").value.trim();
+    const editPatientIdMessage = patientIdValidationMessage(editPatientId);
+    if (editPatientIdMessage) {
+      alert(editPatientIdMessage);
+      document.getElementById("editPatientId").focus();
+      return;
+    }
     if (!document.getElementById("editPatientName").value.trim() || !doctorSelect.value || !surgerySelect.value) {
       alert("환자명, 원장 코드, 수술을 모두 입력해 주세요.");
       return;
@@ -3133,7 +3141,7 @@ const bindEditUsage = () => {
     const next = {
       ...usage,
       patientName: document.getElementById("editPatientName").value.trim(),
-      patientId: document.getElementById("editPatientId").value.trim(),
+      patientId: editPatientId,
       doctorId: doctorSelect.value,
       surgeryId: surgerySelect.value,
       productIds: newProductIds,
@@ -3951,6 +3959,13 @@ const bindUse = () => {
   };
   const collectUseDraftSnapshot = () => {
     if (!form.reportValidity()) return null;
+    const patientId = document.getElementById("patientId").value.trim();
+    const patientIdMessage = patientIdValidationMessage(patientId);
+    if (patientIdMessage) {
+      alert(patientIdMessage);
+      document.getElementById("patientId").focus();
+      return null;
+    }
     const useItems = selectedUseItems();
     const implantDraftPayload = currentImplantDraftPayload();
     const validationMessage = useDraftValidationMessage(useItems, implantDraftPayload);
@@ -3961,7 +3976,7 @@ const bindUse = () => {
     return buildUseDraftSnapshot({
       date: selectedUseDate(),
       patientName: document.getElementById("patientName").value.trim(),
-      patientId: document.getElementById("patientId").value.trim(),
+      patientId,
       doctorText: departmentSelect.selectedOptions[0]?.textContent || "-",
       surgeryText: surgerySelect.selectedOptions[0]?.textContent || "-",
       enteredBy: draftUserText(),
@@ -4530,6 +4545,12 @@ const bindUse = () => {
     const usageDate = useDraftSnapshot.date || selectedUseDate();
     const patientName = document.getElementById("patientName").value.trim();
     const patientId = document.getElementById("patientId").value.trim();
+    const patientIdMessage = patientIdValidationMessage(patientId);
+    if (patientIdMessage) {
+      alert(patientIdMessage);
+      document.getElementById("patientId").focus();
+      return;
+    }
     if (usageDate !== today() && !confirm(`${usageDate} 사용분으로 저장합니다. 계속할까요?`)) {
       return;
     }
