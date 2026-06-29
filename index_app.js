@@ -2178,6 +2178,7 @@ const searchProductQtyValue = (container, productId) => getUsageEntryModule().se
 const clearSearchProductFromUseForm = (productId, form) => getUsageEntryModule().clearSearchProductFromUseForm(productId, form);
 const applyPendingProductItemsToForm = (form, productItems) => getUsageEntryModule().applyPendingProductItemsToForm(form, productItems);
 const finalSaveRecommendationCheck = (options) => getUsageEntryModule().finalSaveRecommendationCheck(options);
+const buildFinalUsageRecord = (options) => getUsageEntryModule().buildFinalUsageRecord(options);
 const useRecommendationHtml = (recommended, restrictActive, selectedItems) => getUsageEntryModule().useRecommendationHtml(recommended, restrictActive, selectedItems);
 const commonImplantPhotosHtml = (photos) => getUsageEntryModule().commonImplantPhotosHtml(photos);
 const emptyImplantDraft = () => getUsageEntryModule().emptyImplantDraft();
@@ -4573,25 +4574,18 @@ const bindUse = () => {
       product.stock = num(product.stock) - item.qty;
     });
     const finalSavedAt = new Date().toISOString();
-    const usageRecord = {
-      id: uid(),
+    const usageRecord = buildFinalUsageRecord({
       patientName: document.getElementById("patientName").value.trim(),
       patientId: document.getElementById("patientId").value.trim(),
       doctorId: document.getElementById("useDoctor").value,
       surgeryId: document.getElementById("useSurgery").value,
       productIds,
-      date: usageDate,
-      createdAt: finalSavedAt,
-      doubleCheck: {
-        mode: "circulatorDraftScrubFinal",
-        status: "finalSaved",
-        draftSavedBy: useDraftSnapshot.enteredBy,
-        draftSavedAt: useDraftSnapshot.enteredAt,
-        finalSavedBy: draftUserText(),
-        finalSavedAt
-      },
-      ...auditCreateFields()
-    };
+      usageDate,
+      finalSavedAt,
+      draftSnapshot: useDraftSnapshot,
+      finalSavedBy: draftUserText(),
+      auditFields: auditCreateFields()
+    });
     state.usages.push(usageRecord);
     currentView = "edit";
     pendingEditUsageId = state.usages[state.usages.length - 1]?.id || "";

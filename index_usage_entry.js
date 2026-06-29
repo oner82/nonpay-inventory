@@ -308,6 +308,37 @@
       return { missingNames, changedNames };
     };
 
+    const buildFinalUsageRecord = ({
+      patientName = "",
+      patientId = "",
+      doctorId = "",
+      surgeryId = "",
+      productIds = [],
+      usageDate = "",
+      finalSavedAt = "",
+      draftSnapshot = {},
+      finalSavedBy = "",
+      auditFields = {}
+    } = {}) => ({
+      id: context.uid(),
+      patientName,
+      patientId,
+      doctorId,
+      surgeryId,
+      productIds,
+      date: usageDate || context.today(),
+      createdAt: finalSavedAt,
+      doubleCheck: {
+        mode: "circulatorDraftScrubFinal",
+        status: "finalSaved",
+        draftSavedBy: draftSnapshot.enteredBy,
+        draftSavedAt: draftSnapshot.enteredAt,
+        finalSavedBy,
+        finalSavedAt
+      },
+      ...auditFields
+    });
+
     const useRecommendationHtml = (recommended, restrictActive, selectedItems = []) => {
       const selectedQtyById = new Map(selectedItems.map((item) => [item.productId, Math.max(1, context.num(item.qty))]));
       const visibleItems = recommended.filter((item) => !(restrictActive && context.productCategory(item.product.category) === "비급여"));
@@ -676,6 +707,7 @@
       resetUseProductControls,
       applyPendingProductItemsToForm,
       finalSaveRecommendationCheck,
+      buildFinalUsageRecord,
       useRecommendationHtml,
       commonImplantPhotosHtml,
       emptyImplantDraft,
