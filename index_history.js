@@ -1,7 +1,11 @@
 (() => {
   window.createHistoryModule = (context) => {
+    const defaultHistoryDate = () => context.today();
+
     const renderHistory = () => {
       const state = context.getState();
+      const defaultDate = defaultHistoryDate();
+      const defaultPatientCount = filteredHistoryUsages(defaultDate, defaultDate, "").length;
       return `
         <section class="grid">
           <div class="card">
@@ -9,11 +13,11 @@
             <div class="row three history-filter-grid">
               <div>
                 <label for="historyStart">시작일</label>
-                <input id="historyStart" type="date">
+                <input id="historyStart" type="date" value="${context.escapeHtml(defaultDate)}">
               </div>
               <div>
                 <label for="historyEnd">종료일</label>
-                <input id="historyEnd" type="date">
+                <input id="historyEnd" type="date" value="${context.escapeHtml(defaultDate)}">
               </div>
               <div>
                 <label for="historySearch">제품 검색</label>
@@ -25,7 +29,7 @@
             </div>
             <div class="actions">
               <button type="button" id="historyApply">기간 적용</button>
-              <button class="secondary" type="button" id="historyReset">초기화</button>
+              <button class="secondary" type="button" id="historyReset">오늘로 초기화</button>
             </div>
           </div>
           <div class="card">
@@ -36,10 +40,10 @@
           </div>
           <div class="card">
             <details class="item">
-              <summary><span>환자별 사용내역</span><span class="pill">${state.usages.length}</span></summary>
+              <summary><span>환자별 사용내역</span><span class="pill">${defaultPatientCount}</span></summary>
               <div class="details-body">
                 <div class="actions"><button class="secondary" type="button" id="exportHistoryPatients">엑셀 저장</button></div>
-                <div id="historyPatientList">${patientHistoryListHtml()}</div>
+                <div id="historyPatientList">${patientHistoryListHtml(defaultDate, defaultDate)}</div>
               </div>
             </details>
           </div>
@@ -498,8 +502,9 @@
       });
       document.getElementById("historyApply").addEventListener("click", updateHistory);
       document.getElementById("historyReset").addEventListener("click", () => {
-        startInput.value = "";
-        endInput.value = "";
+        const defaultDate = defaultHistoryDate();
+        startInput.value = defaultDate;
+        endInput.value = defaultDate;
         searchInput.value = "";
         updateHistory();
       });
