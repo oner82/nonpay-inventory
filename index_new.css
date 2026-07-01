@@ -1405,6 +1405,33 @@
       background: #eff6ff;
     }
     .use-draft-panel[hidden] { display: none !important; }
+    .pending-usage-details {
+      padding: 0;
+      overflow: hidden;
+    }
+    .pending-usage-details > summary {
+      min-height: 58px;
+      padding: 13px;
+      cursor: pointer;
+      list-style: none;
+    }
+    .pending-usage-details > summary::-webkit-details-marker {
+      display: none;
+    }
+    .pending-usage-details > summary::after {
+      content: "펼치기";
+      align-self: center;
+      color: var(--brand-dark);
+      font-size: 12px;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+    .pending-usage-details[open] > summary {
+      border-bottom: 1px solid var(--line);
+    }
+    .pending-usage-details[open] > summary::after {
+      content: "접기";
+    }
     .use-draft-head {
       display: flex;
       justify-content: space-between;

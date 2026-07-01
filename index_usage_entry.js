@@ -29,14 +29,14 @@
       const items = context.pendingUsagesOpen();
       if (!items.length) return "";
       return `
-        <div class="card">
-          <div class="use-draft-head">
+        <details class="card pending-usage-details">
+          <summary class="use-draft-head">
             <div>
               <h3 style="margin:0;">스크럽 확인 대기</h3>
               <div class="muted">임시저장된 기록은 새로고침 후에도 남아 있습니다. 확인할 환자를 불러와 최종저장하세요.</div>
             </div>
             <span class="use-draft-status">${items.length}건</span>
-          </div>
+          </summary>
           <div class="pending-usage-list">
             ${items.map((item) => {
               const summary = pendingUsageSummary(item);
@@ -64,7 +64,7 @@
               `;
             }).join("")}
           </div>
-        </div>
+        </details>
       `;
     };
 
