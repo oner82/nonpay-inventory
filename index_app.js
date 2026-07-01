@@ -2282,9 +2282,9 @@ const pendingImplantDraftsFromRecord = (pending) => getUsageEntryModule().pendin
 const implantDraftPhotoPair = (drafts, value) => getUsageEntryModule().implantDraftPhotoPair(drafts, value);
 const implantDraftsHtml = (drafts, commonPhotoCount) => getUsageEntryModule().implantDraftsHtml(drafts, commonPhotoCount);
 
-const editUsagePatientsForDate = (date) => getUsageEntryModule().editUsagePatientsForDate(date);
+const editUsagePatientsForDate = (date, filters = {}) => getUsageEntryModule().editUsagePatientsForDate(date, filters);
 const editUsagePatientCardHtml = (usage, selectedId = "") => getUsageEntryModule().editUsagePatientCardHtml(usage, selectedId);
-const editUsagePatientListHtml = (date, selectedId = "") => getUsageEntryModule().editUsagePatientListHtml(date, selectedId);
+const editUsagePatientListHtml = (date, selectedId = "", filters = {}) => getUsageEntryModule().editUsagePatientListHtml(date, selectedId, filters);
 const renderUseProductSearchModal = () => getUsageEntryModule().renderUseProductSearchModal();
 const renderImplantPhotoModal = () => getUsageEntryModule().renderImplantPhotoModal();
 
