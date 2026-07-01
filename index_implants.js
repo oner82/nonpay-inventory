@@ -144,8 +144,8 @@
           <button class="secondary" type="button" id="implantFilterReset">초기화</button>
         </div>
         <div class="actions" data-implant-panel="today" ${implantPanelVisible("today") ? "" : "hidden"}>
-          ${canAssignImplantPatientNo() ? `<button type="button" id="closeTodayImplants">오늘 사용분 마감하기</button>` : ""}
-          ${canAssignImplantPatientNo() ? `<button class="secondary" type="button" id="assignImplantPatientNos">선택 날짜 번호 부여</button>` : ""}
+          ${canAssignImplantPatientNo() ? `<button type="button" id="closeTodayImplants">오늘 사용분 마감/번호 재부여</button>` : ""}
+          ${canAssignImplantPatientNo() ? `<button class="secondary" type="button" id="assignImplantPatientNos">선택 날짜 번호 재부여</button>` : ""}
         </div>
         <div class="actions" data-implant-panel="hospital" ${implantPanelVisible("hospital") ? "" : "hidden"}>
           <button class="secondary" type="button" id="exportImplantLedger">엑셀 다운로드</button>
@@ -1574,7 +1574,7 @@ const bindImplants = () => {
     try {
       const count = await assignImplantPatientNosForDate(date);
       const total = implantRecordsForDate(date).length;
-      alert(count ? `${count}건의 환자번호를 부여했습니다.` : (total ? "선택 날짜의 임플란트 기록은 이미 번호가 부여되어 있습니다." : "선택 날짜의 임플란트 기록이 없습니다."));
+      alert(count ? `${count}건의 환자번호를 1번부터 다시 부여했습니다.` : (total ? "선택 날짜의 임플란트 기록은 이미 번호가 부여되어 있습니다." : "선택 날짜의 임플란트 기록이 없습니다."));
       renderList();
     } catch (error) {
       alert(error.message);
@@ -1586,7 +1586,7 @@ const bindImplants = () => {
     try {
       const count = await assignImplantPatientNosForDate(today());
       const total = implantRecordsForDate(today()).length;
-      alert(count ? `오늘 사용분 마감 완료: ${count}건 번호를 부여했습니다.` : (total ? "오늘 사용분은 이미 마감되어 있습니다." : "오늘 저장된 임플란트 기록이 없습니다."));
+      alert(count ? `오늘 사용분 마감 완료: ${count}건 번호를 1번부터 다시 부여했습니다.` : (total ? "오늘 사용분은 이미 마감되어 있습니다." : "오늘 저장된 임플란트 기록이 없습니다."));
       renderList();
     } catch (error) {
       alert(error.message);

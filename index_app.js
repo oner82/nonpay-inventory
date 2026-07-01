@@ -1793,32 +1793,26 @@ const implantSendStatusClass = (status = "pending") => getImplantsModule().impla
 const assignImplantPatientNosForDate = async (date) => {
   if (!canAssignImplantPatientNo()) return 0;
   if (!date) throw new Error("날짜를 선택해 주세요.");
-  const recordsForDate = implantRecordsForDate(date);
-  const used = new Set(recordsForDate.map(implantPatientNoText).filter(Boolean));
-  const duplicate = Array.from(used).find((value) => recordsForDate.filter((record) => implantPatientNoText(record) === value).length > 1);
-  if (duplicate) throw new Error(`같은 날짜에 ${duplicate}번 환자번호가 중복되어 있습니다. 관리자 수동 수정이 필요합니다.`);
-  const targets = sortImplantRecords(recordsForDate.filter((record) => !implantPatientNoText(record)));
-  let nextNo = 1;
+  const targets = sortImplantRecords(implantRecordsForDate(date));
   const updates = [];
-  targets.forEach((record) => {
-    while (used.has(String(nextNo))) nextNo += 1;
-    const patientNo = String(nextNo);
-    used.add(patientNo);
+  const assignedAt = new Date().toISOString();
+  targets.forEach((record, index) => {
+    const patientNo = String(index + 1);
     record.patientNo = patientNo;
-    record.patientNoAssignedAt = new Date().toISOString();
-    record.closedAt = record.patientNoAssignedAt;
+    record.patientNoAssignedAt = assignedAt;
+    record.closedAt = assignedAt;
     record.editUnlocked = false;
     updates.push(setDoc(doc(db, "implantRecords", record.id), {
       patientNo,
-      patientNoAssignedAt: record.patientNoAssignedAt,
-      closedAt: record.closedAt,
+      patientNoAssignedAt: assignedAt,
+      closedAt: assignedAt,
       editUnlocked: false,
       updatedAt: new Date().toISOString(),
       ...auditUpdateFields()
     }, { merge: true }));
   });
   await Promise.all(updates);
-  return updates.length;
+  return targets.length;
 };
 
 const implantDescriptionText = (record) => getImplantsModule().implantDescriptionText(record);
@@ -3645,6 +3639,18 @@ const saveImplantRecordFromEdit = async (usage, recordId, implants, options = {}
     throw new Error("임플란트 기록 수정 권한이 없습니다.");
   }
   const surgeryDate = usage.date || today();
+  const dateChanged = Boolean(existing && implantRecordDate(existing) && implantRecordDate(existing) !== surgeryDate);
+  const patientNoState = dateChanged
+    ? {
+      patientNo: "",
+      patientNoAssignedAt: null,
+      patientNoManuallyEditedAt: null,
+      closedAt: null,
+      editUnlocked: false,
+      patientNoClearedAt: new Date().toISOString(),
+      patientNoClearReason: "usageDateChanged"
+    }
+    : (existing?.patientNo ? { patientNo: existing.patientNo } : { patientNo: "" });
   const cleanImplants = [];
   const initialPhotoCache = new Map();
   for (const implant of implants) {
@@ -3663,7 +3669,7 @@ const saveImplantRecordFromEdit = async (usage, recordId, implants, options = {}
   }
   await setDoc(doc(db, "implantRecords", nextRecordId), {
     id: nextRecordId,
-    ...(existing?.patientNo ? { patientNo: existing.patientNo } : { patientNo: "" }),
+    ...patientNoState,
     ...implantRecordBasePayload(usage),
     implants: cleanImplants,
     sendReady: cleanImplants.length > 0,
