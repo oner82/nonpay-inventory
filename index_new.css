@@ -1534,6 +1534,50 @@
       border: 0;
     }
     .implant-ledger-list { display: grid; gap: 12px; }
+    .implant-ledger-count {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+      padding: 12px;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      background: #f8fbff;
+    }
+    .implant-ledger-count-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 850;
+    }
+    .implant-ledger-count-head strong {
+      color: var(--ink);
+      font-size: 15px;
+    }
+    .implant-ledger-count-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .implant-ledger-count-grid span {
+      display: grid;
+      gap: 2px;
+      min-height: 58px;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+    .implant-ledger-count-grid strong {
+      color: var(--brand-dark);
+      font-size: 24px;
+      line-height: 1;
+    }
     .implant-record-card {
       display: grid;
       gap: 12px;

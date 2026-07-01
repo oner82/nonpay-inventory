@@ -153,6 +153,7 @@
         <div class="actions" data-implant-panel="send" ${implantPanelVisible("send") ? "" : "hidden"}>
           <button type="button" id="prepareImplantVendorSend">마감 확인 후 발송자료 갱신</button>
         </div>
+        <div id="implantLedgerCount" class="implant-ledger-count" data-implant-panel="today admin" ${implantPanelVisible("today admin") ? "" : "hidden"}></div>
       </div>
       <div class="card" data-implant-panel="photos" ${implantPanelVisible("photos") ? "" : "hidden"}>
         <h2>사진 업로드 상태</h2>
@@ -252,6 +253,23 @@ const implantLedgerTableHtml = (records) => {
           `).join("") : `<div class="empty">업체별 기록이 없습니다.</div>`}
         </div>
       `).join("")}
+    </div>
+  `;
+};
+
+const implantLedgerCountHtml = (date) => {
+  const records = implantRecordsForDate(date);
+  const closed = records.filter((record) => implantPatientNoText(record)).length;
+  const pending = records.length - closed;
+  return `
+    <div class="implant-ledger-count-head">
+      <strong>${escapeHtml(date || "-")} 장부 확인</strong>
+      <span>처방전 개수 대조용</span>
+    </div>
+    <div class="implant-ledger-count-grid">
+      <span><strong>${records.length}</strong>전체</span>
+      <span><strong>${pending}</strong>미마감</span>
+      <span><strong>${closed}</strong>마감</span>
     </div>
   `;
 };
@@ -1526,6 +1544,7 @@ const bindImplants = () => {
   const photoStatusPanel = document.getElementById("implantPhotoStatusPanel");
   const backupMonthInput = document.getElementById("implantBackupMonth");
   const ledgerTitle = document.getElementById("implantLedgerTitle");
+  const ledgerCount = document.getElementById("implantLedgerCount");
   const applyImplantPanels = () => {
     app.querySelectorAll("[data-implant-panel]").forEach((panel) => {
       panel.hidden = !panel.dataset.implantPanel.split(/\s+/).filter(Boolean).includes(getCurrentImplantSubView());
@@ -1544,6 +1563,7 @@ const bindImplants = () => {
       ? records.map((record) => implantRecordCardHtml(record, { showAdminTools: getCurrentImplantSubView() === "admin" })).join("")
       : `<div class="empty">조회 조건에 맞는 임플란트 기록이 없습니다.</div>`;
     if (summary) summary.innerHTML = implantLedgerTableHtml(implantRecordsForDate(dateInput.value));
+    if (ledgerCount) ledgerCount.innerHTML = implantLedgerCountHtml(dateInput.value);
     if (photoStatusPanel) photoStatusPanel.innerHTML = implantPhotoStatusPanelHtml(dateInput.value);
     if (sendList && getCurrentImplantSubView() === "send") sendList.innerHTML = implantSendPanelOrganizedHtml(dateInput.value || today());
     applyImplantPanels();
