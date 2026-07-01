@@ -261,6 +261,55 @@
       return usages.map(usageItem).join("") || `<div class="empty">사용내역이 없습니다.</div>`;
     };
 
+    const productGroupTotal = (groupedProducts, category) => {
+      const group = groupedProducts.find((item) => context.productCategory(item.category) === category);
+      return group ? group.items.reduce((sum, item) => sum + item.qty, 0) : 0;
+    };
+
+    const implantLikeProductTotal = (groupedProducts) => groupedProducts
+      .filter((group) => ["ANCHOR", "URO_LANDING", "GS_LANDING", "IMPLANT"].includes(context.productCategory(group.category)))
+      .reduce((sum, group) => sum + group.items.reduce((groupSum, item) => groupSum + item.qty, 0), 0);
+
+    const implantPhotoCount = (records) => records.reduce((sum, record) => {
+      const implants = Array.isArray(record.implants) ? record.implants : [];
+      return sum + implants.reduce((photoSum, implant) => {
+        const photos = Array.isArray(implant.photos) ? implant.photos : [];
+        return photoSum + photos.filter((photo) => photo && (photo.url || photo.dataUrl || photo.preview || photo.src)).length;
+      }, 0);
+    }, 0);
+
+    const implantStatusForUsage = (usage, groupedProducts) => {
+      const records = (typeof context.getImplantRecords === "function" ? context.getImplantRecords() : [])
+        .filter((record) => context.sameId(record.usageId, usage.id));
+      const patientNos = Array.from(new Set(records.map((record) => context.implantPatientNoText?.(record) || "").filter(Boolean)));
+      const hasDateMismatch = records.some((record) => {
+        const recordDate = context.implantRecordDate?.(record) || "";
+        return recordDate && usage.date && recordDate !== usage.date;
+      });
+      return {
+        records,
+        expectedCount: implantLikeProductTotal(groupedProducts),
+        photoCount: implantPhotoCount(records),
+        patientNos,
+        hasDateMismatch
+      };
+    };
+
+    const implantStatusBadgesHtml = (status) => {
+      if (status.records.length) {
+        return `
+          <span class="usage-check-badge good">임플란트 장부 ${status.records.length}건</span>
+          <span class="usage-check-badge ${status.photoCount ? "good" : "warn"}">사진 ${status.photoCount}장</span>
+          <span class="usage-check-badge ${status.patientNos.length ? "good" : "warn"}">${status.patientNos.length ? `마감번호 #${context.escapeHtml(status.patientNos.join(", #"))}` : "미마감"}</span>
+          ${status.hasDateMismatch ? `<span class="usage-check-badge danger">장부 날짜 확인</span>` : ""}
+        `;
+      }
+      if (status.expectedCount) {
+        return `<span class="usage-check-badge danger">임플란트 장부 없음</span>`;
+      }
+      return `<span class="usage-check-badge muted">임플란트 없음</span>`;
+    };
+
     const usageItem = (usage, options = {}) => {
       const showDelete = options.showDelete !== false && context.canDeleteUsageRecord(usage);
       const showEdit = options.showEdit !== false && context.canEditUsage();
@@ -282,6 +331,10 @@
       const missingProducts = Array.from(productCounts.entries())
         .map(([id, qty]) => ({ id, qty, product: context.productById(id) }))
         .filter((item) => !item.product);
+      const totalProductQty = Array.from(productCounts.values()).reduce((sum, qty) => sum + qty, 0);
+      const nonpayTotal = productGroupTotal(groupedProducts, "비급여");
+      const tissueTotal = productGroupTotal(groupedProducts, "인체조직");
+      const implantStatus = implantStatusForUsage(usage, groupedProducts);
       const groupClass = (category) => {
         const key = context.productCategory(category);
         if (key === "비급여") return "nonpay";
@@ -303,25 +356,36 @@
             ${context.auditMetaHtml(usage, "입력")}
             ${doubleCheckText ? `<span>${context.escapeHtml(doubleCheckText)}</span>` : ""}
             <span>과/원장 코드: ${context.escapeHtml(doctor?.name || "-")} · 수술: ${context.escapeHtml(surgeryDepartment)} - ${context.escapeHtml(surgery?.name || "-")}</span>
-            <div class="usage-products">
-              ${groupedProducts.map((group) => `
-                <div class="usage-product-group ${groupClass(group.category)}">
-                  <div class="usage-product-heading">
-                    <span>${context.escapeHtml(context.productCategoryLabel(group.category))}</span>
-                    <span class="pill ${group.category === "비급여" ? "low" : ""}">${group.items.reduce((sum, item) => sum + item.qty, 0)}개</span>
-                  </div>
-                  <div class="usage-product-chips">
-                    ${group.items.map((item) => `<span class="usage-chip">${context.escapeHtml(item.product.name)}${item.qty > 1 ? ` · ${item.qty}개` : ""}</span>`).join("")}
-                  </div>
-                </div>
-              `).join("")}
-              ${missingProducts.length ? `
-                <div class="usage-product-group">
-                  <div class="usage-product-heading"><span>삭제된 제품</span><span class="pill">${missingProducts.reduce((sum, item) => sum + item.qty, 0)}개</span></div>
-                  <div class="usage-product-chips">${missingProducts.map((item) => `<span class="usage-chip">삭제된 제품${item.qty > 1 ? ` · ${item.qty}개` : ""}</span>`).join("")}</div>
-                </div>
-              ` : ""}
+            <div class="usage-check-badges">
+              <span class="usage-check-badge ${nonpayTotal ? "warn" : "muted"}">비급여 ${nonpayTotal}개</span>
+              <span class="usage-check-badge ${tissueTotal ? "info" : "muted"}">인체조직 ${tissueTotal}개</span>
+              ${implantStatusBadgesHtml(implantStatus)}
             </div>
+            <details class="usage-products-details">
+              <summary>
+                <span>사용제품 상세</span>
+                <span class="pill">${totalProductQty}개</span>
+              </summary>
+              <div class="usage-products">
+                ${groupedProducts.map((group) => `
+                  <div class="usage-product-group ${groupClass(group.category)}">
+                    <div class="usage-product-heading">
+                      <span>${context.escapeHtml(context.productCategoryLabel(group.category))}</span>
+                      <span class="pill ${group.category === "비급여" ? "low" : ""}">${group.items.reduce((sum, item) => sum + item.qty, 0)}개</span>
+                    </div>
+                    <div class="usage-product-chips">
+                      ${group.items.map((item) => `<span class="usage-chip">${context.escapeHtml(item.product.name)}${item.qty > 1 ? ` · ${item.qty}개` : ""}</span>`).join("")}
+                    </div>
+                  </div>
+                `).join("")}
+                ${missingProducts.length ? `
+                  <div class="usage-product-group">
+                    <div class="usage-product-heading"><span>삭제된 제품</span><span class="pill">${missingProducts.reduce((sum, item) => sum + item.qty, 0)}개</span></div>
+                    <div class="usage-product-chips">${missingProducts.map((item) => `<span class="usage-chip">삭제된 제품${item.qty > 1 ? ` · ${item.qty}개` : ""}</span>`).join("")}</div>
+                  </div>
+                ` : ""}
+              </div>
+            </details>
           </div>
           ${showActions ? `<div class="actions">
             ${showEdit ? `<button class="secondary" type="button" data-edit-usage="${usage.id}">${context.canModifyUsageRecord(usage) ? "사용내용 수정" : "사용내용 확인"}</button>` : ""}
