@@ -1815,6 +1815,34 @@ const assignImplantPatientNosForDate = async (date) => {
   return targets.length;
 };
 
+const clearImplantPatientNosForDate = async (date) => {
+  if (!canAssignImplantPatientNo()) return 0;
+  if (!date) throw new Error("날짜를 선택해 주세요.");
+  const targets = implantRecordsForDate(date).filter((record) =>
+    implantPatientNoText(record) || record.closedAt || record.patientNoAssignedAt || record.editUnlocked === true
+  );
+  const clearedAt = new Date().toISOString();
+  await Promise.all(targets.map((record) => {
+    record.patientNo = "";
+    record.patientNoAssignedAt = null;
+    record.patientNoManuallyEditedAt = null;
+    record.closedAt = null;
+    record.editUnlocked = false;
+    return setDoc(doc(db, "implantRecords", record.id), {
+      patientNo: "",
+      patientNoAssignedAt: null,
+      patientNoManuallyEditedAt: null,
+      closedAt: null,
+      editUnlocked: false,
+      patientNoClearedAt: clearedAt,
+      patientNoClearReason: "manualDateReset",
+      updatedAt: clearedAt,
+      ...auditUpdateFields()
+    }, { merge: true });
+  }));
+  return targets.length;
+};
+
 const implantDescriptionText = (record) => getImplantsModule().implantDescriptionText(record);
 const implantLedgerRows = (records) => getImplantsModule().implantLedgerRows(records);
 
@@ -1997,6 +2025,7 @@ const getImplantsModule = () => {
       currentAuditUser,
       implantRecordsForDate,
       assignImplantPatientNosForDate,
+      clearImplantPatientNosForDate,
       exportImplantLedgerExcel,
       showSaveToast,
       saveDoneToast,

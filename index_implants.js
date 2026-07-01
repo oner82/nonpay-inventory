@@ -27,6 +27,7 @@
       currentAuditUser,
       implantRecordsForDate,
       assignImplantPatientNosForDate,
+      clearImplantPatientNosForDate,
       exportImplantLedgerExcel,
       showSaveToast,
       saveDoneToast,
@@ -141,11 +142,10 @@
           </div>
         </div>
         <div class="actions">
-          <button class="secondary" type="button" id="implantFilterReset">초기화</button>
+          ${canAssignImplantPatientNo() ? `<button class="secondary" type="button" id="implantFilterReset">선택 날짜 미마감 초기화</button>` : ""}
         </div>
         <div class="actions" data-implant-panel="today" ${implantPanelVisible("today") ? "" : "hidden"}>
-          ${canAssignImplantPatientNo() ? `<button type="button" id="closeTodayImplants">오늘 사용분 마감/번호 재부여</button>` : ""}
-          ${canAssignImplantPatientNo() ? `<button class="secondary" type="button" id="assignImplantPatientNos">선택 날짜 번호 재부여</button>` : ""}
+          ${canAssignImplantPatientNo() ? `<button type="button" id="assignImplantPatientNos">선택 날짜 번호 재부여</button>` : ""}
         </div>
         <div class="actions" data-implant-panel="hospital" ${implantPanelVisible("hospital") ? "" : "hidden"}>
           <button class="secondary" type="button" id="exportImplantLedger">엑셀 다운로드</button>
@@ -1560,13 +1560,22 @@ const bindImplants = () => {
     renderList();
   });
   [nameInput, idInput, noInput].forEach((input) => input.addEventListener("input", renderList));
-  document.getElementById("implantFilterReset")?.addEventListener("click", () => {
-    dateInput.value = today();
-    if (backupMonthInput) backupMonthInput.value = today().slice(0, 7);
-    nameInput.value = "";
-    idInput.value = "";
-    noInput.value = "";
-    renderList();
+  document.getElementById("implantFilterReset")?.addEventListener("click", async () => {
+    if (!canAssignImplantPatientNo()) return;
+    const date = dateInput.value;
+    const total = implantRecordsForDate(date).length;
+    if (!total) {
+      alert("선택 날짜의 임플란트 기록이 없습니다.");
+      return;
+    }
+    if (!confirm(`${date} 임플란트 장부의 환자번호와 마감상태를 삭제하고 모두 미마감으로 되돌릴까요?`)) return;
+    try {
+      const count = await clearImplantPatientNosForDate(date);
+      alert(count ? `${count}건을 미마감으로 초기화했습니다.` : "선택 날짜에 초기화할 마감 기록이 없습니다.");
+      renderList();
+    } catch (error) {
+      alert(error.message);
+    }
   });
   document.getElementById("assignImplantPatientNos")?.addEventListener("click", async () => {
     if (!canAssignImplantPatientNo()) return;
@@ -1575,18 +1584,6 @@ const bindImplants = () => {
       const count = await assignImplantPatientNosForDate(date);
       const total = implantRecordsForDate(date).length;
       alert(count ? `${count}건의 환자번호를 1번부터 다시 부여했습니다.` : (total ? "선택 날짜의 임플란트 기록은 이미 번호가 부여되어 있습니다." : "선택 날짜의 임플란트 기록이 없습니다."));
-      renderList();
-    } catch (error) {
-      alert(error.message);
-    }
-  });
-  document.getElementById("closeTodayImplants")?.addEventListener("click", async () => {
-    if (!canAssignImplantPatientNo()) return;
-    dateInput.value = today();
-    try {
-      const count = await assignImplantPatientNosForDate(today());
-      const total = implantRecordsForDate(today()).length;
-      alert(count ? `오늘 사용분 마감 완료: ${count}건 번호를 1번부터 다시 부여했습니다.` : (total ? "오늘 사용분은 이미 마감되어 있습니다." : "오늘 저장된 임플란트 기록이 없습니다."));
       renderList();
     } catch (error) {
       alert(error.message);
