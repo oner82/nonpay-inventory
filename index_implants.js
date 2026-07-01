@@ -224,7 +224,7 @@ const filteredImplantRecords = (date, patientName, patientId, patientNo) => {
 };
 
 const implantLedgerTableHtml = (records) => {
-  if (!records.length) return `<div class="empty">선택한 날짜의 임플란트 마감 자료가 없습니다.</div>`;
+  if (!records.length) return `<div class="empty">조회 조건에 맞는 임플란트 마감 자료가 없습니다.</div>`;
   return `
     <div class="implant-ledger-list">
       ${records.map((record) => `
@@ -1558,11 +1558,12 @@ const bindImplants = () => {
     }
   };
   const renderList = () => {
-    const records = filteredImplantRecords(dateInput.value, nameInput.value, idInput.value, noInput.value).reverse();
-    list.innerHTML = records.length
-      ? records.map((record) => implantRecordCardHtml(record, { showAdminTools: getCurrentImplantSubView() === "admin" })).join("")
+    const filteredRecords = filteredImplantRecords(dateInput.value, nameInput.value, idInput.value, noInput.value);
+    const listRecords = filteredRecords.slice().reverse();
+    list.innerHTML = listRecords.length
+      ? listRecords.map((record) => implantRecordCardHtml(record, { showAdminTools: getCurrentImplantSubView() === "admin" })).join("")
       : `<div class="empty">조회 조건에 맞는 임플란트 기록이 없습니다.</div>`;
-    if (summary) summary.innerHTML = implantLedgerTableHtml(implantRecordsForDate(dateInput.value));
+    if (summary) summary.innerHTML = implantLedgerTableHtml(filteredRecords);
     if (ledgerCount) ledgerCount.innerHTML = implantLedgerCountHtml(dateInput.value);
     if (photoStatusPanel) photoStatusPanel.innerHTML = implantPhotoStatusPanelHtml(dateInput.value);
     if (sendList && getCurrentImplantSubView() === "send") sendList.innerHTML = implantSendPanelOrganizedHtml(dateInput.value || today());
