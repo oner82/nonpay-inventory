@@ -2113,6 +2113,15 @@
       gap: 9px;
       margin-top: 14px;
     }
+    .edit-patient-search-row {
+      margin-top: 10px;
+    }
+    .edit-patient-details {
+      margin-top: 12px;
+    }
+    .edit-patient-details .details-body {
+      padding-top: 0;
+    }
     .edit-patient-card {
       width: 100%;
       min-height: 0;

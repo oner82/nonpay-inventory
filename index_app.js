@@ -2301,10 +2301,25 @@ const renderEditUsage = () => {
         <input id="editUsageSelectDate" type="date" value="${escapeHtml(editSelectDate)}">
       </div>
       <input type="hidden" id="editUsageSelect" value="${escapeHtml(pendingUsage?.id || "")}">
-      <p class="helper">기본값은 오늘 날짜입니다. 날짜를 바꾸면 아래 환자 카드만 바뀝니다. 수정할 환자는 카드에서 바로 선택하세요.</p>
-      <div id="editUsagePatientList" class="edit-patient-list">
-        ${editUsagePatientListHtml(editSelectDate, pendingUsage?.id || "")}
+      <div class="row two edit-patient-search-row">
+        <div>
+          <label for="editUsagePatientNameSearch">환자명 검색</label>
+          <input id="editUsagePatientNameSearch" autocomplete="off" placeholder="환자 이름 입력">
+        </div>
+        <div>
+          <label for="editUsagePatientIdSearch">등록번호 검색</label>
+          <input id="editUsagePatientIdSearch" inputmode="numeric" autocomplete="off" placeholder="등록번호 입력">
+        </div>
       </div>
+      <p class="helper">기본값은 오늘 날짜입니다. 환자명이나 등록번호를 입력하면 아래 접힌 목록이 열리고 해당 환자만 표시됩니다.</p>
+      <details class="item edit-patient-details" id="editUsagePatientDetails">
+        <summary><span>환자 목록 보기</span><span class="pill" id="editUsagePatientCount">${editUsagePatientsForDate(editSelectDate).length}</span></summary>
+        <div class="details-body">
+          <div id="editUsagePatientList" class="edit-patient-list">
+            ${editUsagePatientListHtml(editSelectDate, pendingUsage?.id || "")}
+          </div>
+        </div>
+      </details>
     </div>
     <form class="card" id="editUsageForm" style="display:none;">
       <h2 id="editUsageFormTitle">사용내용 수정</h2>
@@ -2421,6 +2436,10 @@ const bindEditUsage = () => {
   if (!canEditUsage()) return;
   const dateInput = document.getElementById("editUsageSelectDate");
   const select = document.getElementById("editUsageSelect");
+  const patientNameSearch = document.getElementById("editUsagePatientNameSearch");
+  const patientIdSearch = document.getElementById("editUsagePatientIdSearch");
+  const patientDetails = document.getElementById("editUsagePatientDetails");
+  const patientCount = document.getElementById("editUsagePatientCount");
   const form = document.getElementById("editUsageForm");
   const patientList = document.getElementById("editUsagePatientList");
   const lockNote = document.getElementById("editUsageLockNote");
@@ -2453,10 +2472,16 @@ const bindEditUsage = () => {
     });
     editCommonImplantPhotos.splice(0, editCommonImplantPhotos.length);
   };
-  const renderUsageSelectOptions = (date, selectedId = "") => {
+  const editPatientFilters = () => ({
+    name: patientNameSearch?.value || "",
+    patientId: patientIdSearch?.value || ""
+  });
+  const renderUsageSelectOptions = (date, selectedId = "", filters = editPatientFilters()) => {
     const validSelectedId = selectedId && state.usages.some((usage) => usage.id === selectedId && (usage.date || "") === date) ? selectedId : "";
+    const patients = editUsagePatientsForDate(date, filters);
     select.value = validSelectedId;
-    if (patientList) patientList.innerHTML = editUsagePatientListHtml(date, validSelectedId);
+    if (patientCount) patientCount.textContent = patients.length;
+    if (patientList) patientList.innerHTML = editUsagePatientListHtml(date, validSelectedId, filters);
   };
   const resetLoadedUsage = () => {
     select.value = "";
@@ -2954,6 +2979,12 @@ const bindEditUsage = () => {
     dateInput.value = dateInput.value || today();
     renderUsageSelectOptions(dateInput.value);
     resetLoadedUsage();
+  });
+  [patientNameSearch, patientIdSearch].forEach((input) => {
+    input?.addEventListener("input", () => {
+      renderUsageSelectOptions(dateInput.value, select.value);
+      if (patientDetails) patientDetails.open = true;
+    });
   });
   patientList?.addEventListener("click", (event) => {
     const card = event.target.closest("[data-edit-usage-card]");

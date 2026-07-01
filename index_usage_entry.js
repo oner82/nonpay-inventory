@@ -634,10 +634,19 @@
       </div>
     `).join("") || `<div class="empty">임플란트 업체를 추가해 주세요.</div>`;
 
-    const editUsagePatientsForDate = (date) => context.getState().usages
+    const editUsagePatientsForDate = (date, filters = {}) => {
+      const nameQuery = context.normalizedName(filters.name || "");
+      const patientIdQuery = String(filters.patientId || "").replace(/\D/g, "");
+      return context.getState().usages
       .filter((usage) => (usage.date || "") === date)
+      .filter((usage) => {
+        if (nameQuery && !context.normalizedName(usage.patientName || "").includes(nameQuery)) return false;
+        if (patientIdQuery && !context.patientIdText(usage).replace(/\D/g, "").includes(patientIdQuery)) return false;
+        return true;
+      })
       .slice()
       .sort((a, b) => context.alphaFirstCompare(a.patientName, b.patientName) || context.alphaFirstCompare(context.patientIdText(a), context.patientIdText(b)));
+    };
 
     const editUsagePatientCardHtml = (usage, selectedId = "") => {
       const doctor = context.departmentById(usage.doctorId);
@@ -665,9 +674,13 @@
       `;
     };
 
-    const editUsagePatientListHtml = (date, selectedId = "") => {
-      const patients = editUsagePatientsForDate(date);
-      if (!patients.length) return `<div class="empty">선택한 날짜에 사용내역이 없습니다.</div>`;
+    const editUsagePatientListHtml = (date, selectedId = "", filters = {}) => {
+      const patients = editUsagePatientsForDate(date, filters);
+      if (!patients.length) {
+        return filters.name || filters.patientId
+          ? `<div class="empty">검색 결과가 없습니다.</div>`
+          : `<div class="empty">선택한 날짜에 사용내역이 없습니다.</div>`;
+      }
       return patients.map((usage) => editUsagePatientCardHtml(usage, selectedId)).join("");
     };
 
