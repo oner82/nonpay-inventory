@@ -3265,7 +3265,7 @@ const bindEditUsage = () => {
     pendingEditUsageId = "";
     await saveState("수정 완료", {
       savingMessage: "수정 저장 중입니다...",
-      doneMessage: editImplantCanModify && countImplantPhotosToUpload(nextImplants) ? "수정 저장 완료 · 사진 업로드 준비" : "수정 저장 완료"
+      doneMessage: editImplantCanModify && countEditImplantPhotosToUpload(nextImplants) ? "수정 저장 완료 · 사진 업로드 준비" : "수정 저장 완료"
     });
     if (editImplantCanModify) {
       try {
@@ -3277,7 +3277,7 @@ const bindEditUsage = () => {
             showSaveToast(`사진 업로드 중 ${done}/${total}${failText}`, failed ? "error" : "saving", { hold: done < total, duration: done >= total ? 1800 : undefined });
           }
         });
-        saveDoneToast(photoUploadFailed ? "수정 완료 · 사진 업로드 확인 필요" : (countImplantPhotosToUpload(nextImplants) ? "수정과 사진 저장 완료" : "수정 저장 완료"));
+        saveDoneToast(photoUploadFailed ? "수정 완료 · 사진은 앱에 보관됨" : (countEditImplantPhotosToUpload(nextImplants) ? "수정과 사진 저장 완료" : "수정 저장 완료"));
       } catch (error) {
         saveErrorToast(`임플란트 사진 저장 실패: ${error.message}`);
         alert(`사용내역은 저장됐지만 임플란트 기록 수정에 실패했습니다: ${error.message}`);
@@ -3688,7 +3688,10 @@ const cleanImplantPhotoPayload = (photo) => getImplantsModule().cleanImplantPhot
 const implantPhotoCacheKey = (photo = {}) => getImplantsModule().implantPhotoCacheKey(photo);
 const cloneImplantPhotoPayload = (payload = {}, photo = {}) => getImplantsModule().cloneImplantPhotoPayload(payload, photo);
 const cachedImplantPhotoPayload = (photo, cache, buildPayload) => getImplantsModule().cachedImplantPhotoPayload(photo, cache, buildPayload);
-const countImplantPhotosToUpload = (implants = []) => getImplantsModule().countImplantPhotosToUpload(implants);
+const editImplantPhotoNeedsUpload = (photo = {}) => Boolean(photo.file || photo.editedPreview);
+const countEditImplantPhotosToUpload = (implants = []) => implants.reduce((sum, implant) => (
+  sum + (implant.photos || []).filter(editImplantPhotoNeedsUpload).length
+), 0);
 const notifyImplantPhotoUpload = (onProgress, done, total, failed = 0) => getImplantsModule().notifyImplantPhotoUpload(onProgress, done, total, failed);
 
 const saveImplantRecordFromEdit = async (usage, recordId, implants, options = {}) => {
@@ -3724,7 +3727,7 @@ const saveImplantRecordFromEdit = async (usage, recordId, implants, options = {}
       vendor: implant.vendor || "",
       description: implant.description || "",
       photos: initialPhotos.filter((photo) => photo.url || photo.dataUrl),
-      pendingPhotoCount: (implant.photos || []).filter((photo) => photo.file || photo.needsReupload).length
+      pendingPhotoCount: (implant.photos || []).filter(editImplantPhotoNeedsUpload).length
     });
   }
   await setDoc(doc(db, "implantRecords", nextRecordId), {
@@ -3739,7 +3742,7 @@ const saveImplantRecordFromEdit = async (usage, recordId, implants, options = {}
   }, { merge: true });
 
   const uploadedImplants = [];
-  const uploadTotal = countImplantPhotosToUpload(implants);
+  const uploadTotal = countEditImplantPhotosToUpload(implants);
   let uploadDone = 0;
   let uploadFailed = 0;
   const uploadPhotoCache = new Map();
@@ -3747,11 +3750,11 @@ const saveImplantRecordFromEdit = async (usage, recordId, implants, options = {}
   for (const implant of implants) {
     const implantId = implant.id || uid();
     const photos = (implant.photos || [])
-      .filter((photo) => (photo.url || photo.dataUrl) && !(photo.file || photo.needsReupload))
+      .filter((photo) => (photo.url || photo.dataUrl) && !editImplantPhotoNeedsUpload(photo))
       .map(cleanImplantPhotoPayload);
     const photoUploadErrors = [];
     for (const photo of implant.photos || []) {
-      if (photo.file || photo.needsReupload) {
+      if (editImplantPhotoNeedsUpload(photo)) {
         try {
           photos.push(await cachedImplantPhotoPayload(
             photo,
@@ -3760,8 +3763,7 @@ const saveImplantRecordFromEdit = async (usage, recordId, implants, options = {}
           ));
         } catch (error) {
           console.error(error);
-          if (photo.url) photos.push(cleanImplantPhotoPayload(photo));
-          else photos.push(await implantPhotoFallbackPayload(photo, error.message || "사진 업로드 실패"));
+          photos.push(await implantPhotoFallbackPayload(photo, error.message || "사진 업로드 실패"));
           photoUploadErrors.push(error.message || "사진 업로드 실패");
           uploadFailed += 1;
         } finally {

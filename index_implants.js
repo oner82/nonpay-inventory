@@ -285,7 +285,7 @@ const implantPhotoStatusHtml = (implant) => {
   const errors = Array.isArray(implant.photoUploadErrors) ? implant.photoUploadErrors : [];
   if (!pending && !errors.length) return "";
   const missingPhotoHint = pending && !(implant.photos || []).length ? " · 사진이 보이지 않으면 수정에서 다시 첨부" : "";
-  return `<div class="muted">${pending ? `사진 ${pending}장 업로드 대기${missingPhotoHint}` : ""}${pending && errors.length ? " · " : ""}${errors.length ? `사진 업로드 확인 필요 ${errors.length}건` : ""}</div>`;
+  return `<div class="muted">${pending ? `사진 ${pending}장 클라우드 저장 확인 중${missingPhotoHint}` : ""}${pending && errors.length ? " · " : ""}${errors.length ? `최근 사진 저장 알림 ${errors.length}건` : ""}</div>`;
 };
 
 const implantPhotoStatusPanelHtml = (date) => {
@@ -295,11 +295,12 @@ const implantPhotoStatusPanelHtml = (date) => {
   return `
     <div class="implant-status-grid">
       <div class="implant-status-tile"><span>전체 사진</span><strong>${stats.photos}</strong></div>
-      <div class="implant-status-tile"><span>Storage 저장</span><strong>${stats.storage}</strong></div>
-      <div class="implant-status-tile"><span>업로드 대기</span><strong>${stats.pending}</strong></div>
-      <div class="implant-status-tile"><span>재업로드 가능</span><strong>${stats.retry}</strong></div>
+      <div class="implant-status-tile"><span>클라우드 저장</span><strong>${stats.storage}</strong></div>
+      <div class="implant-status-tile"><span>저장 확인 중</span><strong>${stats.pending}</strong></div>
+      <div class="implant-status-tile"><span>앱 보관 사진</span><strong>${stats.retry}</strong></div>
       <div class="implant-status-tile"><span>확인 필요</span><strong>${stats.failed + stats.missing + stats.errors}</strong></div>
     </div>
+    <p class="helper">앱 보관 사진은 화면과 발송자료에는 사용할 수 있지만, 클라우드 사진 저장소에 다시 백업할 수 있는 사진입니다.</p>
     ${rows.length ? `
       <div class="implant-status-list">
         ${rows.map(({ record, implant, pending, failed, retry, missing, errors }) => `
@@ -309,13 +310,13 @@ const implantPhotoStatusPanelHtml = (date) => {
               <span class="pill">${escapeHtml(implantRecordDate(record))}</span>
             </div>
             <div class="meta">
-              ${pending ? `<span>대기 ${pending}장</span>` : ""}
-              ${retry ? `<span>재업로드 가능 ${retry}장</span>` : ""}
-              ${failed ? `<span>업로드 실패 ${failed}장</span>` : ""}
+              ${pending ? `<span>저장 확인 중 ${pending}장</span>` : ""}
+              ${retry ? `<span>앱 보관 사진 ${retry}장</span>` : ""}
+              ${failed ? `<span>클라우드 저장 실패 ${failed}장</span>` : ""}
               ${missing ? `<span>미표시 ${missing}장</span>` : ""}
-              ${errors ? `<span>오류 ${errors}건</span>` : ""}
+              ${errors ? `<span>최근 저장 알림 ${errors}건</span>` : ""}
             </div>
-            ${retry ? `<div class="actions"><button class="secondary" type="button" data-retry-implant-photos="${escapeHtml(record.id)}">임시저장 사진 재업로드</button></div>` : ""}
+            ${retry ? `<div class="actions"><button class="secondary" type="button" data-retry-implant-photos="${escapeHtml(record.id)}">앱 보관 사진 클라우드 저장</button></div>` : ""}
           </div>
         `).join("")}
       </div>
@@ -351,9 +352,9 @@ const implantRecordCardHtml = (record, options = {}) => {
         </div>
       ` : ""}
       ${retryPhotoCount ? `
-        <div class="implant-lock-banner">사진 ${retryPhotoCount}장 재업로드가 필요합니다.</div>
+        <div class="implant-lock-banner">사진 ${retryPhotoCount}장이 앱에 보관되어 있습니다. 필요하면 클라우드 저장을 다시 시도하세요.</div>
         <div class="actions">
-          <button class="secondary" type="button" data-retry-implant-record-photos="${escapeHtml(record.id)}">사진 재업로드</button>
+          <button class="secondary" type="button" data-retry-implant-record-photos="${escapeHtml(record.id)}">앱 보관 사진 클라우드 저장</button>
         </div>
       ` : ""}
       ${showAdminTools ? `
@@ -1780,12 +1781,12 @@ const bindImplants = () => {
       await retryImplantRecordPhotos(recordId, ({ done, total, failed }) => {
         failedCount = failed;
         const failText = failed ? ` · 실패 ${failed}` : "";
-        showSaveToast(`사진 재업로드 중 ${done}/${total}${failText}`, failed ? "error" : "saving", { hold: done < total });
+        showSaveToast(`앱 보관 사진 저장 중 ${done}/${total}${failText}`, failed ? "error" : "saving", { hold: done < total });
       });
-      saveDoneToast(failedCount ? "사진 재업로드 완료 · 확인 필요" : "사진 재업로드 완료");
+      saveDoneToast(failedCount ? "앱 보관 사진 저장 완료 · 일부 확인 필요" : "앱 보관 사진 클라우드 저장 완료");
       renderList();
     } catch (error) {
-      saveErrorToast(`사진 재업로드 실패: ${error.message}`);
+      saveErrorToast(`앱 보관 사진 저장 실패: ${error.message}`);
       alert(error.message);
     }
   });
@@ -1799,17 +1800,17 @@ const bindImplants = () => {
     if (retryPhotosButton) {
       const recordId = retryPhotosButton.dataset.retryImplantRecordPhotos;
       try {
-        setButtonBusy(retryPhotosButton, true, "재업로드 중...");
+        setButtonBusy(retryPhotosButton, true, "저장 중...");
         let failedCount = 0;
         await retryImplantRecordPhotos(recordId, ({ done, total, failed }) => {
           failedCount = failed;
           const failText = failed ? ` · 실패 ${failed}` : "";
-          showSaveToast(`사진 재업로드 중 ${done}/${total}${failText}`, failed ? "error" : "saving", { hold: done < total });
+          showSaveToast(`앱 보관 사진 저장 중 ${done}/${total}${failText}`, failed ? "error" : "saving", { hold: done < total });
         });
-        saveDoneToast(failedCount ? "사진 재업로드 완료 · 확인 필요" : "사진 재업로드 완료");
+        saveDoneToast(failedCount ? "앱 보관 사진 저장 완료 · 일부 확인 필요" : "앱 보관 사진 클라우드 저장 완료");
         renderList();
       } catch (error) {
-        saveErrorToast(`사진 재업로드 실패: ${error.message}`);
+        saveErrorToast(`앱 보관 사진 저장 실패: ${error.message}`);
         alert(error.message);
       } finally {
         setButtonBusy(retryPhotosButton, false);
