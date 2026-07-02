@@ -17,6 +17,7 @@
       reconcileProductStocks,
       today,
       receiptDateValue,
+      receiptStockDelta,
       setProductFormDirty,
       render,
       saveState,
@@ -133,7 +134,7 @@ const bindProducts = () => {
     const received = state.receipts.reduce((sum, receipt) => {
       const receiptDate = receiptDateValue(receipt);
       if (!receiptDate || receiptDate >= date || String(receipt.productId) !== String(productId)) return sum;
-      return sum + num(receipt.qty);
+      return sum + receiptStockDelta(receipt);
     }, 0);
     return { used, received };
   };

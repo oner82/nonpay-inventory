@@ -40,12 +40,18 @@ const landingCarryoverProducts = () => state.products
   .slice()
   .sort((a, b) => productDisplaySort(productCategory(a.category))(a, b) || byName(a, b));
 
+const nonpayReceiptProducts = () => state.products
+  .filter((item) => productCategory(item.category) === "비급여")
+  .slice()
+  .sort(productDisplaySort("비급여"));
+
 const renderReceipts = () => {
   const canEnterReceipts = canRegisterNonpayReceipts();
   const canEnterLanding = canManageLandingReceipts();
   const canViewReceiptHistory = canManageReceipts();
   const allowedReceiptViews = [
     ...(canEnterReceipts ? ["nonpay"] : []),
+    ...(canEnterReceipts ? ["loan"] : []),
     ...(canEnterLanding ? ["landing"] : []),
     ...(canViewReceiptHistory ? ["history"] : [])
   ];
@@ -55,6 +61,7 @@ const renderReceipts = () => {
   <section class="grid">
     <div class="receipt-tabs">
       ${canEnterReceipts ? `<button class="receipt-tab ${receiptView === "nonpay" ? "active" : ""}" data-receipt-view="nonpay" type="button">비급여 입고관리</button>` : ""}
+      ${canEnterReceipts ? `<button class="receipt-tab ${receiptView === "loan" ? "active" : ""}" data-receipt-view="loan" type="button">타부서 대여</button>` : ""}
       ${canEnterLanding ? `<button class="receipt-tab ${receiptView === "landing" ? "active" : ""}" data-receipt-view="landing" type="button">랜딩 입고관리</button>` : ""}
       ${canViewReceiptHistory ? `<button class="receipt-tab ${receiptView === "history" ? "active" : ""}" data-receipt-view="history" type="button">입고내역</button>` : ""}
     </div>
@@ -65,13 +72,39 @@ const renderReceipts = () => {
         <label for="nonpayReceiptProduct">제품 선택</label>
         <select id="nonpayReceiptProduct" required>
           <option value="">비급여 제품을 선택하세요</option>
-          ${state.products.filter((item) => productCategory(item.category) === "비급여").sort(productDisplaySort("비급여")).map((item) => `<option value="${item.id}">${escapeHtml(item.name)} / 현재고 ${num(item.stock)}</option>`).join("")}
+          ${nonpayReceiptProducts().map((item) => `<option value="${item.id}">${escapeHtml(item.name)} / 현재고 ${num(item.stock)}</option>`).join("")}
         </select>
         <label for="nonpayReceiptQty">입고 수량</label>
         <input id="nonpayReceiptQty" type="number" min="1" value="1" required>
         <label for="nonpayReceiptMemo">메모</label>
         <textarea id="nonpayReceiptMemo" class="memo-input" placeholder="메모 입력(선택)"></textarea>
         <div class="actions"><button type="submit">비급여 입고 저장</button></div>
+      </form>
+    ` : ""}
+    ${receiptView === "loan" ? `
+      <form class="card receipt-wide" id="departmentLoanForm">
+        <h2>타부서 대여 등록</h2>
+        <p class="helper">응급실·병동 등에 비급여 제품을 빌려준 경우 사용합니다. 저장하면 현재고에서 차감되고, 다음날 대시보드에 전날 대여 수량으로 표시됩니다.</p>
+        <label for="loanProduct">제품 선택</label>
+        <select id="loanProduct" required>
+          <option value="">비급여 제품을 선택하세요</option>
+          ${nonpayReceiptProducts().map((item) => `<option value="${item.id}">${escapeHtml(item.name)} / 현재고 ${num(item.stock)}</option>`).join("")}
+        </select>
+        <div class="row two">
+          <div>
+            <label for="loanQty">대여 수량</label>
+            <input id="loanQty" type="number" min="1" value="1" required>
+          </div>
+          <div>
+            <label for="loanDate">대여일</label>
+            <input id="loanDate" type="date" value="${today()}" required>
+          </div>
+        </div>
+        <label for="loanDepartment">대여 부서</label>
+        <input id="loanDepartment" placeholder="예: 응급실, 병동, 외래">
+        <label for="loanMemo">메모</label>
+        <textarea id="loanMemo" class="memo-input" placeholder="예: 응급 처방 예정, 병동 요청자명 등"></textarea>
+        <div class="actions"><button type="submit">대여 저장</button></div>
       </form>
     ` : ""}
     ${receiptView === "landing" ? `
@@ -264,6 +297,37 @@ const bindReceipts = () => {
     state.receipts.push({ id: uid(), type: "nonpay", productId, productName: product.name, qty, date: today(), memo, createdAt: new Date().toISOString(), ...auditCreateFields() });
     render();
     await saveState();
+  });
+  document.getElementById("departmentLoanForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!canRegisterNonpayReceipts()) {
+      alert("타부서 대여 등록은 관리자, 책임사용자, 입고담당자만 가능합니다.");
+      return;
+    }
+    const productId = document.getElementById("loanProduct").value;
+    const qty = Math.max(1, num(document.getElementById("loanQty").value));
+    const date = document.getElementById("loanDate").value || today();
+    const loanDepartment = document.getElementById("loanDepartment")?.value.trim() || "";
+    const memo = document.getElementById("loanMemo")?.value.trim() || "";
+    const product = productById(productId);
+    if (!product) return;
+    if (num(product.stock) < qty && !confirm(`현재고가 ${num(product.stock)}개입니다. 그래도 ${qty}개 대여로 저장할까요?`)) return;
+    product.stock = Math.max(0, num(product.stock) - qty);
+    state.receipts.push({
+      id: uid(),
+      type: "loan",
+      productId,
+      productName: product.name,
+      qty,
+      date,
+      loanDepartment,
+      memo,
+      createdAt: new Date().toISOString(),
+      ...auditCreateFields()
+    });
+    reconcileProductStocks();
+    render();
+    await saveState("타부서 대여 저장 완료", { authoritative: true });
   });
   document.getElementById("landingCarryoverReceiptForm")?.addEventListener("submit", async (event) => {
     event.preventDefault();

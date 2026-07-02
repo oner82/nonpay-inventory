@@ -103,7 +103,7 @@
       const receiptCounts = new Map();
       context.getState().receipts
         .filter((receipt) => context.inDateRange(context.receiptDateValue(receipt), start, end))
-        .forEach((receipt) => receiptCounts.set(receipt.productId, (receiptCounts.get(receipt.productId) || 0) + context.num(receipt.qty)));
+        .forEach((receipt) => receiptCounts.set(receipt.productId, (receiptCounts.get(receipt.productId) || 0) + context.receiptStockDelta(receipt)));
       return { usageCounts, receiptCounts };
     };
 
@@ -153,7 +153,7 @@
       if (type === "receipt") {
         return state.receipts.reduce((sum, receipt) => {
           if (!context.sameId(receipt.productId, productId) || !dateMatch(context.receiptDateValue(receipt))) return sum;
-          return sum + context.num(receipt.qty);
+          return sum + context.receiptStockDelta(receipt);
         }, 0);
       }
       return state.usages.reduce((sum, usage) => {

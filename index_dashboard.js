@@ -18,13 +18,23 @@
 
       const todayText = context.today();
       const todayDate = new Date(`${todayText}T00:00:00`);
+      const dateOffsetText = (date, offset) => {
+        const next = new Date(date);
+        next.setDate(next.getDate() + offset);
+        next.setMinutes(next.getMinutes() - next.getTimezoneOffset());
+        return next.toISOString().slice(0, 10);
+      };
       const dateDistance = (dateText) => {
         const date = new Date(`${dateText || ""}T00:00:00`);
         if (Number.isNaN(date.getTime())) return 9999;
         return Math.floor((todayDate - date) / 86400000);
       };
 
+      const yesterdayText = dateOffsetText(todayDate, -1);
       const todayUsages = state.usages.filter((item) => item.date === todayText);
+      const yesterdayLoanQty = state.receipts
+        .filter((receipt) => receipt.type === "loan" && context.receiptDateValue(receipt) === yesterdayText)
+        .reduce((sum, receipt) => sum + Math.max(1, context.num(receipt.qty)), 0);
       const recentUsages = state.usages.filter((item) => {
         const distance = dateDistance(item.date);
         return distance >= 0 && distance <= 6;
@@ -68,6 +78,7 @@
           <div class="stats">
             ${statCard("오늘 사용 환자", todayUsages.length.toLocaleString(), "P")}
             ${statCard("오늘 사용 제품", todayProductCount.toLocaleString(), "✓")}
+            ${statCard("전날 대여", yesterdayLoanQty.toLocaleString(), "대여")}
             ${statCard("스크럽 확인 대기", openPendingUsageItems.length.toLocaleString(), "확인")}
             ${statCard("랜딩 입고 대기", pendingLandingLines.length.toLocaleString(), "↙")}
             ${statCard("재고 부족 확인", lowProducts.length.toLocaleString(), "!")}

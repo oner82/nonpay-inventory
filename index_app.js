@@ -716,6 +716,11 @@ const auditMetaHtml = (item, label = "입력") => `
   <span>${label}시각: ${escapeHtml(auditTimeText(item))}</span>
 `;
 const receiptDateValue = (receipt) => receipt?.date || String(receipt?.createdAt || receipt?.updatedAt || "").slice(0, 10) || "";
+const receiptStockDelta = (receipt) => {
+  if (receipt?.type === "landingCancelled") return 0;
+  const qty = num(receipt?.qty);
+  return receipt?.type === "loan" ? -qty : qty;
+};
 const receiptProduct = (receipt) => productById(receipt?.productId);
 const receiptProductName = (receipt) => receiptProduct(receipt)?.name || receipt?.productName || "삭제된 제품";
 const receiptProductMeta = (receipt) => {
@@ -729,6 +734,8 @@ const receiptProductMeta = (receipt) => {
 const receiptTypeLabel = (receipt) => {
   if (receipt?.type === "landing") return "랜딩";
   if (receipt?.type === "landingCarryover") return "이월 랜딩";
+  if (receipt?.type === "landingCancelled") return "랜딩 취소";
+  if (receipt?.type === "loan") return "타부서 대여";
   return "비급여";
 };
 const receiptSortValue = (receipt) => {
@@ -892,7 +899,7 @@ const productMovementCounts = () => {
     (usage.productIds || []).forEach((id) => used.set(id, (used.get(id) || 0) + 1));
   });
   state.receipts.forEach((receipt) => {
-    received.set(receipt.productId, (received.get(receipt.productId) || 0) + num(receipt.qty));
+    received.set(receipt.productId, (received.get(receipt.productId) || 0) + receiptStockDelta(receipt));
   });
   return { used, received };
 };
@@ -1334,6 +1341,8 @@ const getDashboardModule = () => {
       productCategory,
       productCategoryLabel,
       productById,
+      receiptDateValue,
+      receiptStockDelta,
       landingUsageLines,
       pendingUsagesOpen,
       PRODUCT_CATEGORIES,
@@ -1517,6 +1526,7 @@ const getProductsModule = () => {
       reconcileProductStocks,
       today,
       receiptDateValue,
+      receiptStockDelta,
       render,
       saveState,
       uid,
@@ -1723,13 +1733,14 @@ const renderReceiptHistoryList = (start = "", end = "", query = "") => {
               ${receiverBadge}
             </div>
             <div class="receipt-history-meta">
-              <span>입고일: ${escapeHtml(date || "-")}</span>
+              <span>날짜: ${escapeHtml(date || "-")}</span>
               <span>구분: ${escapeHtml(receiptTypeLabel(receipt))}</span>
               <span>입력자: ${escapeHtml(auditUserText(receipt) || "-")}</span>
-              <span>입고시각: ${escapeHtml(auditTimeText(receipt))}${updatedText}</span>
+              <span>입력시각: ${escapeHtml(auditTimeText(receipt))}${updatedText}</span>
             </div>
             ${receipt.memo ? `<div class="receipt-memo">메모: ${escapeHtml(receipt.memo)}</div>` : ""}
             ${receipt.type === "landing" ? `<div class="receipt-memo">제품: ${escapeHtml(name)}${meta ? ` · ${escapeHtml(meta)}` : ""}</div>` : ""}
+            ${receipt.type === "loan" ? `<div class="receipt-memo">대여 부서: ${escapeHtml(receipt.loanDepartment || "-")}</div>` : ""}
             ${manager ? `
               <div class="actions">
                 <button class="secondary" type="button" data-edit-receipt="${escapeHtml(receipt.id)}">수정</button>
@@ -1831,6 +1842,8 @@ const getReceiptsModule = () => {
       renderReceiptHistoryList,
       receiptProduct,
       receiptProductName,
+      receiptDateValue,
+      receiptStockDelta,
       sameId,
       today,
       auditUpdateFields,
@@ -4972,6 +4985,7 @@ const getHistoryModule = () => {
       normalizedName,
       inDateRange,
       receiptDateValue,
+      receiptStockDelta,
       sameId,
       parseSeedProducts,
       productKey,
@@ -5034,6 +5048,7 @@ const exportReceiptHistory = (start = "", end = "", query = "") => {
         patientIdText(usage),
         receipt.usageDate || usage?.date || "",
         receipt.type === "landing" ? landingReceiptLineSummary(receipt) : "",
+        receipt.loanDepartment || "",
         num(receipt.qty),
         receipt.memo || "",
         receipt.updatedByName || receipt.updatedBy?.name || "",
@@ -5042,7 +5057,7 @@ const exportReceiptHistory = (start = "", end = "", query = "") => {
     });
   downloadExcel(
     "입고내역.xlsx",
-    ["입고일", "입고시각", "입고자", "구분", "제품군", "제품명", "업체명", "세부분류", "환자명", "환자ID", "사용일", "랜딩표시", "입고수량", "메모", "수정자", "수정시각"],
+    ["날짜", "입력시각", "입력자", "구분", "제품군", "제품명", "업체명", "세부분류", "환자명", "환자ID", "사용일", "랜딩표시", "대여부서", "수량", "메모", "수정자", "수정시각"],
     rows
   );
 };
