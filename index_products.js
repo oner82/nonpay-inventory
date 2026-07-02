@@ -17,6 +17,7 @@
       reconcileProductStocks,
       today,
       receiptDateValue,
+      setProductFormDirty,
       render,
       saveState,
       uid,
@@ -93,6 +94,7 @@ const renderProducts = () => `
 
 const bindProducts = () => {
   const form = document.getElementById("productForm");
+  const markProductFormDirty = () => setProductFormDirty?.(true);
   const syncProductFields = () => {
     const category = document.getElementById("productCategory").value;
     const companySelect = document.getElementById("productCompany");
@@ -113,7 +115,10 @@ const bindProducts = () => {
   };
   context.setSyncProductFields(syncProductFields);
   document.getElementById("productCategory").addEventListener("change", syncProductFields);
+  form.addEventListener("input", markProductFormDirty);
+  form.addEventListener("change", markProductFormDirty);
   document.getElementById("productReset").addEventListener("click", () => {
+    setProductFormDirty?.(false);
     form.reset();
     document.getElementById("productId").value = "";
     document.getElementById("productFormTitle").textContent = "제품 추가";
@@ -170,6 +175,7 @@ const bindProducts = () => {
     }
     state.products = [...state.products.filter((item) => item.id !== id), next];
     reconcileProductStocks();
+    setProductFormDirty?.(false);
     render();
     await saveState("제품 저장 완료", {
       savingMessage: "제품 저장 중입니다...",

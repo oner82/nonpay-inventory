@@ -280,6 +280,7 @@ let pendingUsages = [];
 let suppressPendingUsagesRender = false;
 let productCategoryToKeepOpen = "";
 let useEntryDirty = false;
+let productFormDirty = false;
 let deferredUseEntryRender = false;
 const useEntryAutosaveKey = "orInventoryUseEntryPatientDraft";
 const useEntryAutosaveMaxAgeMs = 12 * 60 * 60 * 1000;
@@ -350,9 +351,10 @@ const setStatus = (message, type = "ok") => {
 };
 
 const isUseEntryProtected = () => currentView === "use" && useEntryDirty;
+const isProductFormProtected = () => currentView === "products" && productFormDirty;
 
 const renderOrDeferForUseEntry = (message = "새 데이터가 들어왔습니다. 입력 중인 사용입력을 보호하고 있습니다.") => {
-  if (isUseEntryProtected()) {
+  if (isUseEntryProtected() || isProductFormProtected()) {
     deferredUseEntryRender = true;
     setStatus(message, "ok");
     return false;
@@ -1056,6 +1058,7 @@ const bindCommon = () => {
       }
       const item = productById(editProductBtn.dataset.editProduct);
       if (!item) return;
+      productFormDirty = false;
       document.getElementById("productFormTitle").textContent = "제품 수정";
       document.getElementById("productId").value = item.id;
       document.getElementById("productCategory").value = item.category;
@@ -1456,6 +1459,7 @@ const getProductsModule = () => {
       getState: () => state,
       getImplantVendors: () => implantVendors,
       setSyncProductFields: (handler) => { syncProductFields = handler; },
+      setProductFormDirty: (dirty) => { productFormDirty = dirty; },
       canManageSettings,
       renderGroupedProducts,
       productCompanyOptions,
