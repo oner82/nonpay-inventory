@@ -148,7 +148,8 @@
           ${canAssignImplantPatientNo() ? `<button type="button" id="assignImplantPatientNos">선택 날짜 번호 재부여</button>` : ""}
         </div>
         <div class="actions" data-implant-panel="hospital" ${implantPanelVisible("hospital") ? "" : "hidden"}>
-          <button class="secondary" type="button" id="exportImplantLedger">엑셀 다운로드</button>
+          <button type="button" id="printHospitalImplantLedger">병원확인용 PDF 저장</button>
+          <button class="secondary" type="button" id="exportImplantLedger">목록 엑셀 다운로드</button>
         </div>
         <div class="actions" data-implant-panel="send" ${implantPanelVisible("send") ? "" : "hidden"}>
           <button type="button" id="prepareImplantVendorSend">마감 확인 후 발송자료 갱신</button>
@@ -880,6 +881,191 @@ const implantSendPrintHtml = (date, group) => `<!doctype html>
     }).join("")}
   </body>
   </html>`;
+
+const hospitalImplantLedgerRows = (records) => records.flatMap((record) => {
+  const implants = Array.isArray(record.implants) && record.implants.length
+    ? record.implants
+    : [{ id: `${record.id || uid()}-empty`, vendor: "", description: "", photos: [] }];
+  return implants.map((implant, index) => ({ record, implant, firstForPatient: index === 0, patientRowspan: implants.length }));
+});
+
+const hospitalImplantLedgerPhotoHtml = (photos = []) => {
+  const usablePhotos = photos
+    .map((photo) => implantPhotoViewSrc(photo))
+    .filter(Boolean);
+  if (!usablePhotos.length) return `<div class="hospital-photo-empty">첨부사진 없음</div>`;
+  return `
+    <div class="hospital-photo-grid">
+      ${usablePhotos.map((src) => `<img src="${escapeHtml(src)}" alt="임플란트 스티커 사진">`).join("")}
+    </div>
+  `;
+};
+
+const hospitalImplantLedgerPrintRowsHtml = (records) => {
+  const rows = hospitalImplantLedgerRows(records);
+  if (!rows.length) {
+    return `
+      <tr>
+        <td colspan="11" class="empty-row">선택 날짜의 임플란트 장부가 없습니다.</td>
+      </tr>
+    `;
+  }
+  return rows.map(({ record, implant, firstForPatient, patientRowspan }) => {
+    const patientNo = implantPatientNoText(record) || "미마감";
+    const opText = [record.surgeryName || surgeryById(record.surgeryId)?.name || "", record.surgeonCode || departmentById(record.doctorId)?.name || ""]
+      .filter(Boolean)
+      .join(" / ");
+    const scrubText = auditUserText(record) || record.enteredByName || record.createdByName || "";
+    const description = String(implant.description || "").trim();
+    const photos = Array.isArray(implant.photos) ? implant.photos : [];
+    return `
+      <tr>
+        ${firstForPatient ? `
+          <td class="date" rowspan="${patientRowspan}">${escapeHtml(implantRecordDate(record) || "-")}</td>
+          <td class="no" rowspan="${patientRowspan}">#${escapeHtml(patientNo)}</td>
+          <td class="id" rowspan="${patientRowspan}">${escapeHtml(record.patientId || "")}</td>
+          <td class="name" rowspan="${patientRowspan}">${escapeHtml(record.patientName || "")}</td>
+          <td class="op" rowspan="${patientRowspan}">${escapeHtml(opText || "-")}</td>
+        ` : ""}
+        <td class="vendor">${escapeHtml(implant.vendor || "업체 없음")}</td>
+        <td class="implant">
+          ${description ? `<div class="hospital-implant-desc">${escapeHtml(description)}</div>` : ""}
+          ${hospitalImplantLedgerPhotoHtml(photos)}
+        </td>
+        <td class="part"></td>
+        <td class="scrub">${escapeHtml(scrubText)}</td>
+        <td class="supplement"></td>
+        <td class="paper"></td>
+      </tr>
+    `;
+  }).join("");
+};
+
+const hospitalImplantLedgerPrintHtml = (date) => {
+  const records = sortImplantRecords(implantRecordsForDate(date));
+  const generatedAt = new Date().toLocaleString("ko-KR");
+  return `<!doctype html>
+  <html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <title>${escapeHtml(date)} 병원확인용 임플란트 장부</title>
+    <style>
+      @page { size: A4 portrait; margin: 8mm; }
+      * { box-sizing: border-box; }
+      body { margin: 0; color: #111827; font-family: Arial, "Malgun Gothic", sans-serif; background: #fff; }
+      .toolbar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; background: #eef6ff; border-bottom: 1px solid #bfdbfe; }
+      .toolbar strong { font-size: 15px; }
+      .toolbar button { border: 0; border-radius: 8px; padding: 10px 14px; background: #2563eb; color: #fff; font-weight: 900; cursor: pointer; }
+      .page { width: 194mm; margin: 0 auto; padding: 4mm 0 0; }
+      .ledger-head { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: end; margin-bottom: 5mm; }
+      .title { font-size: 22px; line-height: 1.1; font-weight: 900; letter-spacing: 0; }
+      .meta { text-align: right; font-size: 11px; line-height: 1.45; color: #475569; font-weight: 800; }
+      table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+      thead { display: table-header-group; }
+      tr { page-break-inside: avoid; break-inside: avoid; }
+      th, td { border: 1.4px solid #111827; vertical-align: top; padding: 3px; }
+      th { height: 8mm; text-align: center; font-size: 11px; font-weight: 900; background: #f8fafc; }
+      td { min-height: 10mm; font-size: 10px; font-weight: 800; overflow-wrap: anywhere; }
+      th.date, td.date { width: 8%; text-align: center; }
+      th.no, td.no { width: 7%; text-align: center; font-size: 13px; }
+      th.id, td.id { width: 10%; }
+      th.name, td.name { width: 9%; }
+      th.op, td.op { width: 12%; white-space: pre-wrap; }
+      th.vendor, td.vendor { width: 10%; text-align: center; }
+      th.implant, td.implant { width: 36%; }
+      th.part, td.part { width: 5%; text-align: center; }
+      th.scrub, td.scrub { width: 6%; text-align: center; }
+      th.supplement, td.supplement { width: 5%; text-align: center; }
+      th.paper, td.paper { width: 5%; text-align: center; }
+      .hospital-implant-desc { white-space: pre-wrap; font-family: Consolas, "Malgun Gothic", monospace; font-size: 10.5px; line-height: 1.25; margin-bottom: 3px; }
+      .hospital-photo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; align-items: start; }
+      .hospital-photo-grid img { width: 100%; max-height: 39mm; object-fit: contain; border: 1px solid #cbd5e1; background: #fff; }
+      .hospital-photo-grid img:only-child { grid-column: 1 / -1; max-height: 48mm; }
+      .hospital-photo-empty, .empty-row { min-height: 18mm; display: grid; place-items: center; color: #64748b; font-size: 11px; font-weight: 800; text-align: center; }
+      .footer { margin-top: 5mm; text-align: center; color: #374151; font-size: 15px; font-weight: 900; }
+      @media print {
+        .toolbar { display: none; }
+        .page { width: auto; margin: 0; padding: 0; }
+        .ledger-head { margin-bottom: 4mm; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="toolbar">
+      <strong>사진이 모두 보이면 PDF 저장을 눌러 주세요. 인쇄 대상에서 “PDF로 저장”을 선택하면 됩니다.</strong>
+      <button type="button" onclick="window.print()">PDF 저장</button>
+    </div>
+    <main class="page">
+      <header class="ledger-head">
+        <div class="title">임플란트 병원 확인용 장부</div>
+        <div class="meta">
+          <div>DATE ${escapeHtml(date || "-")}</div>
+          <div>기록 ${records.length}건 · 생성 ${escapeHtml(generatedAt)}</div>
+        </div>
+      </header>
+      <table>
+        <thead>
+          <tr>
+            <th class="date">DATE</th>
+            <th class="no">NO.</th>
+            <th class="id">ID</th>
+            <th class="name">NAME</th>
+            <th class="op">OP</th>
+            <th class="vendor">업체명</th>
+            <th class="implant">IMPLANT</th>
+            <th class="part">Part</th>
+            <th class="scrub">Scrub</th>
+            <th class="supplement">보충</th>
+            <th class="paper">서류</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${hospitalImplantLedgerPrintRowsHtml(records)}
+        </tbody>
+      </table>
+      <div class="footer">윌스기념병원</div>
+    </main>
+    <script>
+      (() => {
+        const images = Array.from(document.images);
+        const settle = () => window.setTimeout(() => window.print(), 250);
+        if (!images.length) {
+          settle();
+          return;
+        }
+        let pending = images.length;
+        const done = () => {
+          pending -= 1;
+          if (pending <= 0) settle();
+        };
+        images.forEach((image) => {
+          if (image.complete) done();
+          else {
+            image.addEventListener("load", done, { once: true });
+            image.addEventListener("error", done, { once: true });
+          }
+        });
+        window.setTimeout(() => {
+          if (pending > 0) settle();
+        }, 3500);
+      })();
+    </script>
+  </body>
+  </html>`;
+};
+
+const printHospitalImplantLedgerPdf = (date) => {
+  const targetDate = date || today();
+  const win = window.open("", "_blank");
+  if (!win) {
+    alert("PDF 저장 창을 열 수 없습니다. 브라우저 팝업 차단을 해제해 주세요.");
+    return false;
+  }
+  win.document.open();
+  win.document.write(hospitalImplantLedgerPrintHtml(targetDate));
+  win.document.close();
+  return true;
+};
 
 const implantSendLedgerTableRowsHtml = (group, options = {}) => group.lines.map(({ record, implant }) => {
   const photos = implant.photos || [];
@@ -1613,6 +1799,9 @@ const bindImplants = () => {
   });
   document.getElementById("exportImplantLedger")?.addEventListener("click", () => {
     exportImplantLedgerExcel(dateInput.value);
+  });
+  document.getElementById("printHospitalImplantLedger")?.addEventListener("click", () => {
+    printHospitalImplantLedgerPdf(dateInput.value);
   });
   document.getElementById("downloadImplantMonthlyBackup")?.addEventListener("click", async () => {
     try {
