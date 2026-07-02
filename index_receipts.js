@@ -35,6 +35,11 @@
       landingUsageLines
     } = context;
 
+const landingCarryoverProducts = () => state.products
+  .filter((item) => productCategory(item.category) !== "비급여")
+  .slice()
+  .sort((a, b) => productDisplaySort(productCategory(a.category))(a, b) || byName(a, b));
+
 const renderReceipts = () => {
   const canEnterReceipts = canRegisterNonpayReceipts();
   const canEnterLanding = canManageLandingReceipts();
@@ -70,6 +75,20 @@ const renderReceipts = () => {
       </form>
     ` : ""}
     ${receiptView === "landing" ? `
+      <form class="card receipt-wide" id="landingCarryoverReceiptForm">
+        <h2>이월 랜딩 입고 등록</h2>
+        <p class="helper">프로그램 사용 시작 전 이미 사용했지만 아직 받지 못했던 랜딩 제품을 받았을 때 사용합니다. 환자 사용내역과 연결하지 않고 현재고와 입고내역에만 반영됩니다.</p>
+        <label for="landingCarryoverProduct">제품 선택</label>
+        <select id="landingCarryoverProduct" required>
+          <option value="">랜딩 제품을 선택하세요</option>
+          ${landingCarryoverProducts().map((item) => `<option value="${item.id}">${escapeHtml(item.name)}${item.company ? ` / ${escapeHtml(item.company)}` : ""}${item.subcategory ? ` / ${escapeHtml(item.subcategory)}` : ""} / 현재고 ${num(item.stock)}</option>`).join("")}
+        </select>
+        <label for="landingCarryoverQty">입고 수량</label>
+        <input id="landingCarryoverQty" type="number" min="1" value="1" required>
+        <label for="landingCarryoverMemo">메모</label>
+        <textarea id="landingCarryoverMemo" class="memo-input" placeholder="예: 프로그램 시작 전 사용분 보충"></textarea>
+        <div class="actions"><button type="submit">이월 랜딩 입고 저장</button></div>
+      </form>
       <div class="card receipt-wide">
         <h2>랜딩 입고 확인</h2>
         ${renderLandingBoard()}
@@ -245,6 +264,35 @@ const bindReceipts = () => {
     state.receipts.push({ id: uid(), type: "nonpay", productId, productName: product.name, qty, date: today(), memo, createdAt: new Date().toISOString(), ...auditCreateFields() });
     render();
     await saveState();
+  });
+  document.getElementById("landingCarryoverReceiptForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!canManageLandingReceipts()) {
+      alert("이월 랜딩 입고 등록은 관리자와 책임사용자만 가능합니다.");
+      return;
+    }
+    const productId = document.getElementById("landingCarryoverProduct").value;
+    const qty = Math.max(1, num(document.getElementById("landingCarryoverQty").value));
+    const memo = document.getElementById("landingCarryoverMemo")?.value.trim() || "프로그램 시작 전 사용분 보충";
+    const product = productById(productId);
+    if (!product) return;
+    product.stock = num(product.stock) + qty;
+    state.receipts.push({
+      id: uid(),
+      type: "landingCarryover",
+      productId,
+      productName: product.name,
+      qty,
+      date: today(),
+      memo,
+      company: product.company || "",
+      subcategory: product.subcategory || "",
+      category: product.category || "",
+      createdAt: new Date().toISOString(),
+      ...auditCreateFields()
+    });
+    render();
+    await saveState("이월 랜딩 입고 저장 완료");
   });
   const receiveLandingLine = async (usageId, productId) => {
     if (!canManageLandingReceipts()) {

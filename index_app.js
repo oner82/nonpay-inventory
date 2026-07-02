@@ -720,7 +720,11 @@ const receiptProductMeta = (receipt) => {
     product?.subcategory || receipt?.subcategory || ""
   ].filter(Boolean).join(" · ");
 };
-const receiptTypeLabel = (receipt) => receipt?.type === "landing" ? "랜딩" : "비급여";
+const receiptTypeLabel = (receipt) => {
+  if (receipt?.type === "landing") return "랜딩";
+  if (receipt?.type === "landingCarryover") return "이월 랜딩";
+  return "비급여";
+};
 const receiptSortValue = (receipt) => {
   const value = receipt?.createdAt || receipt?.updatedAt || receipt?.date || "";
   const time = new Date(value).getTime();
