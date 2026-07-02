@@ -1610,6 +1610,14 @@ const landingImplantPatientNo = (usageId) => {
   const patientNo = records.find((record) => implantPatientNoText(record))?.patientNo || records[0]?.patientNo || "";
   return patientNo ? `#${patientNo}` : "미마감";
 };
+const landingReceiptUsage = (receipt) => receipt?.usageId ? state.usages.find((item) => sameId(item.id, receipt.usageId)) : null;
+const landingReceiptLineSummary = (receipt) => {
+  const usage = landingReceiptUsage(receipt);
+  const date = receipt?.usageDate || usage?.date || receiptDateValue(receipt);
+  const patientNo = landingImplantPatientNo(receipt?.usageId);
+  const patientName = receipt?.patientName || usage?.patientName || "-";
+  return `${shortCompactDate(date)} · ${patientNo} · ${patientName} · ${Math.max(1, num(receipt?.qty))}개`;
+};
 
 const renderLandingBoard = () => {
   const lines = landingUsageLines(true);
@@ -1708,7 +1716,7 @@ const renderReceiptHistoryList = (start = "", end = "", query = "") => {
           <div class="item receipt-history-card" data-receipt-row="${escapeHtml(receipt.id)}">
             <div class="receipt-history-head">
               <div class="receipt-history-name">
-                ${escapeHtml(name)}
+                ${escapeHtml(receipt.type === "landing" ? landingReceiptLineSummary(receipt) : name)}
                 <span>${escapeHtml(meta || "-")}</span>
               </div>
               <span class="pill">${num(receipt.qty).toLocaleString()}개</span>
@@ -1721,7 +1729,7 @@ const renderReceiptHistoryList = (start = "", end = "", query = "") => {
               <span>입고시각: ${escapeHtml(auditTimeText(receipt))}${updatedText}</span>
             </div>
             ${receipt.memo ? `<div class="receipt-memo">메모: ${escapeHtml(receipt.memo)}</div>` : ""}
-            ${receipt.type === "landing" ? `<div class="receipt-memo">사용일: ${escapeHtml(receipt.usageDate || "-")} · 환자명: ${escapeHtml(receipt.patientName || "-")}</div>` : ""}
+            ${receipt.type === "landing" ? `<div class="receipt-memo">제품: ${escapeHtml(name)}${meta ? ` · ${escapeHtml(meta)}` : ""}</div>` : ""}
             ${manager ? `
               <div class="actions">
                 <button class="secondary" type="button" data-edit-receipt="${escapeHtml(receipt.id)}">수정</button>
@@ -5025,6 +5033,7 @@ const exportReceiptHistory = (start = "", end = "", query = "") => {
         receipt.patientName || usage?.patientName || "",
         patientIdText(usage),
         receipt.usageDate || usage?.date || "",
+        receipt.type === "landing" ? landingReceiptLineSummary(receipt) : "",
         num(receipt.qty),
         receipt.memo || "",
         receipt.updatedByName || receipt.updatedBy?.name || "",
@@ -5033,7 +5042,7 @@ const exportReceiptHistory = (start = "", end = "", query = "") => {
     });
   downloadExcel(
     "입고내역.xlsx",
-    ["입고일", "입고시각", "입고자", "구분", "제품군", "제품명", "업체명", "세부분류", "환자명", "환자ID", "사용일", "입고수량", "메모", "수정자", "수정시각"],
+    ["입고일", "입고시각", "입고자", "구분", "제품군", "제품명", "업체명", "세부분류", "환자명", "환자ID", "사용일", "랜딩표시", "입고수량", "메모", "수정자", "수정시각"],
     rows
   );
 };
