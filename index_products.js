@@ -15,6 +15,8 @@
       nextNonpaySortOrder,
       productMovementCounts,
       reconcileProductStocks,
+      today,
+      receiptDateValue,
       render,
       saveState,
       uid,
@@ -58,13 +60,18 @@ const renderProducts = () => `
       </div>
       <div class="row two">
         <div>
-          <label for="productStock">현재고</label>
+          <label for="productStock">현재고(지금 기준)</label>
           <input id="productStock" type="number" min="0" value="0" required>
         </div>
         <div>
           <label for="productWarning">경고수량</label>
           <input id="productWarning" type="number" min="0" value="1" required>
         </div>
+      </div>
+      <div>
+        <label for="productOpeningStockToday">오늘 시작 전 현재고</label>
+        <input id="productOpeningStockToday" type="number" min="0" placeholder="오늘 이미 사용한 뒤 시작 전 재고를 맞출 때만 입력">
+        <div class="helper">입력하면 오늘 사용/입고는 그대로 두고, 오늘 시작 시점 재고가 이 수량이 되도록 기준재고를 보정합니다.</div>
       </div>
       <div id="productLandingWrap">
         <label for="productLanding">랜딩수량</label>
@@ -113,6 +120,18 @@ const bindProducts = () => {
     document.getElementById("productCompany").innerHTML = productCompanyOptions();
     syncProductFields();
   });
+  const productMovementBeforeDate = (productId, date) => {
+    const used = state.usages.reduce((sum, usage) => {
+      if (!usage.date || usage.date >= date) return sum;
+      return sum + (usage.productIds || []).filter((id) => String(id) === String(productId)).length;
+    }, 0);
+    const received = state.receipts.reduce((sum, receipt) => {
+      const receiptDate = receiptDateValue(receipt);
+      if (!receiptDate || receiptDate >= date || String(receipt.productId) !== String(productId)) return sum;
+      return sum + num(receipt.qty);
+    }, 0);
+    return { used, received };
+  };
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const id = document.getElementById("productId").value || uid();
@@ -142,7 +161,13 @@ const bindProducts = () => {
     };
     if (!next.name) return;
     const { used, received } = productMovementCounts();
-    next.baseStock = num(next.stock) - (received.get(id) || 0) + (used.get(id) || 0);
+    const openingStockTodayInput = document.getElementById("productOpeningStockToday").value;
+    if (openingStockTodayInput !== "") {
+      const beforeToday = productMovementBeforeDate(id, today());
+      next.baseStock = num(openingStockTodayInput) - beforeToday.received + beforeToday.used;
+    } else {
+      next.baseStock = num(next.stock) - (received.get(id) || 0) + (used.get(id) || 0);
+    }
     state.products = [...state.products.filter((item) => item.id !== id), next];
     reconcileProductStocks();
     render();

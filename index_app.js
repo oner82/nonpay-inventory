@@ -1064,6 +1064,7 @@ const bindCommon = () => {
       document.getElementById("productCompany").value = productCompanySelectValue(item.company || "", item.companyVendorId || "");
       document.getElementById("productSubcategory").value = item.subcategory || "";
       document.getElementById("productStock").value = num(item.stock);
+      document.getElementById("productOpeningStockToday").value = "";
       document.getElementById("productWarning").value = num(item.warningStock);
       document.getElementById("productLanding").value = num(item.landingQty);
       syncProductFields?.();
@@ -1464,6 +1465,8 @@ const getProductsModule = () => {
       nextNonpaySortOrder,
       productMovementCounts,
       reconcileProductStocks,
+      today,
+      receiptDateValue,
       render,
       saveState,
       uid,
