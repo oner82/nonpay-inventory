@@ -9,6 +9,8 @@ let runTransaction;
 let onSnapshot;
 let enableIndexedDbPersistence;
 let collection;
+let query;
+let where;
 let getStorage;
 let storageRef;
 let uploadBytes;
@@ -278,6 +280,8 @@ let implantRecords = [];
 let implantVendors = [];
 let pendingUsages = [];
 let suppressPendingUsagesRender = false;
+let implantRecordsLoaded = false;
+let implantRecordsLoading = false;
 let productCategoryToKeepOpen = "";
 let useEntryDirty = false;
 let productFormDirty = false;
@@ -1017,11 +1021,54 @@ const renderNav = () => {
   });
 };
 
+const implantRecordViews = new Set(["implants", "edit", "history"]);
+const currentViewNeedsImplantRecords = () => implantRecordViews.has(currentView);
+const implantRecordsLoadingHtml = () => `
+  <div class="card">
+    <h2>임플란트 장부 불러오는 중</h2>
+    <p class="helper">장부 사진은 문서 품질 유지를 위해 원본 정보를 보존합니다. 앱 시작 속도를 위해 이 화면에서 필요할 때만 불러옵니다.</p>
+  </div>
+`;
+
+const ensureImplantRecordsSubscription = () => {
+  if (implantRecordsLoaded) return true;
+  if (!db || !collection || !onSnapshot) return false;
+  if (!implantRecordsUnsubscribe && !implantRecordsLoading) {
+    implantRecordsLoading = true;
+    implantRecordsUnsubscribe = onSnapshot(collection(db, "implantRecords"), (snapshot) => {
+      implantRecords = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+      implantRecordsLoaded = true;
+      implantRecordsLoading = false;
+      if (hydrated && currentViewNeedsImplantRecords()) render();
+    }, (error) => {
+      console.error(error);
+      implantRecordsLoading = false;
+      setStatus(`임플란트 기록 연결 오류: ${error.message}`, "error");
+    });
+  }
+  return false;
+};
+
 const render = () => {
   if (!ensureLocalSession() || !ensureCurrentViewAllowed()) return;
   renderedDate = today();
   renderSessionControls();
   renderNav();
+  const currentLabel = menus.find(([key]) => key === currentView)?.[1] || "대시보드";
+  if (currentViewNeedsImplantRecords() && !ensureImplantRecordsSubscription()) {
+    app.innerHTML = `
+      <div class="page-head">
+        <h2>${escapeHtml(currentLabel)}</h2>
+        <div class="page-user">
+          <strong>수술실 재고관리</strong><br>
+          <span>${escapeHtml(today())}</span>
+        </div>
+      </div>
+      ${implantRecordsLoadingHtml()}
+    `;
+    bindCommon();
+    return;
+  }
   const views = {
     dashboard: renderDashboard,
     receipts: renderReceipts,
@@ -1031,7 +1078,6 @@ const render = () => {
     edit: renderEditUsage,
     settings: renderSettings
   };
-  const currentLabel = menus.find(([key]) => key === currentView)?.[1] || "대시보드";
   app.innerHTML = `
     <div class="page-head">
       <h2>${escapeHtml(currentLabel)}</h2>
@@ -4854,17 +4900,12 @@ const bindUse = () => {
     }
     if (loadedPendingUsageId && db) {
       try {
-        await setDoc(doc(db, "pendingUsages", loadedPendingUsageId), {
-          status: "confirmed",
-          confirmedUsageId: usageRecord.id,
-          confirmedAt: finalSavedAt,
-          confirmedBy: currentAuditUser(),
-          updatedAt: new Date().toISOString(),
-          ...auditUpdateFields()
-        }, { merge: true });
+        await deleteDoc(doc(db, "pendingUsages", loadedPendingUsageId));
+        pendingUsages = pendingUsages.filter((item) => !sameId(item.id, loadedPendingUsageId));
+        loadedPendingUsageId = "";
       } catch (error) {
         console.error(error);
-        saveErrorToast(`임시저장 확정 처리 실패: ${error.message}`);
+        saveErrorToast(`임시저장 대기 정리 실패: ${error.message}`);
       }
     }
     setButtonBusy(submitButton, false);
@@ -5066,15 +5107,6 @@ const bindBackup = () => getBackupResetModule().bindBackup();
 
 const subscribeImplantCollections = () => {
   if (!db || !collection || !onSnapshot) return;
-  if (!implantRecordsUnsubscribe) {
-    implantRecordsUnsubscribe = onSnapshot(collection(db, "implantRecords"), (snapshot) => {
-      implantRecords = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
-      if (hydrated && ["implants", "edit"].includes(currentView)) render();
-    }, (error) => {
-      console.error(error);
-      setStatus(`임플란트 기록 연결 오류: ${error.message}`, "error");
-    });
-  }
   if (!implantVendorsUnsubscribe) {
     implantVendorsUnsubscribe = onSnapshot(collection(db, "implantVendors"), (snapshot) => {
       implantVendors = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
@@ -5089,7 +5121,10 @@ const subscribeImplantCollections = () => {
     });
   }
   if (!pendingUsagesUnsubscribe) {
-    pendingUsagesUnsubscribe = onSnapshot(collection(db, "pendingUsages"), (snapshot) => {
+    const pendingUsageQuery = query
+      ? query(collection(db, "pendingUsages"), where("status", "==", "pending"))
+      : collection(db, "pendingUsages");
+    pendingUsagesUnsubscribe = onSnapshot(pendingUsageQuery, (snapshot) => {
       pendingUsages = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
       if (hydrated && currentView === "use") {
         if (suppressPendingUsagesRender) {
@@ -5179,6 +5214,8 @@ const loadFirebaseAndBoot = async () => {
     onSnapshot = firestoreModule.onSnapshot;
     enableIndexedDbPersistence = firestoreModule.enableIndexedDbPersistence;
     collection = firestoreModule.collection;
+    query = firestoreModule.query;
+    where = firestoreModule.where;
     getStorage = storageModule.getStorage;
     storageRef = storageModule.ref;
     uploadBytes = storageModule.uploadBytes;
