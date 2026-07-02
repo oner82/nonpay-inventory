@@ -355,7 +355,7 @@ const setStatus = (message, type = "ok") => {
 };
 
 const isUseEntryProtected = () => currentView === "use" && useEntryDirty;
-const isProductFormProtected = () => currentView === "products" && productFormDirty;
+const isProductFormProtected = () => currentView === "settings" && currentSettingsView === "products" && productFormDirty;
 
 const renderOrDeferForUseEntry = (message = "새 데이터가 들어왔습니다. 입력 중인 사용입력을 보호하고 있습니다.") => {
   if (isUseEntryProtected() || isProductFormProtected()) {
