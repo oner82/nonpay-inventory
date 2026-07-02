@@ -1193,7 +1193,7 @@
     /* 2026-05-05 final tablet history filter fix: iPad landscape uses wide viewport */
     .history-filter-grid {
       display: grid !important;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 12px !important;
       align-items: end !important;
     }
@@ -1212,9 +1212,6 @@
     @media (min-width: 721px) and (max-width: 1500px) {
       .history-filter-grid {
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-      }
-      .history-filter-grid > div:nth-child(3) {
-        grid-column: 1 / -1 !important;
       }
       .history-filter-grid #historySearch {
         max-width: 100% !important;

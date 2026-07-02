@@ -5,12 +5,12 @@
     const renderHistory = () => {
       const state = context.getState();
       const defaultDate = defaultHistoryDate();
-      const defaultPatientCount = filteredHistoryUsages(defaultDate, defaultDate, "").length;
+      const defaultPatientCount = filteredHistoryUsages(defaultDate, defaultDate, "", "").length;
       return `
         <section class="grid">
           <div class="card">
             <h2>사용내역 검색</h2>
-            <div class="row three history-filter-grid">
+            <div class="row history-filter-grid">
               <div>
                 <label for="historyStart">시작일</label>
                 <input id="historyStart" type="date" value="${context.escapeHtml(defaultDate)}">
@@ -25,6 +25,10 @@
                 <datalist id="historyProductList">
                   ${state.products.slice().sort(context.byName).map((product) => `<option value="${context.escapeHtml(product.name)}"></option>`).join("")}
                 </datalist>
+              </div>
+              <div>
+                <label for="historyPatientSearch">환자 검색</label>
+                <input id="historyPatientSearch" autocomplete="off" placeholder="환자명 또는 등록번호">
               </div>
             </div>
             <div class="actions">
@@ -54,13 +58,21 @@
     const historyFilterValues = () => ({
       start: document.getElementById("historyStart")?.value || "",
       end: document.getElementById("historyEnd")?.value || "",
-      query: document.getElementById("historySearch")?.value || ""
+      query: document.getElementById("historySearch")?.value || "",
+      patientQuery: document.getElementById("historyPatientSearch")?.value || ""
     });
 
-    const filteredHistoryUsages = (start, end, query) => {
+    const filteredHistoryUsages = (start, end, query, patientQuery = "") => {
       const normalizedQuery = context.normalizedName(query || "");
+      const normalizedPatientQuery = context.normalizedName(patientQuery || "");
+      const patientIdQuery = String(patientQuery || "").replace(/\D/g, "");
       return context.getState().usages.filter((usage) => {
         if (!context.inDateRange(usage.date, start, end)) return false;
+        if (normalizedPatientQuery) {
+          const patientText = context.normalizedName(`${usage.patientName || ""} ${context.patientIdText(usage)}`);
+          const patientId = context.patientIdText(usage).replace(/\D/g, "");
+          if (!patientText.includes(normalizedPatientQuery) && (!patientIdQuery || !patientId.includes(patientIdQuery))) return false;
+        }
         if (!normalizedQuery) return true;
         const doctor = context.departmentById(usage.doctorId);
         const surgery = context.surgeryById(usage.surgeryId);
@@ -68,7 +80,7 @@
           const product = context.productById(id);
           return `${product?.name || ""} ${product?.company || ""} ${product?.subcategory || ""}`;
         }).join(" ");
-        return context.normalizedName(`${usage.patientName || ""} ${context.patientIdText(usage)} ${doctor?.name || ""} ${surgery?.name || ""} ${productText}`).includes(normalizedQuery);
+        return context.normalizedName(`${doctor?.name || ""} ${surgery?.name || ""} ${productText}`).includes(normalizedQuery);
       });
     };
 
@@ -260,8 +272,8 @@
       `;
     };
 
-    const patientHistoryListHtml = (start = "", end = "", query = "") => {
-      const usages = filteredHistoryUsages(start, end, query).slice().reverse();
+    const patientHistoryListHtml = (start = "", end = "", query = "", patientQuery = "") => {
+      const usages = filteredHistoryUsages(start, end, query, patientQuery).slice().reverse();
       return usages.map(usageItem).join("") || `<div class="empty">사용내역이 없습니다.</div>`;
     };
 
@@ -446,8 +458,8 @@
     };
 
     const exportHistoryPatients = () => {
-      const { start, end, query } = historyFilterValues();
-      const rows = filteredHistoryUsages(start, end, query).slice().reverse().map((usage) => {
+      const { start, end, query, patientQuery } = historyFilterValues();
+      const rows = filteredHistoryUsages(start, end, query, patientQuery).slice().reverse().map((usage) => {
         const doctor = context.departmentById(usage.doctorId);
         const surgery = context.surgeryById(usage.surgeryId);
         const productText = usage.productIds.map((id) => context.productById(id)?.name || "삭제된 제품").join(", ");
@@ -476,6 +488,7 @@
       const startInput = document.getElementById("historyStart");
       const endInput = document.getElementById("historyEnd");
       const searchInput = document.getElementById("historySearch");
+      const patientSearchInput = document.getElementById("historyPatientSearch");
       const summary = document.getElementById("historyProductSummary");
       const patientList = document.getElementById("historyPatientList");
       const bindHistoryExports = () => {
@@ -491,12 +504,13 @@
         const start = startInput.value;
         const end = endInput.value;
         const query = searchInput.value;
+        const patientQuery = patientSearchInput.value;
         summary.innerHTML = productUsageSummaryHtml(start, end, query);
-        patientList.innerHTML = patientHistoryListHtml(start, end, query);
+        patientList.innerHTML = patientHistoryListHtml(start, end, query, patientQuery);
         bindHistoryDeleteButtons();
         bindHistoryExports();
       };
-      [startInput, endInput, searchInput].forEach((input) => {
+      [startInput, endInput, searchInput, patientSearchInput].forEach((input) => {
         input.addEventListener("input", updateHistory);
         input.addEventListener("change", updateHistory);
       });
@@ -506,6 +520,7 @@
         startInput.value = defaultDate;
         endInput.value = defaultDate;
         searchInput.value = "";
+        patientSearchInput.value = "";
         updateHistory();
       });
       const bindHistoryDeleteButtons = () => {
