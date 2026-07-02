@@ -1021,7 +1021,7 @@ const renderNav = () => {
   });
 };
 
-const implantRecordViews = new Set(["implants", "edit", "history"]);
+const implantRecordViews = new Set(["implants", "edit", "history", "receipts"]);
 const currentViewNeedsImplantRecords = () => implantRecordViews.has(currentView);
 const implantRecordsLoadingHtml = () => `
   <div class="card">
@@ -1604,6 +1604,13 @@ const landingUsageLines = (includeReceived = true) => {
   }).filter(Boolean);
 };
 
+const shortCompactDate = (date = "") => String(date || "").replace(/-/g, "").slice(2) || "-";
+const landingImplantPatientNo = (usageId) => {
+  const records = implantRecordsForUsage(usageId);
+  const patientNo = records.find((record) => implantPatientNoText(record))?.patientNo || records[0]?.patientNo || "";
+  return patientNo ? `#${patientNo}` : "미마감";
+};
+
 const renderLandingBoard = () => {
   const lines = landingUsageLines(true);
   if (!lines.length) return `<div class="empty">랜딩 입고 확인 대상이 없습니다.</div>`;
@@ -1645,7 +1652,8 @@ const renderLandingBoard = () => {
 const landingLineItem = ({ usage, product, receipt, qty }) => `
   <div class="item landing-line ${receipt ? "received" : "pending"}">
     <div class="compact-line">
-      <div class="compact-main">${escapeHtml(product?.name || "삭제된 제품")} · ${escapeHtml(usage.patientName)} · 사용 ${escapeHtml(usage.date)} · ${Math.max(1, num(qty))}개</div>
+      <div class="compact-main">${escapeHtml(shortCompactDate(usage.date))} · ${escapeHtml(landingImplantPatientNo(usage.id))} · ${escapeHtml(usage.patientName || "-")} · ${Math.max(1, num(qty))}개</div>
+      <div class="compact-meta">${escapeHtml(product?.name || "삭제된 제품")}${product?.subcategory ? ` · ${escapeHtml(product.subcategory)}` : ""}</div>
       <div class="compact-meta">${receipt ? `입고 ${escapeHtml(receipt.date)} · ${num(receipt.qty)}개 · 입고자: ${escapeHtml(auditUserText(receipt) || "-")} · 입고시각: ${escapeHtml(auditTimeText(receipt))}` : "입고 대기"}</div>
       <span class="pill ${receipt ? "" : "low"}">${receipt ? "확인" : "대기"}</span>
       ${receipt ? "" : `<div class="compact-actions"><button type="button" data-receive-landing="${usage.id}::${product.id}">입고 확인</button></div>`}
