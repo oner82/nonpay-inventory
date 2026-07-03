@@ -1605,6 +1605,23 @@ const saveAndShareImplantVendorStatementPdf = async (date, group) => {
   return "saved-only";
 };
 
+const saveImplantVendorStatementsZip = async (date, groups, onProgress) => {
+  const files = [];
+  let done = 0;
+  onProgress?.({ done, total: groups.length });
+  for (const group of groups) {
+    const blob = await renderImplantStatementPdfBlob(date, group);
+    files.push({
+      name: implantVendorStatementFileName(date, group.vendor, "pdf"),
+      content: new Uint8Array(await blob.arrayBuffer())
+    });
+    done += 1;
+    onProgress?.({ done, total: groups.length, vendor: group.vendor });
+  }
+  downloadBytes(`임플란트_업체발송_${date}.zip`, zipFiles(files), "application/zip");
+  return files.length;
+};
+
 const downloadImplantVendorStatementHtml = (date, group) => {
   downloadBytes(
     implantVendorStatementFileName(date, group.vendor, "html"),
@@ -1661,9 +1678,27 @@ const implantSendPanelHtml = (date) => {
 const implantSendPanelOrganizedHtml = (date) => {
   const groups = implantSendGroups(date);
   if (!groups.length) return `<div class="empty">업체별로 발송할 임플란트 기록이 없습니다.</div>`;
+  const activeGroups = groups.filter((group) => group.status !== "excluded");
+  const activeStats = activeGroups.reduce((sum, group) => {
+    const stats = implantSendGroupStats(group);
+    sum.patients += stats.patients;
+    sum.records += group.lines.length;
+    sum.photos += stats.photos;
+    return sum;
+  }, { patients: 0, records: 0, photos: 0 });
   const unnumberedTotal = implantRecordsForDate(date).filter((record) => !implantPatientNoText(record)).length;
   return `
     ${unnumberedTotal ? `<div class="implant-send-preview">선택 날짜에 환자번호가 없는 기록 ${unnumberedTotal}건이 있습니다. 업체 발송 전 마감 또는 번호 부여가 필요합니다.</div>` : ""}
+    <div class="implant-send-bulk-actions">
+      <div>
+        <div class="implant-send-bulk-title">전체 업체 발송 준비</div>
+        <div class="implant-send-bulk-meta">업체 ${activeGroups.length}곳 · 환자 ${activeStats.patients}명 · 기록 ${activeStats.records}건 · 사진 ${activeStats.photos}장</div>
+      </div>
+      <div class="implant-send-bulk-buttons">
+        <button type="button" data-bulk-download-implant-send>전체 PDF ZIP 저장</button>
+        <button class="secondary" type="button" data-bulk-set-implant-send-status="sent">전체 발송완료</button>
+      </div>
+    </div>
     <div class="implant-send-list">
       ${groups.map((group) => {
         const message = implantSendMessage(date, group.vendor, group.lines);
@@ -1839,6 +1874,57 @@ const bindImplants = () => {
     const photoImage = event.target.closest("[data-implant-photo-view]");
     if (photoImage) {
       showImplantPhotoModal(photoImage.dataset.implantPhotoView);
+      return;
+    }
+    const bulkDownloadButton = event.target.closest("[data-bulk-download-implant-send]");
+    if (bulkDownloadButton) {
+      const date = dateInput.value || today();
+      const groups = implantSendGroups(date).filter((group) => group.status !== "excluded");
+      if (!groups.length) {
+        alert("ZIP으로 저장할 업체가 없습니다.");
+        return;
+      }
+      setButtonBusy(bulkDownloadButton, true, "전체 PDF 생성 중...");
+      showSaveToast(`업체 ${groups.length}곳 PDF를 ZIP으로 만드는 중입니다...`, "saving", { hold: true });
+      try {
+        const count = await saveImplantVendorStatementsZip(date, groups, ({ done, total }) => {
+          if (done) showSaveToast(`업체 PDF 생성 중 ${done}/${total}`, "saving", { hold: done < total });
+        });
+        saveDoneToast(`업체 ${count}곳 PDF ZIP 저장을 시작했습니다.`);
+      } catch (error) {
+        console.error(error);
+        saveErrorToast(`전체 PDF ZIP 생성 실패: ${error.message || error}`);
+        alert(error.message || error);
+      } finally {
+        setButtonBusy(bulkDownloadButton, false);
+      }
+      return;
+    }
+    const bulkStatusButton = event.target.closest("[data-bulk-set-implant-send-status]");
+    if (bulkStatusButton) {
+      const date = dateInput.value || today();
+      const status = bulkStatusButton.dataset.bulkSetImplantSendStatus;
+      const groups = implantSendGroups(date).filter((group) => group.status !== "excluded");
+      if (!groups.length) {
+        alert("상태를 변경할 업체가 없습니다.");
+        return;
+      }
+      if (!confirm(`업체 ${groups.length}곳을 모두 '${implantSendStatusLabel(status)}'로 표시할까요?`)) return;
+      setButtonBusy(bulkStatusButton, true, "저장 중...");
+      try {
+        let total = 0;
+        for (const group of groups) {
+          total += await updateImplantSendGroupStatus(date, group.vendor, status);
+        }
+        sendList.innerHTML = implantSendPanelOrganizedHtml(date);
+        renderList();
+        saveDoneToast(`전체 업체 · ${implantSendStatusLabel(status)} 저장 완료 (${total}건)`);
+      } catch (error) {
+        saveErrorToast(`전체 발송 상태 저장 실패: ${error.message}`);
+        alert(error.message);
+      } finally {
+        setButtonBusy(bulkStatusButton, false);
+      }
       return;
     }
     const statusButton = event.target.closest("[data-set-implant-send-status]");

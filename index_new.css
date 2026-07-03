@@ -1928,6 +1928,34 @@
       flex-wrap: wrap;
       gap: 8px;
     }
+    .implant-send-bulk-actions {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 12px;
+      padding: 12px;
+      border: 1px solid #bfdbfe;
+      border-radius: 12px;
+      background: #eff6ff;
+    }
+    .implant-send-bulk-title {
+      color: #1d4ed8;
+      font-size: 15px;
+      font-weight: 950;
+    }
+    .implant-send-bulk-meta {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 850;
+    }
+    .implant-send-bulk-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
     .implant-send-details {
       border: 1px solid var(--line);
       border-radius: 10px;
@@ -2138,6 +2166,9 @@
       .implant-send-clean-head { grid-template-columns: 1fr; }
       .implant-send-status-control { min-width: 0; }
       .implant-send-primary-actions button { flex: 1 1 130px; }
+      .implant-send-bulk-actions { grid-template-columns: 1fr; }
+      .implant-send-bulk-buttons { justify-content: stretch; }
+      .implant-send-bulk-buttons button { flex: 1 1 150px; }
     }
     @media (max-width: 720px) {
       .use-content-head { align-items: flex-start; }
