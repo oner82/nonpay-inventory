@@ -20,6 +20,7 @@
       renderReceiptHistoryList,
       receiptProduct,
       receiptProductName,
+      captureLandingBoardOpenState,
       sameId,
       today,
       auditUpdateFields,
@@ -390,6 +391,7 @@ const bindReceipts = () => {
   app.querySelectorAll("[data-receive-landing]").forEach((button) => {
     button.addEventListener("click", async () => {
       const [usageId, productId] = button.dataset.receiveLanding.split("::");
+      captureLandingBoardOpenState?.();
       await receiveLandingLine(usageId, productId);
       render();
       await saveState();
@@ -398,6 +400,7 @@ const bindReceipts = () => {
   app.querySelectorAll("[data-receive-company]").forEach((button) => {
     button.addEventListener("click", async () => {
       const company = button.dataset.receiveCompany;
+      captureLandingBoardOpenState?.();
       const lines = landingUsageLines(false).filter((line) => (line.product.company || "업체 없음") === company);
       lines.forEach((line) => {
         const product = line.product;

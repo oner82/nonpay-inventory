@@ -1628,6 +1628,15 @@ const landingReceiptLineSummary = (receipt) => {
   const patientName = receipt?.patientName || usage?.patientName || "-";
   return `${shortCompactDate(date)} · ${patientNo} · ${patientName} · ${Math.max(1, num(receipt?.qty))}개`;
 };
+let landingBoardOpenKeys = new Set();
+const landingBoardOpenAttr = (key) => landingBoardOpenKeys.has(key) ? "open" : "";
+const captureLandingBoardOpenState = () => {
+  landingBoardOpenKeys = new Set(
+    Array.from(app.querySelectorAll("[data-landing-open-key][open]"))
+      .map((detail) => detail.dataset.landingOpenKey)
+      .filter(Boolean)
+  );
+};
 
 const renderLandingBoard = () => {
   const lines = landingUsageLines(true);
@@ -1639,8 +1648,9 @@ const renderLandingBoard = () => {
     const categoryLabels = [...new Set(companyLines.map((line) => productCategoryLabel(line.product.category)))].sort(alphaFirstCompare).join(", ");
     const productIds = [...new Set(companyLines.map((line) => line.product.id))]
       .sort((a, b) => alphaFirstCompare(productById(a)?.name || "", productById(b)?.name || ""));
+    const companyKey = `company:${company}`;
     return `
-      <details class="item">
+      <details class="item" data-landing-open-key="${escapeHtml(companyKey)}" ${landingBoardOpenAttr(companyKey)}>
         <summary><span>${escapeHtml(company)} 랜딩 입고</span><span class="pill">${pendingCount ? `대기 ${pendingCount}` : "완료"}</span></summary>
         <div class="details-body">
           <div class="meta"><span>${escapeHtml(categoryLabels)}</span></div>
@@ -1651,8 +1661,9 @@ const renderLandingBoard = () => {
               .filter((line) => line.product.id === productId)
               .sort((a, b) => alphaFirstCompare(a.usage.date, b.usage.date) || alphaFirstCompare(a.usage.patientName, b.usage.patientName));
             const productPending = productLines.filter((line) => !line.receipt).length;
+            const productKey = `product:${company}:${productId}`;
             return `
-              <details class="item">
+              <details class="item" data-landing-open-key="${escapeHtml(productKey)}" ${landingBoardOpenAttr(productKey)}>
                 <summary><span>${escapeHtml(product?.name || "삭제된 제품")}</span><span class="pill">${productPending ? `대기 ${productPending}` : "완료"}</span></summary>
                 <div class="details-body">
                   <div class="meta"><span>${escapeHtml(productCategoryLabel(product?.category))}${product?.subcategory ? ` · ${escapeHtml(product.subcategory)}` : ""}</span></div>
@@ -1844,6 +1855,7 @@ const getReceiptsModule = () => {
       receiptProductName,
       receiptDateValue,
       receiptStockDelta,
+      captureLandingBoardOpenState,
       sameId,
       today,
       auditUpdateFields,
