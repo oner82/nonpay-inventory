@@ -3089,6 +3089,7 @@ const bindEditUsage = () => {
     if (!card) return;
     select.value = card.dataset.editUsageCard;
     loadUsage(card.dataset.editUsageCard);
+    if (patientDetails) patientDetails.open = false;
   });
   select.addEventListener("change", () => loadUsage(select.value));
   useDepartment.addEventListener("change", filterOptions);
