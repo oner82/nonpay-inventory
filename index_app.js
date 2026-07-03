@@ -1722,9 +1722,27 @@ const renderReceiptHistoryList = (start = "", end = "", query = "") => {
   const receipts = filteredReceipts(start, end, query);
   const manager = canManageReceipts();
   if (!receipts.length) return `<div class="empty">조회된 입고이력이 없습니다.</div>`;
+  const receiptTypeClass = (receipt) => {
+    if (receipt.type === "loan") return "loan";
+    if (receipt.type === "landing" || receipt.type === "landingCarryover") return "landing";
+    if (receipt.type === "landingCancelled") return "cancelled";
+    return "nonpay";
+  };
+  const receiptGroups = receipts.reduce((groups, receipt) => {
+    const date = receiptDateValue(receipt) || "날짜 없음";
+    if (!groups.has(date)) groups.set(date, []);
+    groups.get(date).push(receipt);
+    return groups;
+  }, new Map());
   return `
     <div class="receipt-history-list">
-      ${receipts.map((receipt) => {
+      ${Array.from(receiptGroups.entries()).map(([groupDate, groupReceipts]) => `
+        <section class="receipt-date-group">
+          <div class="receipt-date-head">
+            <strong>${escapeHtml(groupDate)}</strong>
+            <span>${groupReceipts.length.toLocaleString()}건 · ${groupReceipts.reduce((sum, receipt) => sum + Math.max(1, num(receipt.qty)), 0).toLocaleString()}개</span>
+          </div>
+          ${groupReceipts.map((receipt) => {
         const product = receiptProduct(receipt);
         const name = receiptProductName(receipt);
         const meta = receiptProductMeta(receipt);
@@ -1736,22 +1754,24 @@ const renderReceiptHistoryList = (start = "", end = "", query = "") => {
         return `
           <div class="item receipt-history-card" data-receipt-row="${escapeHtml(receipt.id)}">
             <div class="receipt-history-head">
+              <span class="receipt-type-badge ${receiptTypeClass(receipt)}">${escapeHtml(receiptTypeLabel(receipt))}</span>
               <div class="receipt-history-name">
                 ${escapeHtml(receipt.type === "landing" ? landingReceiptLineSummary(receipt) : name)}
                 <span>${escapeHtml(meta || "-")}</span>
               </div>
-              <span class="pill">${num(receipt.qty).toLocaleString()}개</span>
+              <strong class="receipt-qty">${num(receipt.qty).toLocaleString()}개</strong>
               ${receiverBadge}
             </div>
             <div class="receipt-history-meta">
-              <span>날짜: ${escapeHtml(date || "-")}</span>
-              <span>구분: ${escapeHtml(receiptTypeLabel(receipt))}</span>
               <span>입력자: ${escapeHtml(auditUserText(receipt) || "-")}</span>
               <span>입력시각: ${escapeHtml(auditTimeText(receipt))}${updatedText}</span>
+              <span>날짜: ${escapeHtml(date || "-")}</span>
             </div>
-            ${receipt.memo ? `<div class="receipt-memo">메모: ${escapeHtml(receipt.memo)}</div>` : ""}
-            ${receipt.type === "landing" ? `<div class="receipt-memo">제품: ${escapeHtml(name)}${meta ? ` · ${escapeHtml(meta)}` : ""}</div>` : ""}
-            ${receipt.type === "loan" ? `<div class="receipt-memo">대여 부서: ${escapeHtml(receipt.loanDepartment || "-")}</div>` : ""}
+            <div class="receipt-extra">
+              ${receipt.memo ? `<span>메모: ${escapeHtml(receipt.memo)}</span>` : ""}
+              ${receipt.type === "landing" ? `<span>제품: ${escapeHtml(name)}${meta ? ` · ${escapeHtml(meta)}` : ""}</span>` : ""}
+              ${receipt.type === "loan" ? `<span>대여 부서: ${escapeHtml(receipt.loanDepartment || "-")}</span>` : ""}
+            </div>
             ${manager ? `
               <div class="actions">
                 <button class="secondary" type="button" data-edit-receipt="${escapeHtml(receipt.id)}">수정</button>
@@ -1782,7 +1802,9 @@ const renderReceiptHistoryList = (start = "", end = "", query = "") => {
             ` : ""}
           </div>
         `;
-      }).join("")}
+          }).join("")}
+        </section>
+      `).join("")}
     </div>
   `;
 };

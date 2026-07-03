@@ -388,16 +388,27 @@
     }
     .receipt-search-option:hover { background: #f8fbff; }
     .receipt-history-tools { align-items: center; justify-content: space-between; margin-bottom: 12px; }
-    .receipt-history-list { display: grid; gap: 10px; }
-    .receipt-history-card { display: grid; gap: 10px; }
-    .receipt-history-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .receipt-history-list { display: grid; gap: 14px; }
+    .receipt-date-group { display: grid; gap: 8px; }
+    .receipt-date-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-radius: 10px; background: #eef4ff; color: var(--ink); font-weight: 900; }
+    .receipt-date-head span { color: var(--muted); font-size: 12px; font-weight: 850; }
+    .receipt-history-card { display: grid; gap: 8px; padding: 10px 12px; border-left: 5px solid #dbe7f5; }
+    .receipt-history-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; }
     .receipt-history-name { min-width: 0; font-weight: 950; color: var(--ink); }
     .receipt-history-name span { display: block; color: var(--muted); font-size: 12px; font-weight: 800; margin-top: 3px; }
+    .receipt-type-badge { display: inline-flex; align-items: center; justify-content: center; min-height: 28px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 950; white-space: nowrap; }
+    .receipt-type-badge.nonpay { background: #edf4ff; color: #1f4f99; }
+    .receipt-type-badge.landing { background: #ecfdf5; color: #047857; }
+    .receipt-type-badge.loan { background: #fff7ed; color: #c2410c; }
+    .receipt-type-badge.cancelled { background: #f1f5f9; color: #64748b; }
+    .receipt-qty { min-width: 54px; text-align: right; color: var(--brand-dark); font-size: 18px; font-weight: 950; white-space: nowrap; }
     .receipt-role-badge { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border-radius: 999px; background: #fff7ed; color: #c2410c; font-size: 12px; font-weight: 950; white-space: nowrap; }
     .receipt-safety-note { margin: 0 0 12px; padding: 10px 12px; border: 1px solid #fed7aa; border-radius: 12px; background: #fff7ed; color: #9a3412; font-size: 13px; font-weight: 850; line-height: 1.45; }
-    .receipt-history-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-    .receipt-history-meta span { min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: #f8fbff; color: #53647a; font-size: 12px; font-weight: 850; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .receipt-memo { color: var(--muted); font-size: 13px; font-weight: 800; }
+    .receipt-history-meta { display: flex; flex-wrap: wrap; gap: 6px 10px; color: #53647a; font-size: 12px; font-weight: 850; }
+    .receipt-history-meta span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .receipt-extra { display: flex; flex-wrap: wrap; gap: 6px; color: var(--muted); font-size: 13px; font-weight: 800; }
+    .receipt-extra:empty { display: none; }
+    .receipt-extra span { padding: 5px 8px; border-radius: 8px; background: #f8fbff; }
     .receipt-edit-form { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #f8fafc; }
     .receipt-edit-form[hidden] { display: none; }
     .memo-input { min-height: 86px; font-family: inherit; }
@@ -492,8 +503,9 @@
       main { padding: 12px 8px 36px; }
       .page-head { margin-bottom: 10px; padding: 10px; min-height: 52px; }
       .page-head h2 { font-size: 18px; }
-      .receipt-history-meta { grid-template-columns: 1fr 1fr; }
-      .receipt-history-head { align-items: stretch; flex-direction: column; }
+      .receipt-history-meta { display: flex; }
+      .receipt-history-head { grid-template-columns: 1fr auto; align-items: start; }
+      .receipt-history-head .receipt-type-badge { grid-column: 1 / -1; width: fit-content; }
       .receipt-history-head .pill { width: fit-content; }
       details.summary-row > summary { grid-template-columns: 1fr; gap: 6px; }
       .summary-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
