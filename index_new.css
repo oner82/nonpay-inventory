@@ -1948,6 +1948,154 @@
       padding: 12px;
       border-top: 1px solid var(--line);
     }
+    .morning-check-panel {
+      display: grid;
+      gap: 12px;
+    }
+    .morning-check-summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .morning-check-metric {
+      display: grid;
+      gap: 4px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #f8fafc;
+      color: var(--ink);
+    }
+    .morning-check-metric strong {
+      font-size: 24px;
+      font-weight: 950;
+      line-height: 1;
+    }
+    .morning-check-metric span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+    }
+    .morning-check-metric.ok {
+      border-color: #bbf7d0;
+      background: #ecfdf5;
+    }
+    .morning-check-metric.warn {
+      border-color: #fde68a;
+      background: #fffbeb;
+    }
+    .morning-check-metric.danger {
+      border-color: #fecdd3;
+      background: #fff1f2;
+    }
+    .morning-check-list {
+      display: grid;
+      gap: 9px;
+    }
+    .morning-check-group {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .morning-check-group[hidden] {
+      display: none;
+    }
+    .morning-check-group summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      cursor: pointer;
+      padding: 12px;
+      background: #f8fbff;
+      color: var(--ink);
+      font-size: 15px;
+      font-weight: 950;
+    }
+    .morning-check-group-body {
+      display: grid;
+      gap: 9px;
+      padding: 10px;
+      border-top: 1px solid var(--line);
+    }
+    .morning-check-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 92px 118px 86px;
+      gap: 10px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-left: 5px solid #cbd5e1;
+      border-radius: 12px;
+      background: #fff;
+    }
+    .morning-check-row.warn { border-left-color: #f59e0b; }
+    .morning-check-row.danger { border-left-color: #ef4444; }
+    .morning-check-row.matched {
+      border-color: #bbf7d0;
+      border-left-color: #22c55e;
+      background: #f0fdf4;
+    }
+    .morning-check-row.short {
+      border-color: #fecdd3;
+      border-left-color: #ef4444;
+      background: #fff1f2;
+    }
+    .morning-check-row.over {
+      border-color: #bfdbfe;
+      border-left-color: #2563eb;
+      background: #eff6ff;
+    }
+    .morning-check-title {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      color: var(--ink);
+      font-size: 15px;
+      font-weight: 950;
+    }
+    .morning-check-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .morning-check-meta span {
+      padding: 4px 7px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #f8fafc;
+    }
+    .morning-check-stock,
+    .morning-check-actual,
+    .morning-check-diff {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 900;
+      text-align: center;
+    }
+    .morning-check-stock strong,
+    .morning-check-diff {
+      color: var(--ink);
+      font-size: 17px;
+      font-weight: 950;
+    }
+    .morning-check-actual input {
+      height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0 10px;
+      text-align: center;
+      font-size: 16px;
+      font-weight: 950;
+    }
     .implant-send-section-title {
       display: flex;
       align-items: center;
@@ -2138,6 +2286,11 @@
       .implant-send-clean-head { grid-template-columns: 1fr; }
       .implant-send-status-control { min-width: 0; }
       .implant-send-primary-actions button { flex: 1 1 130px; }
+      .morning-check-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .morning-check-row { grid-template-columns: 1fr; }
+      .morning-check-stock,
+      .morning-check-actual,
+      .morning-check-diff { text-align: left; }
     }
     @media (max-width: 720px) {
       .use-content-head { align-items: flex-start; }

@@ -1866,6 +1866,7 @@ const getReceiptsModule = () => {
       canManageReceipts,
       currentUserRole,
       productCategory,
+      productCategoryLabel,
       productDisplaySort,
       escapeHtml,
       num,
