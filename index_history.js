@@ -37,13 +37,13 @@
             </div>
           </div>
           <div class="card">
-            <details class="item">
+            <details class="item" id="historyProductDetails">
               <summary><span>제품군별 제품 사용내역</span><span class="pill">3</span></summary>
               <div class="details-body" id="historyProductSummary">${productUsageSummaryHtml()}</div>
             </details>
           </div>
           <div class="card">
-            <details class="item">
+            <details class="item" id="historyPatientDetails">
               <summary><span>환자별 사용내역</span><span class="pill">${defaultPatientCount}</span></summary>
               <div class="details-body">
                 <div class="actions"><button class="secondary" type="button" id="exportHistoryPatients">엑셀 저장</button></div>
@@ -274,7 +274,8 @@
 
     const patientHistoryListHtml = (start = "", end = "", query = "", patientQuery = "") => {
       const usages = filteredHistoryUsages(start, end, query, patientQuery).slice().reverse();
-      return usages.map(usageItem).join("") || `<div class="empty">사용내역이 없습니다.</div>`;
+      const openProducts = Boolean(String(query || patientQuery || "").trim());
+      return usages.map((usage) => usageItem(usage, { openProducts })).join("") || `<div class="empty">사용내역이 없습니다.</div>`;
     };
 
     const productGroupTotal = (groupedProducts, category) => {
@@ -377,7 +378,7 @@
               <span class="usage-check-badge ${tissueTotal ? "info" : "muted"}">인체조직 ${tissueTotal}개</span>
               ${implantStatusBadgesHtml(implantStatus)}
             </div>
-            <details class="usage-products-details">
+            <details class="usage-products-details" ${options.openProducts ? "open" : ""}>
               <summary>
                 <span>사용제품 상세</span>
                 <span class="pill">${totalProductQty}개</span>
@@ -507,6 +508,11 @@
         const patientQuery = patientSearchInput.value;
         summary.innerHTML = productUsageSummaryHtml(start, end, query);
         patientList.innerHTML = patientHistoryListHtml(start, end, query, patientQuery);
+        const hasSearch = Boolean(String(query || patientQuery || "").trim());
+        const patientDetails = document.getElementById("historyPatientDetails");
+        const productDetails = document.getElementById("historyProductDetails");
+        if (patientDetails && hasSearch) patientDetails.open = true;
+        if (productDetails && query.trim()) productDetails.open = true;
         bindHistoryDeleteButtons();
         bindHistoryExports();
       };
