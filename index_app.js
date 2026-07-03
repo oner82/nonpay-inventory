@@ -2894,9 +2894,9 @@ const bindEditUsage = () => {
     image.src = implantPhotoViewSrc(photo);
     applyImplantModalPhotoState(image, photo);
     showImplantPhotoEditTools();
-    if (cropButton) cropButton.textContent = photo.cropped ? "자르기 수정" : "자르기";
+    if (cropButton) cropButton.textContent = "자르기 영역 다시잡기";
   };
-  const openEditImplantPhotoEditor = (pair) => {
+  const openEditImplantPhotoEditor = async (pair) => {
     activeEditImplantPhotoPair = pair;
     const { photo } = parseEditImplantPair(pair);
     if (!photo) return;
@@ -2909,6 +2909,7 @@ const bindEditUsage = () => {
       refreshEditImplantPhotoEditor();
     };
     refreshEditImplantPhotoEditor();
+    await enableImplantCropFrame(photo);
   };
   const revokeEditImplantLocalPhotos = (photos) => {
     (photos || []).forEach((photo) => {
@@ -3170,7 +3171,7 @@ const bindEditUsage = () => {
       row.photos.push(...addedPhotos);
       renderEditImplantRows();
       if (addedPhotos.length === 1) {
-        openEditImplantPhotoEditor(`${row.id}::${addedPhotos[0].id}`);
+        await openEditImplantPhotoEditor(`${row.id}::${addedPhotos[0].id}`);
       }
       return;
     }
@@ -3179,7 +3180,7 @@ const bindEditUsage = () => {
     if ((editPhotoButton || editPhotoImage) && editImplantCanModify) {
       event.preventDefault();
       event.stopPropagation();
-      openEditImplantPhotoEditor(editPhotoButton?.dataset.editExistingImplantPhoto || editPhotoImage?.dataset.previewEditImplantPhoto);
+      await openEditImplantPhotoEditor(editPhotoButton?.dataset.editExistingImplantPhoto || editPhotoImage?.dataset.previewEditImplantPhoto);
       return;
     }
     const previewButton = event.target.closest("button[data-preview-edit-implant-photo]");
@@ -3261,16 +3262,20 @@ const bindEditUsage = () => {
     markEditImplantPhotoChanged(targetPhoto);
     renderEditImplantRows();
     refreshEditImplantPhotoEditor();
+    await enableImplantCropFrame(targetPhoto);
   });
   document.getElementById("implantModalCrop")?.addEventListener("click", async () => {
     const { frame } = implantCropElements();
-    if (frame && !frame.hidden) {
-      await applyActiveImplantCrop();
+    if (frame && !frame.hidden && activeImplantCropPhoto) {
+      activeImplantCropPhoto.cropRect = null;
+      positionImplantCropFrame(activeImplantCropPhoto);
     } else if (activeImplantCropPhoto) {
       await enableImplantCropFrame(activeImplantCropPhoto);
     }
   });
-  document.getElementById("implantModalDone")?.addEventListener("click", () => {
+  document.getElementById("implantModalDone")?.addEventListener("click", async () => {
+    const { frame } = implantCropElements();
+    if (activeImplantCropPhoto && frame && !frame.hidden) await applyActiveImplantCrop();
     activeEditImplantPhotoPair = "";
     hideImplantPhotoModal();
   });
@@ -3561,10 +3566,8 @@ const enableImplantCropFrame = async (photo) => {
   activeImplantCropPhoto = photo;
   bindImplantCropFrame();
   frame.hidden = false;
-  image.style.transform = "";
-  image.classList.remove("cropped", "rotated");
-  image.closest(".implant-crop-stage")?.classList.remove("rotated");
-  setImplantCropButtonText("자르기 적용");
+  applyImplantModalPhotoState(image, photo);
+  setImplantCropButtonText("자르기 영역 다시잡기");
   try {
     if (image.decode) await image.decode();
   } catch (_) {}
@@ -4420,9 +4423,9 @@ const bindUse = () => {
     image.src = implantPhotoViewSrc(photo);
     applyImplantModalPhotoState(image, photo);
     showImplantPhotoEditTools();
-    if (cropButton) cropButton.textContent = photo.cropped ? "자르기 수정" : "자르기";
+    if (cropButton) cropButton.textContent = "자르기 영역 다시잡기";
   };
-  const openImplantPhotoEditor = (pair) => {
+  const openImplantPhotoEditor = async (pair) => {
     activeImplantEditPair = pair;
     const { photo } = parseImplantPair(pair);
     if (!photo) return;
@@ -4435,6 +4438,7 @@ const bindUse = () => {
       refreshImplantPhotoEditor();
     };
     refreshImplantPhotoEditor();
+    await enableImplantCropFrame(photo);
   };
   const renderProductSearchResults = () => {
     const query = productSearch.value;
@@ -4769,7 +4773,7 @@ const bindUse = () => {
       markUseEntryDirty();
       renderImplantDrafts();
       if (addedPhotos.length === 1) {
-        openImplantPhotoEditor(`${draft.id}::${addedPhotos[0].id}`);
+        await openImplantPhotoEditor(`${draft.id}::${addedPhotos[0].id}`);
       }
       return;
     }
@@ -4796,7 +4800,7 @@ const bindUse = () => {
     }
     const editButton = event.target.closest("[data-edit-implant-photo]");
     if (editButton) {
-      openImplantPhotoEditor(editButton.dataset.editImplantPhoto);
+      await openImplantPhotoEditor(editButton.dataset.editImplantPhoto);
       return;
     }
     const rotateButton = event.target.closest("[data-rotate-implant-photo]");
@@ -4848,18 +4852,23 @@ const bindUse = () => {
     refreshImplantPhotoEditor();
     renderImplantDrafts();
     refreshImplantPhotoEditor();
+    await enableImplantCropFrame(photo);
   });
   document.getElementById("implantModalCrop")?.addEventListener("click", async () => {
     const { photo } = parseImplantPair(activeImplantEditPair);
     if (!photo && !activeImplantCropPhoto) return;
     const { frame } = implantCropElements();
-    if (frame && !frame.hidden) {
-      await applyActiveImplantCrop();
+    if (frame && !frame.hidden && (photo || activeImplantCropPhoto)) {
+      const targetPhoto = photo || activeImplantCropPhoto;
+      targetPhoto.cropRect = null;
+      positionImplantCropFrame(targetPhoto);
     } else {
       await enableImplantCropFrame(photo || activeImplantCropPhoto);
     }
   });
-  document.getElementById("implantModalDone")?.addEventListener("click", () => {
+  document.getElementById("implantModalDone")?.addEventListener("click", async () => {
+    const { frame } = implantCropElements();
+    if (activeImplantCropPhoto && frame && !frame.hidden) await applyActiveImplantCrop();
     activeImplantEditPair = "";
     hideImplantPhotoModal();
   });
