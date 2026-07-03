@@ -3400,6 +3400,23 @@ const bindEditUsage = () => {
 let activeImplantCropPhoto = null;
 let activeImplantCropApply = null;
 let implantCropPointerState = null;
+let modalScrollLockY = null;
+
+const lockModalPageScroll = () => {
+  if (modalScrollLockY !== null) return;
+  modalScrollLockY = window.scrollY || document.documentElement.scrollTop || 0;
+  document.body.classList.add("modal-scroll-locked");
+  document.body.style.top = `-${modalScrollLockY}px`;
+};
+
+const unlockModalPageScroll = () => {
+  if (modalScrollLockY === null) return;
+  const scrollY = modalScrollLockY;
+  modalScrollLockY = null;
+  document.body.classList.remove("modal-scroll-locked");
+  document.body.style.top = "";
+  window.scrollTo(0, scrollY);
+};
 
 const implantCropElements = () => ({
   stage: document.getElementById("implantCropStage"),
@@ -3470,6 +3487,7 @@ const bindImplantCropFrame = () => {
   frame.dataset.cropBound = "1";
   frame.addEventListener("pointerdown", (event) => {
     event.preventDefault();
+    event.stopPropagation();
     const bounds = implantImageBoundsInStage();
     if (!bounds) return;
     const frameRect = frame.getBoundingClientRect();
@@ -3489,6 +3507,7 @@ const bindImplantCropFrame = () => {
   frame.addEventListener("pointermove", (event) => {
     if (!implantCropPointerState) return;
     event.preventDefault();
+    event.stopPropagation();
     const state = implantCropPointerState;
     const dx = event.clientX - state.startX;
     const dy = event.clientY - state.startY;
@@ -3525,10 +3544,14 @@ const bindImplantCropFrame = () => {
     frame.style.width = `${width}px`;
     frame.style.height = `${height}px`;
   });
-  frame.addEventListener("pointerup", () => {
+  frame.addEventListener("pointerup", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
     implantCropPointerState = null;
   });
-  frame.addEventListener("pointercancel", () => {
+  frame.addEventListener("pointercancel", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
     implantCropPointerState = null;
   });
 };
@@ -3617,6 +3640,7 @@ const showImplantPhotoModal = (url) => {
   activeImplantCropApply = null;
   implantCropPointerState = null;
   setImplantCropButtonText("자르기");
+  lockModalPageScroll();
   modal.hidden = false;
 };
 
@@ -3635,6 +3659,7 @@ const hideImplantPhotoModal = () => {
   activeImplantCropApply = null;
   implantCropPointerState = null;
   if (modal) modal.hidden = true;
+  unlockModalPageScroll();
 };
 
 const bindImplants = () => getImplantsModule().bindImplants();
