@@ -1801,7 +1801,7 @@ const renderLandingReceiptHistoryList = (receipts, manager) => {
       const name = receiptProductName(first);
       const meta = receiptProductMeta(first);
       return `
-            <details class="receipt-product-group" open>
+            <details class="receipt-product-group">
               <summary>
                 <span>${escapeHtml(name)}</span>
                 <span class="pill">${productReceipts.length}건 · ${productReceipts.reduce((sum, receipt) => sum + Math.max(1, num(receipt.qty)), 0)}개</span>
