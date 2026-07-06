@@ -4070,6 +4070,8 @@ const bindUse = () => {
   const editUseDraftButton = document.getElementById("editUseDraft");
   const finalSaveUseDraftButton = document.getElementById("finalSaveUseDraft");
   const cancelUseDraftButton = document.getElementById("cancelUseDraft");
+  const patientNameInput = document.getElementById("patientName");
+  const patientIdInput = document.getElementById("patientId");
   const implantDrafts = [];
   const commonImplantPhotos = [];
   let activeImplantEditPair = "";
@@ -4077,6 +4079,7 @@ const bindUse = () => {
   let useDraftSnapshot = null;
   let useDraftDirty = false;
   let loadedPendingUsageId = "";
+  let lastPendingPatientWarningKey = "";
   if (useDate && !useDate.value) useDate.value = today();
   const selectedUseDate = () => useDate?.value || today();
   const useEntryPatientFields = () => ({
@@ -4096,6 +4099,39 @@ const bindUse = () => {
     } else {
       clearUseEntryAutosave();
     }
+  };
+  const contextNormalizedPatientName = (value = "") => normalizedName(value);
+  const pendingUsagePatientKey = (pending) =>
+    `${contextNormalizedPatientName(pending?.patientName || "")}::${String(pending?.patientId || "").trim()}`;
+  const matchingPendingUsageForPatient = () => {
+    const patientName = contextNormalizedPatientName(patientNameInput?.value || "");
+    const patientId = String(patientIdInput?.value || "").trim();
+    if (!patientName || !patientId) return null;
+    return pendingUsagesOpen().find((pending) => {
+      if (sameId(pending.id, loadedPendingUsageId)) return false;
+      return contextNormalizedPatientName(pending.patientName || "") === patientName &&
+        String(pending.patientId || "").trim() === patientId;
+    }) || null;
+  };
+  const warnPendingUsagePatientIfNeeded = () => {
+    const pending = matchingPendingUsageForPatient();
+    if (!pending) return;
+    const key = pendingUsagePatientKey(pending);
+    if (key === lastPendingPatientWarningKey) return;
+    lastPendingPatientWarningKey = key;
+    const pendingTime = formatDateTime(pending.updatedAt || pending.createdAt || "");
+    const message = [
+      "스크럽 확인 대기에 같은 이름과 같은 등록번호의 환자가 있습니다.",
+      `환자: ${pending.patientName || "-"} (${pending.patientId || "-"})`,
+      pendingTime ? `임시저장: ${pendingTime}` : "",
+      "",
+      "정말 새로 사용입력 하시겠습니까?",
+      "확인: 새 사용입력 계속",
+      "취소: 확인 대기 기록 불러오기"
+    ].filter(Boolean).join("\n");
+    if (confirm(message)) return;
+    loadPendingUsageIntoForm(pending);
+    saveDoneToast("같은 환자의 스크럽 확인 대기 기록을 불러왔습니다.");
   };
   const markUseEntryDirty = () => {
     if (currentView !== "use") return;
@@ -4287,6 +4323,7 @@ const bindUse = () => {
     commonImplantPhotos.splice(0, commonImplantPhotos.length);
     activeImplantEditPair = "";
     loadedPendingUsageId = "";
+    lastPendingPatientWarningKey = "";
     useDraftSnapshot = null;
     useDraftDirty = false;
     if (implantEnabled) implantEnabled.checked = false;
@@ -4631,6 +4668,11 @@ const bindUse = () => {
     renderUseRecommendation();
   });
   resetUseEntryButton?.addEventListener("click", resetUseEntryForm);
+  [patientNameInput, patientIdInput].forEach((input) => {
+    input?.addEventListener("input", warnPendingUsagePatientIfNeeded);
+    input?.addEventListener("change", warnPendingUsagePatientIfNeeded);
+    input?.addEventListener("blur", warnPendingUsagePatientIfNeeded);
+  });
   form.querySelectorAll("[data-use-product], [data-use-qty]").forEach((input) => {
     const syncAndRender = () => {
       if (input.dataset.useProduct) {
