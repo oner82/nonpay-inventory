@@ -229,6 +229,8 @@ const renderReceipts = () => {
           <option value="">비급여 제품을 선택하세요</option>
           ${nonpayReceiptProducts().map((item) => `<option value="${item.id}">${escapeHtml(item.name)} / 현재고 ${num(item.stock)}</option>`).join("")}
         </select>
+        <label for="nonpayReceiptDate">입고일</label>
+        <input id="nonpayReceiptDate" type="date" value="${today()}" required>
         <label for="nonpayReceiptQty">입고 수량</label>
         <input id="nonpayReceiptQty" type="number" min="1" value="1" required>
         <label for="nonpayReceiptMemo">메모</label>
@@ -502,12 +504,13 @@ const bindReceipts = () => {
       return;
     }
     const productId = document.getElementById("nonpayReceiptProduct").value;
+    const date = document.getElementById("nonpayReceiptDate")?.value || today();
     const qty = Math.max(1, num(document.getElementById("nonpayReceiptQty").value));
     const memo = document.getElementById("nonpayReceiptMemo")?.value.trim() || "";
     const product = productById(productId);
     if (!product) return;
     product.stock = num(product.stock) + qty;
-    state.receipts.push({ id: uid(), type: "nonpay", productId, productName: product.name, qty, date: today(), memo, createdAt: new Date().toISOString(), ...auditCreateFields() });
+    state.receipts.push({ id: uid(), type: "nonpay", productId, productName: product.name, qty, date, memo, createdAt: new Date().toISOString(), ...auditCreateFields() });
     render();
     await saveState();
   });

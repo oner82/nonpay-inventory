@@ -2251,7 +2251,10 @@ const renderUse = () => `
   <section class="grid">
     ${renderPendingUsageList()}
     <form class="card" id="useForm">
-      <h2>사용입력</h2>
+      <div class="use-form-head">
+        <h2>사용입력</h2>
+        <button class="secondary" type="button" id="resetUseEntryForm">새 환자 입력</button>
+      </div>
       <div class="row four">
         <div>
           <label for="useDate">사용일</label>
@@ -4050,6 +4053,7 @@ const bindUse = () => {
   const openProductSearch = document.getElementById("openUseProductSearch");
   const closeProductSearch = document.getElementById("closeUseProductSearch");
   const productSearchModal = document.getElementById("useProductSearchModal");
+  const resetUseEntryButton = document.getElementById("resetUseEntryForm");
   const implantEnabled = document.getElementById("useImplantEnabled");
   const implantPanel = document.getElementById("implantUsePanel");
   const implantEntriesWrap = document.getElementById("implantVendorEntries");
@@ -4260,6 +4264,45 @@ const bindUse = () => {
   const renderImplantDrafts = () => {
     implantEntriesWrap.innerHTML = implantDraftsHtml(implantDrafts, commonImplantPhotos.length);
   };
+  const resetUseEntryForm = () => {
+    const hasInput = document.getElementById("patientName")?.value.trim() ||
+      document.getElementById("patientId")?.value.trim() ||
+      useDepartment.value ||
+      departmentSelect.value ||
+      surgerySelect.value ||
+      selectedUseItems().length ||
+      implantDrafts.length ||
+      commonImplantPhotos.length ||
+      useDraftSnapshot;
+    if (hasInput && !confirm("현재 사용입력 내용을 비우고 새 환자를 입력할까요? 임시저장 대기 기록은 삭제되지 않습니다.")) return;
+    if (useDate) useDate.value = today();
+    document.getElementById("patientName").value = "";
+    document.getElementById("patientId").value = "";
+    useDepartment.value = "";
+    departmentSelect.value = "";
+    surgerySelect.value = "";
+    setRestrictButton(false);
+    resetUseProductControls(form);
+    implantDrafts.splice(0, implantDrafts.length);
+    commonImplantPhotos.splice(0, commonImplantPhotos.length);
+    activeImplantEditPair = "";
+    loadedPendingUsageId = "";
+    useDraftSnapshot = null;
+    useDraftDirty = false;
+    if (implantEnabled) implantEnabled.checked = false;
+    if (implantPanel) implantPanel.hidden = true;
+    if (useDraftPanel) useDraftPanel.hidden = true;
+    if (productSearch) productSearch.value = "";
+    if (productSearchResults) productSearchResults.innerHTML = `<div class="empty">제품명을 입력해 주세요.</div>`;
+    filterUseOptions();
+    renderUseRecommendation();
+    renderSelectedUseList();
+    renderCommonImplantPhotos();
+    renderImplantDrafts();
+    resetUseEntryProtection();
+    setStatus("새 환자 입력을 시작할 수 있습니다.", "ok");
+    document.getElementById("patientName")?.focus();
+  };
   const collectUseDraftSnapshot = () => {
     if (!form.reportValidity()) return null;
     const patientId = document.getElementById("patientId").value.trim();
@@ -4280,6 +4323,8 @@ const bindUse = () => {
       date: selectedUseDate(),
       patientName: document.getElementById("patientName").value.trim(),
       patientId,
+      doctorId: departmentSelect.value,
+      surgeryId: surgerySelect.value,
       doctorText: departmentSelect.selectedOptions[0]?.textContent || "-",
       surgeryText: surgerySelect.selectedOptions[0]?.textContent || "-",
       enteredBy: draftUserText(),
@@ -4585,6 +4630,7 @@ const bindUse = () => {
     markUseEntryDirty();
     renderUseRecommendation();
   });
+  resetUseEntryButton?.addEventListener("click", resetUseEntryForm);
   form.querySelectorAll("[data-use-product], [data-use-qty]").forEach((input) => {
     const syncAndRender = () => {
       if (input.dataset.useProduct) {
@@ -4911,11 +4957,14 @@ const bindUse = () => {
     }
     const rule = currentUseRule();
     const restrictActive = isRestrictOn();
-    const useItems = selectedUseItems();
-    const implantDraftPayload = currentImplantDraftPayload();
+    const useItems = (useDraftSnapshot.useItems || []).map((item) => ({
+      productId: item.productId,
+      qty: Math.max(1, num(item.qty))
+    }));
+    const implantDraftPayload = useDraftSnapshot.implantDraftPayload || [];
     const usageDate = useDraftSnapshot.date || selectedUseDate();
-    const patientName = document.getElementById("patientName").value.trim();
-    const patientId = document.getElementById("patientId").value.trim();
+    const patientName = String(useDraftSnapshot.patientName || document.getElementById("patientName").value).trim();
+    const patientId = String(useDraftSnapshot.patientId || document.getElementById("patientId").value).trim();
     const patientIdMessage = patientIdValidationMessage(patientId);
     if (patientIdMessage) {
       alert(patientIdMessage);
@@ -4966,8 +5015,8 @@ const bindUse = () => {
     const usageRecord = buildFinalUsageRecord({
       patientName,
       patientId,
-      doctorId: document.getElementById("useDoctor").value,
-      surgeryId: document.getElementById("useSurgery").value,
+      doctorId: useDraftSnapshot.doctorId || document.getElementById("useDoctor").value,
+      surgeryId: useDraftSnapshot.surgeryId || document.getElementById("useSurgery").value,
       productIds,
       usageDate,
       finalSavedAt,

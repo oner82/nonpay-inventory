@@ -411,6 +411,17 @@
     .receipt-extra span { padding: 5px 8px; border-radius: 8px; background: #f8fbff; }
     .receipt-edit-form { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #f8fafc; }
     .receipt-edit-form[hidden] { display: none; }
+    .use-form-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .use-form-head h2 {
+      margin: 0;
+    }
     .memo-input { min-height: 86px; font-family: inherit; }
     .compact-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: nowrap; }
     .compact-main { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 900; }

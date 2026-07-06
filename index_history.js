@@ -1,11 +1,63 @@
 (() => {
   window.createHistoryModule = (context) => {
     const defaultHistoryDate = () => context.today();
+    const createDefaultHistoryFilters = () => ({
+      start: defaultHistoryDate(),
+      end: defaultHistoryDate(),
+      query: "",
+      patientQuery: ""
+    });
+    let historyFilterState = null;
+    let historyOpenState = {
+      product: false,
+      patient: false,
+      categories: new Set(),
+      products: new Set()
+    };
+
+    const currentHistoryFilters = () => {
+      if (!historyFilterState) historyFilterState = createDefaultHistoryFilters();
+      return historyFilterState;
+    };
+
+    const resetHistoryOpenState = () => {
+      historyOpenState = {
+        product: false,
+        patient: false,
+        categories: new Set(),
+        products: new Set()
+      };
+    };
+
+    const inputDateOffset = (days) => {
+      const date = new Date(`${context.today()}T00:00:00`);
+      date.setDate(date.getDate() + days);
+      return date.toISOString().slice(0, 10);
+    };
+
+    const captureHistoryOpenState = () => {
+      const productDetails = document.getElementById("historyProductDetails");
+      const patientDetails = document.getElementById("historyPatientDetails");
+      if (productDetails) historyOpenState.product = productDetails.open;
+      if (patientDetails) historyOpenState.patient = patientDetails.open;
+      historyOpenState.categories = new Set(
+        Array.from(document.querySelectorAll("[data-history-category]"))
+          .filter((details) => details.open)
+          .map((details) => details.dataset.historyCategory)
+      );
+      historyOpenState.products = new Set(
+        Array.from(document.querySelectorAll("[data-history-product]"))
+          .filter((details) => details.open)
+          .map((details) => details.dataset.historyProduct)
+      );
+    };
 
     const renderHistory = () => {
       const state = context.getState();
-      const defaultDate = defaultHistoryDate();
-      const defaultPatientCount = filteredHistoryUsages(defaultDate, defaultDate, "", "").length;
+      const filters = currentHistoryFilters();
+      if (String(filters.query || filters.patientQuery || "").trim()) historyOpenState.patient = true;
+      if (String(filters.query || "").trim()) historyOpenState.product = true;
+      const defaultPatientCount = filteredHistoryUsages(filters.start, filters.end, filters.query, filters.patientQuery).length;
       return `
         <section class="grid">
           <div class="card">
@@ -13,41 +65,42 @@
             <div class="row history-filter-grid">
               <div>
                 <label for="historyStart">시작일</label>
-                <input id="historyStart" type="date" value="${context.escapeHtml(defaultDate)}">
+                <input id="historyStart" type="date" value="${context.escapeHtml(filters.start)}">
               </div>
               <div>
                 <label for="historyEnd">종료일</label>
-                <input id="historyEnd" type="date" value="${context.escapeHtml(defaultDate)}">
+                <input id="historyEnd" type="date" value="${context.escapeHtml(filters.end)}">
               </div>
               <div>
                 <label for="historySearch">제품 검색</label>
-                <input id="historySearch" list="historyProductList" autocomplete="off" placeholder="제품명 입력">
+                <input id="historySearch" list="historyProductList" autocomplete="off" placeholder="제품명 입력" value="${context.escapeHtml(filters.query)}">
                 <datalist id="historyProductList">
                   ${state.products.slice().sort(context.byName).map((product) => `<option value="${context.escapeHtml(product.name)}"></option>`).join("")}
                 </datalist>
               </div>
               <div>
                 <label for="historyPatientSearch">환자 검색</label>
-                <input id="historyPatientSearch" autocomplete="off" placeholder="환자명 또는 등록번호">
+                <input id="historyPatientSearch" autocomplete="off" placeholder="환자명 또는 등록번호" value="${context.escapeHtml(filters.patientQuery)}">
               </div>
             </div>
             <div class="actions">
               <button type="button" id="historyApply">기간 적용</button>
+              <button class="secondary" type="button" id="historyYesterday">어제로 보기</button>
               <button class="secondary" type="button" id="historyReset">오늘로 초기화</button>
             </div>
           </div>
           <div class="card">
-            <details class="item" id="historyProductDetails">
+            <details class="item" id="historyProductDetails" ${historyOpenState.product ? "open" : ""}>
               <summary><span>제품군별 제품 사용내역</span><span class="pill">3</span></summary>
-              <div class="details-body" id="historyProductSummary">${productUsageSummaryHtml()}</div>
+              <div class="details-body" id="historyProductSummary">${productUsageSummaryHtml(filters.start, filters.end, filters.query)}</div>
             </details>
           </div>
           <div class="card">
-            <details class="item" id="historyPatientDetails">
+            <details class="item" id="historyPatientDetails" ${historyOpenState.patient ? "open" : ""}>
               <summary><span>환자별 사용내역</span><span class="pill">${defaultPatientCount}</span></summary>
               <div class="details-body">
                 <div class="actions"><button class="secondary" type="button" id="exportHistoryPatients">엑셀 저장</button></div>
-                <div id="historyPatientList">${patientHistoryListHtml(defaultDate, defaultDate)}</div>
+                <div id="historyPatientList">${patientHistoryListHtml(filters.start, filters.end, filters.query, filters.patientQuery)}</div>
               </div>
             </details>
           </div>
@@ -223,8 +276,9 @@
         const rows = productRows.map(({ product, received, used }) => {
           const isNonpay = context.productCategory(product.category) === "비급여";
           const patientRows = productUsagePatientRows(product.id, effectiveStart, effectiveEnd);
+          const productOpen = historyOpenState.products.has(String(product.id));
           return `
-            <details class="summary-row ${isNonpay ? "nonpay" : ""}">
+            <details class="summary-row ${isNonpay ? "nonpay" : ""}" data-history-product="${context.escapeHtml(product.id)}" ${productOpen ? "open" : ""}>
               <summary>
                 <div class="summary-headline">
                   <span class="summary-name">${context.escapeHtml(product.name)}</span>
@@ -251,8 +305,9 @@
             </details>
           `;
         }).join("");
+        const categoryOpen = historyOpenState.categories.has(String(category));
         return `
-          <details class="item">
+          <details class="item" data-history-category="${context.escapeHtml(category)}" ${categoryOpen ? "open" : ""}>
             <summary><span>${context.escapeHtml(context.productCategoryLabel(category))} 제품 사용내역</span><span class="pill">${productRows.length}</span></summary>
             <div class="details-body">
               <div class="actions">
@@ -501,11 +556,22 @@
         });
         document.getElementById("exportHistoryPatients")?.addEventListener("click", exportHistoryPatients);
       };
-      const updateHistory = () => {
+      const bindHistoryOpenCapture = () => {
+        [
+          document.getElementById("historyProductDetails"),
+          document.getElementById("historyPatientDetails"),
+          ...Array.from(summary.querySelectorAll("details"))
+        ].filter(Boolean).forEach((details) => {
+          details.addEventListener("toggle", captureHistoryOpenState);
+        });
+      };
+      const updateHistory = (options = {}) => {
+        if (!options.skipCapture) captureHistoryOpenState();
         const start = startInput.value;
         const end = endInput.value;
         const query = searchInput.value;
         const patientQuery = patientSearchInput.value;
+        historyFilterState = { start, end, query, patientQuery };
         summary.innerHTML = productUsageSummaryHtml(start, end, query);
         patientList.innerHTML = patientHistoryListHtml(start, end, query, patientQuery);
         const hasSearch = Boolean(String(query || patientQuery || "").trim());
@@ -515,19 +581,32 @@
         if (productDetails && query.trim()) productDetails.open = true;
         bindHistoryDeleteButtons();
         bindHistoryExports();
+        bindHistoryOpenCapture();
       };
       [startInput, endInput, searchInput, patientSearchInput].forEach((input) => {
         input.addEventListener("input", updateHistory);
         input.addEventListener("change", updateHistory);
       });
       document.getElementById("historyApply").addEventListener("click", updateHistory);
+      document.getElementById("historyYesterday").addEventListener("click", () => {
+        const yesterday = inputDateOffset(-1);
+        startInput.value = yesterday;
+        endInput.value = yesterday;
+        updateHistory();
+        const productDetails = document.getElementById("historyProductDetails");
+        if (productDetails) {
+          productDetails.open = true;
+          captureHistoryOpenState();
+        }
+      });
       document.getElementById("historyReset").addEventListener("click", () => {
         const defaultDate = defaultHistoryDate();
         startInput.value = defaultDate;
         endInput.value = defaultDate;
         searchInput.value = "";
         patientSearchInput.value = "";
-        updateHistory();
+        resetHistoryOpenState();
+        updateHistory({ skipCapture: true });
       });
       const bindHistoryDeleteButtons = () => {
         if (patientList.dataset.boundHistoryActions === "true") return;
@@ -547,6 +626,7 @@
       };
       bindHistoryDeleteButtons();
       bindHistoryExports();
+      bindHistoryOpenCapture();
     };
 
     return {
