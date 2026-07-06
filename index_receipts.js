@@ -39,6 +39,7 @@
       landingUsageLines
     } = context;
     let morningCheckDate = today();
+    let receiptHistoryType = "nonpay";
 
 const landingCarryoverProducts = () => state.products
   .filter((item) => productCategory(item.category) !== "비급여")
@@ -293,8 +294,13 @@ const renderReceipts = () => {
     ${receiptView === "history" ? `
       <div class="card receipt-wide">
         <h2>입고내역</h2>
+        <div class="receipt-history-tabs">
+          <button class="receipt-history-tab ${receiptHistoryType === "nonpay" ? "active" : ""}" type="button" data-receipt-history-type="nonpay">비급여</button>
+          <button class="receipt-history-tab ${receiptHistoryType === "landing" ? "active" : ""}" type="button" data-receipt-history-type="landing">랜딩</button>
+          <button class="receipt-history-tab ${receiptHistoryType === "loan" ? "active" : ""}" type="button" data-receipt-history-type="loan">타부서 대여</button>
+        </div>
         ${receiptHistoryFiltersHtml("receiptTabHistory")}
-        <div id="receiptTabHistoryList">${renderReceiptHistory()}</div>
+        <div id="receiptTabHistoryList">${renderReceiptHistoryList("", "", "", receiptHistoryType)}</div>
       </div>
     ` : ""}
   </section>
@@ -358,7 +364,7 @@ const bindReceiptHistoryControls = (prefix, listId) => {
   const list = document.getElementById(listId);
   if (!startInput || !endInput || !searchInput || !list) return;
   const updateList = () => {
-    list.innerHTML = renderReceiptHistoryList(startInput.value, endInput.value, searchInput.value);
+    list.innerHTML = renderReceiptHistoryList(startInput.value, endInput.value, searchInput.value, receiptHistoryType);
   };
   const closeProductMenu = () => {
     if (productMenu) productMenu.hidden = true;
@@ -410,7 +416,16 @@ const bindReceiptHistoryControls = (prefix, listId) => {
     updateList();
   });
   app.querySelectorAll("[data-export-receipt-history]").forEach((button) => {
-    button.addEventListener("click", () => exportReceiptHistory(startInput.value, endInput.value, searchInput.value));
+    button.addEventListener("click", () => exportReceiptHistory(startInput.value, endInput.value, searchInput.value, receiptHistoryType));
+  });
+  app.querySelectorAll("[data-receipt-history-type]").forEach((button) => {
+    button.addEventListener("click", () => {
+      receiptHistoryType = button.dataset.receiptHistoryType || "nonpay";
+      app.querySelectorAll("[data-receipt-history-type]").forEach((item) => {
+        item.classList.toggle("active", item.dataset.receiptHistoryType === receiptHistoryType);
+      });
+      updateList();
+    });
   });
   list.addEventListener("click", async (event) => {
     const editButton = event.target.closest("[data-edit-receipt]");
