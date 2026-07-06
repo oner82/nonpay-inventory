@@ -56,6 +56,15 @@ const morningCheckProducts = () => state.products
   .slice()
   .sort((a, b) => productDisplaySort(productCategory(a.category))(a, b) || byName(a, b));
 
+const morningCheckCategoryOrder = ["비급여", "인체조직", "ANCHOR", "GS_LANDING", "URO_LANDING"];
+const morningCheckCategorySort = (a, b) => {
+  const left = morningCheckCategoryOrder.indexOf(productCategory(a));
+  const right = morningCheckCategoryOrder.indexOf(productCategory(b));
+  const leftOrder = left === -1 ? morningCheckCategoryOrder.length : left;
+  const rightOrder = right === -1 ? morningCheckCategoryOrder.length : right;
+  return leftOrder - rightOrder || String(a || "").localeCompare(String(b || ""), "ko");
+};
+
 const productUsageCountBefore = (productId, date) => state.usages.reduce((sum, usage) => {
   if (!usage?.date || usage.date >= date) return sum;
   return sum + (usage.productIds || []).filter((id) => sameId(id, productId)).length;
@@ -95,7 +104,7 @@ const morningCheckStatus = (product, stock) => {
 const morningStockCheckHtml = () => {
   const products = morningCheckProducts();
   const checkDate = morningCheckDate || today();
-  const categories = [...new Set(products.map((product) => productCategory(product.category)))].filter(Boolean);
+  const categories = [...new Set(products.map((product) => productCategory(product.category)))].filter(Boolean).sort(morningCheckCategorySort);
   const stockRows = products.map((product) => {
     const expectedStock = morningExpectedStock(product, checkDate);
     return { product, expectedStock, status: morningCheckStatus(product, expectedStock) };
@@ -151,7 +160,7 @@ const morningStockCheckHtml = () => {
       <p class="helper">선택한 날짜의 아침 시작 기준 프로그램 재고입니다. 당일 사용·입고는 제외하고 전날까지의 기록으로 계산합니다. 이 화면은 확인용이며 재고 수량을 저장하지 않습니다.</p>
       <div class="morning-check-list" id="receiptMorningCheckList">
         ${groupedRows.map(({ category, rows, attention: groupAttention }) => `
-          <details class="morning-check-group" data-morning-group open>
+          <details class="morning-check-group" data-morning-group>
             <summary>
               <span>${escapeHtml(productCategoryLabel(category))}</span>
               <span class="pill ${groupAttention ? "low" : ""}">${rows.length}품목${groupAttention ? ` · 확인 ${groupAttention}` : ""}</span>
