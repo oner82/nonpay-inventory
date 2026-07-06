@@ -4133,6 +4133,27 @@ const bindUse = () => {
     loadPendingUsageIntoForm(pending);
     saveDoneToast("같은 환자의 스크럽 확인 대기 기록을 불러왔습니다.");
   };
+  const focusFirstMissingUseEntryField = (missing = []) => {
+    const first = missing[0]?.field;
+    if (first) first.focus();
+  };
+  const useDraftRequiredFieldMessage = () => {
+    const missing = [
+      { label: "환자명", field: patientNameInput, missing: !String(patientNameInput?.value || "").trim() },
+      { label: "환자 등록번호", field: patientIdInput, missing: !String(patientIdInput?.value || "").trim() },
+      { label: "과", field: useDepartment, missing: !useDepartment.value },
+      { label: "원장 코드", field: departmentSelect, missing: !departmentSelect.value },
+      { label: "수술명", field: surgerySelect, missing: !surgerySelect.value }
+    ].filter((item) => item.missing);
+    if (!missing.length) return "";
+    focusFirstMissingUseEntryField(missing);
+    return [
+      "임시저장을 할 수 없습니다.",
+      `빠진 항목: ${missing.map((item) => item.label).join(", ")}`,
+      "",
+      "환자 기본정보에서 빠진 항목을 선택한 뒤 다시 임시저장을 눌러 주세요."
+    ].join("\n");
+  };
   const markUseEntryDirty = () => {
     if (currentView !== "use") return;
     useEntryDirty = true;
@@ -4341,6 +4362,11 @@ const bindUse = () => {
     document.getElementById("patientName")?.focus();
   };
   const collectUseDraftSnapshot = () => {
+    const requiredMessage = useDraftRequiredFieldMessage();
+    if (requiredMessage) {
+      alert(requiredMessage);
+      return null;
+    }
     if (!form.reportValidity()) return null;
     const patientId = document.getElementById("patientId").value.trim();
     const patientIdMessage = patientIdValidationMessage(patientId);
