@@ -337,6 +337,8 @@ const nextNonpaySortOrder = (excludeId = "") => {
   return orders.length ? Math.max(...orders) + 10 : (nonpayProductsInDisplayOrder().length + 1) * 10;
 };
 const productById = (id) => state.products.find((item) => item.id === id);
+const isVendorManagedProduct = (product) =>
+  productCategory(product?.category) === "인체조직" && Boolean(product?.vendorManaged);
 const departmentById = (id) => state.doctors.find((item) => item.id === id);
 const surgeryById = (id) => state.surgeries.find((item) => item.id === id);
 const usageRuleById = (id) => state.usageRules.find((item) => sameId(item.id, id));
@@ -847,7 +849,8 @@ const normalizeLegacyMasters = () => {
       subcategory: category === "ANCHOR" ? String(item.subcategory || item.type || "").trim() : "",
       landingQty,
       baseStock: item.baseStock,
-      warningStock: num(item.warningStock) || warningQtyFromBase(baseQty)
+      warningStock: num(item.warningStock) || warningQtyFromBase(baseQty),
+      vendorManaged: category === "인체조직" && Boolean(item.vendorManaged)
     };
   });
   const seenProducts = new Set();
@@ -903,7 +906,10 @@ const productMovementCounts = () => {
   const used = new Map();
   const received = new Map();
   state.usages.forEach((usage) => {
-    (usage.productIds || []).forEach((id) => used.set(id, (used.get(id) || 0) + 1));
+    (usage.productIds || []).forEach((id) => {
+      if (isVendorManagedProduct(productById(id))) return;
+      used.set(id, (used.get(id) || 0) + 1);
+    });
   });
   state.receipts.forEach((receipt) => {
     received.set(receipt.productId, (received.get(receipt.productId) || 0) + receiptStockDelta(receipt));
@@ -1130,6 +1136,7 @@ const bindCommon = () => {
       document.getElementById("productOpeningStockToday").value = "";
       document.getElementById("productWarning").value = num(item.warningStock);
       document.getElementById("productLanding").value = num(item.landingQty);
+      document.getElementById("productVendorManaged").checked = isVendorManagedProduct(item);
       syncProductFields?.();
       document.getElementById("productForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
@@ -1348,6 +1355,7 @@ const getDashboardModule = () => {
       productCategory,
       productCategoryLabel,
       productById,
+      isVendorManagedProduct,
       receiptDateValue,
       receiptStockDelta,
       landingUsageLines,
@@ -1365,11 +1373,13 @@ const renderDashboard = () => getDashboardModule().renderDashboard();
 const bindDashboard = () => getDashboardModule().bindDashboard();
 
 const productItem = (item, options = {}) => {
-  const low = num(item.stock) <= num(item.warningStock);
+  const vendorManaged = isVendorManagedProduct(item);
+  const low = !vendorManaged && num(item.stock) <= num(item.warningStock);
   const detail = [
     `분류: ${escapeHtml(productCategoryLabel(item.category))}`,
     item.company ? `업체: ${escapeHtml(item.company)}` : "",
-    item.subcategory ? `세부: ${escapeHtml(item.subcategory)}` : ""
+    item.subcategory ? `세부: ${escapeHtml(item.subcategory)}` : "",
+    vendorManaged ? "업체관리 · 재고차감 제외" : ""
   ].filter(Boolean).join(" · ");
   return `
     <div class="item">
@@ -1379,7 +1389,7 @@ const productItem = (item, options = {}) => {
       </div>
       <div class="meta">
         <span>${detail}</span>
-        <span>현재고: ${num(item.stock)} · 경고수량: ${num(item.warningStock)}${item.category === "비급여" ? "" : ` · 랜딩수량: ${num(item.landingQty)}`}</span>
+        <span>${vendorManaged ? "업체관리품 · 업체 장부 기록" : `현재고: ${num(item.stock)} · 경고수량: ${num(item.warningStock)}${item.category === "비급여" ? "" : ` · 랜딩수량: ${num(item.landingQty)}`}`}</span>
       </div>
       ${canManageSettings() ? `<div class="actions">
         ${options.showSort ? `
@@ -1502,9 +1512,9 @@ window.adjustQtyButton = (button, delta) => {
 
 const productCheckItem = (item) => `
   <label class="check-card use-card">
-    <input type="checkbox" value="${item.id}" data-use-product="${item.id}" ${num(item.stock) < 1 ? "disabled" : ""}>
-    <span>${escapeHtml(item.name)}<br><span class="muted">${escapeHtml(item.company || item.category)}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ""}</span></span>
-    ${qtyStepper(`data-use-qty="${item.id}" aria-label="${escapeHtml(item.name)} 사용 수량"`, 1, Math.max(1, num(item.stock)))}
+    <input type="checkbox" value="${item.id}" data-use-product="${item.id}" ${!isVendorManagedProduct(item) && num(item.stock) < 1 ? "disabled" : ""}>
+    <span>${escapeHtml(item.name)}<br><span class="muted">${escapeHtml(item.company || item.category)}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ""}${isVendorManagedProduct(item) ? " · 업체관리 · 재고차감 제외" : ""}</span></span>
+    ${qtyStepper(`data-use-qty="${item.id}" aria-label="${escapeHtml(item.name)} 사용 수량"`, 1, isVendorManagedProduct(item) ? 999 : Math.max(1, num(item.stock)))}
   </label>
 `;
 
@@ -1921,6 +1931,7 @@ const getReceiptsModule = () => {
       auditUpdateFields,
       auditCreateFields,
       reconcileProductStocks,
+      isVendorManagedProduct,
       render,
       saveState,
       normalizedName,
@@ -2259,6 +2270,7 @@ const getUsageEntryModule = () => {
       formatDateTime,
       productCategory,
       productById,
+      isVendorManagedProduct,
       productCategoryLabel,
       qtyStepper,
       implantPhotoViewSrc,
@@ -3012,7 +3024,9 @@ const bindEditUsage = () => {
     }, new Map());
     form.querySelectorAll("[data-use-product]").forEach((input) => {
       const product = productById(input.value);
-      const available = num(product?.stock) + (originalCounts.get(input.value) || 0);
+      const available = isVendorManagedProduct(product)
+        ? 999
+        : num(product?.stock) + (originalCounts.get(input.value) || 0);
       const qtyInput = form.querySelector(`[data-use-qty="${input.value}"]`);
       input.disabled = false;
       if (qtyInput) {
@@ -3053,8 +3067,8 @@ const bindEditUsage = () => {
     productSearchResults.innerHTML = results.length ? results.map((item) => `
       <label class="check-card use-card">
         <input type="checkbox" value="${item.id}" data-edit-search-product="${item.id}" ${form.querySelector(`[data-use-product="${item.id}"]`)?.checked ? "checked" : ""}>
-        <span>${escapeHtml(item.name)}<br><span class="muted">${escapeHtml(productCategoryLabel(item.category))}${item.company ? ` · ${escapeHtml(item.company)}` : ""}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ""} · 현재고 ${num(item.stock)}</span></span>
-        ${qtyStepper(`data-edit-search-qty="${item.id}" aria-label="${escapeHtml(item.name)} 수정 수량"`, Math.max(1, num(form.querySelector(`[data-use-qty="${item.id}"]`)?.value) || 1), Math.max(1, num(item.stock) || 999))}
+        <span>${escapeHtml(item.name)}<br><span class="muted">${escapeHtml(productCategoryLabel(item.category))}${item.company ? ` · ${escapeHtml(item.company)}` : ""}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ""} · ${isVendorManagedProduct(item) ? "업체관리 · 재고차감 제외" : `현재고 ${num(item.stock)}`}</span></span>
+        ${qtyStepper(`data-edit-search-qty="${item.id}" aria-label="${escapeHtml(item.name)} 수정 수량"`, Math.max(1, num(form.querySelector(`[data-use-qty="${item.id}"]`)?.value) || 1), isVendorManagedProduct(item) ? 999 : Math.max(1, num(item.stock) || 999))}
       </label>
     `).join("") : `<div class="empty">검색 결과가 없습니다.</div>`;
     productSearchResults.querySelectorAll("[data-edit-search-product]").forEach((input) => {
@@ -3392,13 +3406,16 @@ const bindEditUsage = () => {
     setButtonBusy(submitButton, true, "저장 중...");
     usage.productIds.forEach((productId) => {
       const product = productById(productId);
-      if (product) product.stock = num(product.stock) + 1;
+      if (product && !isVendorManagedProduct(product)) product.stock = num(product.stock) + 1;
     });
-    const unavailable = newItems.find((item) => num(productById(item.productId)?.stock) < item.qty);
+    const unavailable = newItems.find((item) => {
+      const product = productById(item.productId);
+      return !isVendorManagedProduct(product) && num(product?.stock) < item.qty;
+    });
     if (unavailable) {
       usage.productIds.forEach((productId) => {
         const product = productById(productId);
-        if (product) product.stock = Math.max(0, num(product.stock) - 1);
+        if (product && !isVendorManagedProduct(product)) product.stock = Math.max(0, num(product.stock) - 1);
       });
       alert("재고가 부족한 제품이 있습니다.");
       setButtonBusy(submitButton, false);
@@ -3408,14 +3425,14 @@ const bindEditUsage = () => {
     if (hasLandingReceipt && !confirm("이미 랜딩 입고 확인된 사용내역입니다. 입고내역은 보존됩니다. 그래도 수정할까요?")) {
       usage.productIds.forEach((productId) => {
         const product = productById(productId);
-        if (product) product.stock = Math.max(0, num(product.stock) - 1);
+        if (product && !isVendorManagedProduct(product)) product.stock = Math.max(0, num(product.stock) - 1);
       });
       setButtonBusy(submitButton, false);
       return;
     }
     newItems.forEach((item) => {
       const product = productById(item.productId);
-      if (product) product.stock = Math.max(0, num(product.stock) - item.qty);
+      if (product && !isVendorManagedProduct(product)) product.stock = Math.max(0, num(product.stock) - item.qty);
     });
     const next = {
       ...usage,
@@ -4117,6 +4134,7 @@ const bindUse = () => {
   let useDraftDirty = false;
   let loadedPendingUsageId = "";
   let lastPendingPatientWarningKey = "";
+  let lastSavedPatientWarningKey = "";
   if (useDate && !useDate.value) useDate.value = today();
   const selectedUseDate = () => useDate?.value || today();
   const useEntryPatientFields = () => ({
@@ -4169,6 +4187,46 @@ const bindUse = () => {
     if (confirm(message)) return;
     loadPendingUsageIntoForm(pending);
     saveDoneToast("같은 환자의 스크럽 확인 대기 기록을 불러왔습니다.");
+  };
+  const savedUsagePatientKey = (usage) =>
+    `${usage?.date || selectedUseDate()}::${contextNormalizedPatientName(usage?.patientName || "")}::${String(usage?.patientId || "").trim()}`;
+  const matchingSavedUsageForPatient = () => {
+    const date = selectedUseDate();
+    const patientName = contextNormalizedPatientName(patientNameInput?.value || "");
+    const patientId = String(patientIdInput?.value || "").trim();
+    if (!date || !patientName || !patientId) return null;
+    return state.usages.find((usage) =>
+      (usage.date || "") === date &&
+      contextNormalizedPatientName(usage.patientName || "") === patientName &&
+      String(usage.patientId || "").trim() === patientId
+    ) || null;
+  };
+  const warnSavedUsagePatientIfNeeded = () => {
+    const usage = matchingSavedUsageForPatient();
+    if (!usage) return;
+    const key = savedUsagePatientKey(usage);
+    if (key === lastSavedPatientWarningKey) return;
+    lastSavedPatientWarningKey = key;
+    const doctor = departmentById(usage.doctorId)?.name || "-";
+    const surgery = surgeryById(usage.surgeryId)?.name || "-";
+    const dateText = (usage.date || selectedUseDate()) === today() ? "오늘" : `${usage.date || selectedUseDate()}에`;
+    const message = [
+      `이미 ${dateText} 저장된 환자입니다.`,
+      `환자: ${usage.patientName || "-"} (${patientIdText(usage) || "-"})`,
+      `기존 기록: ${doctor} · ${surgery}`,
+      "",
+      "추가로 사용입력하시겠습니까?",
+      "확인: 추가 사용입력 계속",
+      "취소: 입력을 멈추고 기존 기록을 확인"
+    ].join("\n");
+    if (confirm(message)) return;
+    pendingEditUsageId = usage.id;
+    currentView = "edit";
+    render();
+  };
+  const warnPatientReuseIfNeeded = () => {
+    warnPendingUsagePatientIfNeeded();
+    warnSavedUsagePatientIfNeeded();
   };
   const focusFirstMissingUseEntryField = (missing = []) => {
     const first = missing[0]?.field;
@@ -4382,6 +4440,7 @@ const bindUse = () => {
     activeImplantEditPair = "";
     loadedPendingUsageId = "";
     lastPendingPatientWarningKey = "";
+    lastSavedPatientWarningKey = "";
     useDraftSnapshot = null;
     useDraftDirty = false;
     if (implantEnabled) implantEnabled.checked = false;
@@ -4732,10 +4791,11 @@ const bindUse = () => {
   });
   resetUseEntryButton?.addEventListener("click", resetUseEntryForm);
   [patientNameInput, patientIdInput].forEach((input) => {
-    input?.addEventListener("input", warnPendingUsagePatientIfNeeded);
-    input?.addEventListener("change", warnPendingUsagePatientIfNeeded);
-    input?.addEventListener("blur", warnPendingUsagePatientIfNeeded);
+    input?.addEventListener("input", warnPatientReuseIfNeeded);
+    input?.addEventListener("change", warnPatientReuseIfNeeded);
+    input?.addEventListener("blur", warnPatientReuseIfNeeded);
   });
+  useDate?.addEventListener("change", warnPatientReuseIfNeeded);
   form.querySelectorAll("[data-use-product], [data-use-qty]").forEach((input) => {
     const syncAndRender = () => {
       if (input.dataset.useProduct) {
@@ -5114,7 +5174,7 @@ const bindUse = () => {
     setButtonBusy(submitButton, true, "저장 중...");
     useItems.forEach((item) => {
       const product = productById(item.productId);
-      product.stock = num(product.stock) - item.qty;
+      if (product && !isVendorManagedProduct(product)) product.stock = num(product.stock) - item.qty;
     });
     const finalSavedAt = new Date().toISOString();
     const usageRecord = buildFinalUsageRecord({
@@ -5187,6 +5247,7 @@ const productUsageSort = (category) => (a, b) => {
 };
 
 const stockStatusClass = (product) => {
+  if (isVendorManagedProduct(product)) return "stock-ok";
   const stock = num(product?.stock);
   const warning = num(product?.warningStock);
   if (stock <= warning) return "stock-danger";
@@ -5219,6 +5280,7 @@ const getHistoryModule = () => {
       productCategory,
       productUsageSort,
       stockStatusClass,
+      isVendorManagedProduct,
       num,
       patientDisplayName,
       auditMetaHtml,
@@ -5305,7 +5367,7 @@ const deleteUsageRecord = async (usageId, { onSuccess } = {}) => {
   if (!confirm("사용내역을 삭제하고 재고를 복구할까요?")) return false;
   usage.productIds.forEach((id) => {
     const product = productById(id);
-    if (product) product.stock = num(product.stock) + 1;
+    if (product && !isVendorManagedProduct(product)) product.stock = num(product.stock) + 1;
   });
   state.usages = state.usages.filter((item) => String(item.id) !== String(usage.id));
   await saveState("사용내역 삭제 완료 · 재고 복구", { authoritative: true });

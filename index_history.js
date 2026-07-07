@@ -240,8 +240,23 @@
       .filter((product) => productMatchesReportQuery(product, query))
       .sort(context.productUsageSort(category))
       .map((product) => {
+        const vendorManaged = context.isVendorManagedProduct?.(product);
         const totalReceived = productMovementTotal(product.id, "receipt");
         const totalUsed = productMovementTotal(product.id, "usage");
+        if (vendorManaged) {
+          return {
+            product,
+            initialStock: "업체관리",
+            totalReceived,
+            totalUsed,
+            basisStock: "업체관리",
+            periodReceived: 0,
+            periodUsed: productMovementTotal(product.id, "usage", (date) => Boolean(date) && date >= period.start && date <= period.end),
+            currentStock: "업체관리",
+            systemCurrentStock: "업체관리",
+            latestReceiptDate: latestReceiptDateForProduct(product.id)
+          };
+        }
         const initialStock = productInitialStock(product, totalReceived, totalUsed);
         const basisReceived = productMovementTotal(product.id, "receipt", (date) => Boolean(date) && date < period.start);
         const basisUsed = productMovementTotal(product.id, "usage", (date) => Boolean(date) && date < period.start);
@@ -275,6 +290,7 @@
         const productRows = productUsageSummaryRows(category, effectiveStart, effectiveEnd, query);
         const rows = productRows.map(({ product, received, used }) => {
           const isNonpay = context.productCategory(product.category) === "비급여";
+          const vendorManaged = context.isVendorManagedProduct?.(product);
           const patientRows = productUsagePatientRows(product.id, effectiveStart, effectiveEnd);
           const productOpen = historyOpenState.products.has(String(product.id));
           return `
@@ -287,7 +303,7 @@
                 <div class="summary-metrics">
                   <div class="metric"><span>기간입고</span> <strong>${received}</strong></div>
                   <div class="metric"><span>기간사용</span> <strong>${used}</strong></div>
-                  <div class="metric ${context.stockStatusClass(product)}"><strong>${context.num(product.stock)}</strong><span>재고</span></div>
+                  <div class="metric ${context.stockStatusClass(product)}"><strong>${vendorManaged ? "업체관리" : context.num(product.stock)}</strong><span>재고</span></div>
                 </div>
               </summary>
               <div class="details-body">

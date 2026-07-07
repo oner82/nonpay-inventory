@@ -91,9 +91,10 @@
         <div class="selected-use-buttons">
           ${safeItems.map((item) => {
             const product = item.product;
+            const vendorManaged = context.isVendorManagedProduct?.(product);
             const linkedQty = context.getApp().querySelector(`[data-use-qty="${item.productId}"]`);
-            const maxQty = Math.max(1, context.num(linkedQty?.max || product.stock || 999));
-            const meta = [context.productCategoryLabel(product.category), product.company, product.subcategory].filter(Boolean).join(" · ");
+            const maxQty = vendorManaged ? 999 : Math.max(1, context.num(linkedQty?.max || product.stock || 999));
+            const meta = [context.productCategoryLabel(product.category), product.company, product.subcategory, vendorManaged ? "업체관리 · 재고차감 제외" : ""].filter(Boolean).join(" · ");
             return `
               <div class="selected-use-chip ${chipClass(product.category)}">
                 <div class="selected-use-name" title="${context.escapeHtml(product.name)}">
@@ -187,7 +188,8 @@
           ${items.map((item) => {
             const product = context.productById(item.productId);
             if (!product) return "";
-            const meta = [context.productCategoryLabel(product.category), product.company, product.subcategory].filter(Boolean).join(" · ");
+            const vendorManaged = context.isVendorManagedProduct?.(product);
+            const meta = [context.productCategoryLabel(product.category), product.company, product.subcategory, vendorManaged ? "업체관리 · 재고차감 제외" : ""].filter(Boolean).join(" · ");
             return `
               <div class="selected-use-chip ${chipClass(product.category)}">
                 <div class="selected-use-name" title="${context.escapeHtml(product.name)}">
@@ -195,7 +197,7 @@
                 </div>
                 <div class="selected-use-controls">
                   <button type="button" class="secondary" data-selected-dec="${item.productId}" aria-label="수량 줄이기">−</button>
-                  <input type="number" min="1" max="${Math.max(1, context.num(product.stock) + item.qty)}" value="${item.qty}" data-selected-qty="${item.productId}" aria-label="${context.escapeHtml(product.name)} 수량" readonly>
+                  <input type="number" min="1" max="${vendorManaged ? 999 : Math.max(1, context.num(product.stock) + item.qty)}" value="${item.qty}" data-selected-qty="${item.productId}" aria-label="${context.escapeHtml(product.name)} 수량" readonly>
                   <button type="button" class="secondary" data-selected-inc="${item.productId}" aria-label="수량 늘리기">+</button>
                   <button type="button" class="remove-selected" data-selected-remove="${item.productId}">삭제</button>
                 </div>
@@ -211,11 +213,13 @@
       const selectedQtyById = new Map(selectedItems.map((item) => [item.productId, Math.max(1, context.num(item.qty))]));
       return results.map((item) => {
         const selectedQty = selectedQtyById.get(item.id);
+        const vendorManaged = context.isVendorManagedProduct?.(item);
+        const stockText = vendorManaged ? "업체관리 · 재고차감 제외" : `현재고 ${context.num(item.stock)}`;
         return `
           <label class="check-card use-card">
             <input type="checkbox" value="${item.id}" data-search-product="${item.id}" ${selectedQty ? "checked" : ""}>
-            <span>${context.escapeHtml(item.name)}<br><span class="muted">${context.escapeHtml(context.productCategoryLabel(item.category))}${item.company ? ` · ${context.escapeHtml(item.company)}` : ""}${item.subcategory ? ` · ${context.escapeHtml(item.subcategory)}` : ""} · 현재고 ${context.num(item.stock)}</span></span>
-            ${context.qtyStepper(`data-search-qty="${item.id}" aria-label="${context.escapeHtml(item.name)} 검색 사용 수량"`, selectedQty || 1, Math.max(1, context.num(item.stock)))}
+            <span>${context.escapeHtml(item.name)}<br><span class="muted">${context.escapeHtml(context.productCategoryLabel(item.category))}${item.company ? ` · ${context.escapeHtml(item.company)}` : ""}${item.subcategory ? ` · ${context.escapeHtml(item.subcategory)}` : ""} · ${context.escapeHtml(stockText)}</span></span>
+            ${context.qtyStepper(`data-search-qty="${item.id}" aria-label="${context.escapeHtml(item.name)} 검색 사용 수량"`, selectedQty || 1, vendorManaged ? 999 : Math.max(1, context.num(item.stock)))}
           </label>
         `;
       }).join("");
@@ -379,11 +383,13 @@
           ${visibleItems.map((item) => {
             const selectedQty = selectedQtyById.get(item.productId);
             const qty = selectedQty || Math.max(1, context.num(item.qty));
+            const vendorManaged = context.isVendorManagedProduct?.(item.product);
+            const stockText = vendorManaged ? "업체관리 · 재고차감 제외" : `현재고 ${context.num(item.product.stock)}`;
             return `
               <label class="check-card use-card">
                 <input type="checkbox" value="${item.productId}" data-recommend-product="${item.productId}" ${selectedQty ? "checked" : ""}>
-                <span>${context.escapeHtml(item.product.name)}<br><span class="muted">추천 ${Math.max(1, context.num(item.qty))}개 · 현재고 ${context.num(item.product.stock)}</span></span>
-                ${context.qtyStepper(`data-recommend-qty="${item.productId}" aria-label="${context.escapeHtml(item.product.name)} 추천 사용 수량"`, qty, Math.max(1, context.num(item.product.stock)))}
+                <span>${context.escapeHtml(item.product.name)}<br><span class="muted">추천 ${Math.max(1, context.num(item.qty))}개 · ${context.escapeHtml(stockText)}</span></span>
+                ${context.qtyStepper(`data-recommend-qty="${item.productId}" aria-label="${context.escapeHtml(item.product.name)} 추천 사용 수량"`, qty, vendorManaged ? 999 : Math.max(1, context.num(item.product.stock)))}
               </label>
             `;
           }).join("")}
@@ -527,7 +533,10 @@
 
     const useDraftValidationMessage = (useItems = [], implantDraftPayload = []) => {
       if (!useItems.length && !implantDraftPayload.length) return "제품을 선택하거나 임플란트 장부를 작성해 주세요.";
-      const unavailable = useItems.find((item) => context.num(context.productById(item.productId)?.stock) < item.qty);
+      const unavailable = useItems.find((item) => {
+        const product = context.productById(item.productId);
+        return !context.isVendorManagedProduct?.(product) && context.num(product?.stock) < item.qty;
+      });
       if (unavailable) return "재고가 부족한 제품이 있습니다.";
       if (invalidImplantDraft(implantDraftPayload)) return "임플란트 장부가 작성되지 않았습니다. 업체명과 사용내용 또는 사진을 확인해 주세요.";
       return "";

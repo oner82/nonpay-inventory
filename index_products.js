@@ -79,6 +79,10 @@ const renderProducts = () => `
         <label for="productLanding">랜딩수량</label>
         <input id="productLanding" type="number" min="0" value="0">
       </div>
+      <div id="productVendorManagedWrap">
+        <label><input id="productVendorManaged" type="checkbox"> 업체관리품</label>
+        <div class="helper">병원은 보관만 하고 업체가 재고를 관리하는 인체조직입니다. 사용입력에는 표시되지만 재고 차감과 재고확인에서는 제외됩니다.</div>
+      </div>
       <div class="actions">
         <button type="submit">제품 저장</button>
         <button class="secondary" type="button" id="productReset">새로 입력</button>
@@ -103,11 +107,13 @@ const bindProducts = () => {
     document.getElementById("productCompanyWrap").style.display = category === "비급여" ? "none" : "block";
     document.getElementById("productSubcategoryWrap").style.display = category === "ANCHOR" ? "block" : "none";
     document.getElementById("productLandingWrap").style.display = category === "비급여" ? "none" : "block";
+    document.getElementById("productVendorManagedWrap").style.display = category === "인체조직" ? "block" : "none";
     if (category === "비급여") {
       companySelect.value = "";
       document.getElementById("productSubcategory").value = "";
       document.getElementById("productLanding").value = "0";
     }
+    if (category !== "인체조직") document.getElementById("productVendorManaged").checked = false;
     companySelect.required = category !== "비급여";
     companySelect.disabled = category !== "비급여" && !implantVendors().length;
     if (companyHelp) companyHelp.textContent = implantVendors().length
@@ -163,6 +169,7 @@ const bindProducts = () => {
       stock: num(document.getElementById("productStock").value),
       warningStock: num(document.getElementById("productWarning").value),
       landingQty: category === "비급여" ? 0 : num(document.getElementById("productLanding").value),
+      vendorManaged: category === "인체조직" && document.getElementById("productVendorManaged").checked,
       sortOrder: category === "비급여" ? (productSortOrderValue(existingProduct) || nextNonpaySortOrder(id)) : 0
     };
     if (!next.name) return;

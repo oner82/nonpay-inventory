@@ -10,7 +10,7 @@
     const renderDashboard = () => {
       const state = context.getState();
       const lowProducts = state.products
-        .filter((item) => context.num(item.stock) <= context.num(item.warningStock))
+        .filter((item) => !context.isVendorManagedProduct?.(item) && context.num(item.stock) <= context.num(item.warningStock))
         .sort((a, b) => context.num(a.stock) - context.num(b.stock) || context.alphaFirstCompare(a.name, b.name));
       const hiddenLowIds = new Set(state.hiddenLowProductIds || []);
       const visibleLowProducts = lowProducts.filter((item) => !hiddenLowIds.has(item.id));
@@ -135,7 +135,7 @@
                     </div>
                     <div class="meta">
                       <span>${context.escapeHtml(context.productCategoryLabel(item.product.category))}${item.product.company ? ` · ${context.escapeHtml(item.product.company)}` : ""}${item.product.subcategory ? ` · ${context.escapeHtml(item.product.subcategory)}` : ""}</span>
-                      <span>현재고 ${context.num(item.product.stock)} · 경고수량 ${context.num(item.product.warningStock)}</span>
+                      <span>${context.isVendorManagedProduct?.(item.product) ? "업체관리 · 재고차감 제외" : `현재고 ${context.num(item.product.stock)} · 경고수량 ${context.num(item.product.warningStock)}`}</span>
                     </div>
                   </div>
                 `).join("") : `<div class="empty">최근 7일 사용 데이터가 없습니다.</div>`}
@@ -157,8 +157,9 @@
                 <div class="summary-table">
                   ${context.PRODUCT_CATEGORIES.map((category) => {
                     const items = state.products.filter((item) => context.productCategory(item.category) === category);
-                    const stock = items.reduce((sum, item) => sum + context.num(item.stock), 0);
-                    const low = items.filter((item) => context.num(item.stock) <= context.num(item.warningStock)).length;
+                    const stockItems = items.filter((item) => !context.isVendorManagedProduct?.(item));
+                    const stock = stockItems.reduce((sum, item) => sum + context.num(item.stock), 0);
+                    const low = stockItems.filter((item) => context.num(item.stock) <= context.num(item.warningStock)).length;
                     return `
                       <details class="summary-row ${category === "비급여" ? "nonpay" : ""}" open>
                         <summary>
@@ -169,7 +170,7 @@
                           <div class="summary-metrics">
                             <div class="metric"><strong>${stock}</strong><span>재고</span></div>
                             <div class="metric ${low ? "stock-danger" : "stock-ok"}"><strong>${low}</strong><span>부족</span></div>
-                            <div class="metric"><strong>${items.reduce((sum, item) => sum + context.num(item.warningStock), 0)}</strong><span>경고합</span></div>
+                            <div class="metric"><strong>${stockItems.reduce((sum, item) => sum + context.num(item.warningStock), 0)}</strong><span>경고합</span></div>
                           </div>
                         </summary>
                       </details>

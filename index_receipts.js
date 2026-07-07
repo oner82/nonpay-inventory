@@ -35,6 +35,7 @@
       byName,
       exportReceiptHistory,
       productById,
+      isVendorManagedProduct,
       uid,
       landingUsageLines
     } = context;
@@ -42,7 +43,7 @@
     let receiptHistoryType = "nonpay";
 
 const landingCarryoverProducts = () => state.products
-  .filter((item) => productCategory(item.category) !== "비급여")
+  .filter((item) => productCategory(item.category) !== "비급여" && !isVendorManagedProduct?.(item))
   .slice()
   .sort((a, b) => productDisplaySort(productCategory(a.category))(a, b) || byName(a, b));
 
@@ -52,7 +53,7 @@ const nonpayReceiptProducts = () => state.products
   .sort(productDisplaySort("비급여"));
 
 const morningCheckProducts = () => state.products
-  .filter((product) => product?.name)
+  .filter((product) => product?.name && !isVendorManagedProduct?.(product))
   .slice()
   .sort((a, b) => productDisplaySort(productCategory(a.category))(a, b) || byName(a, b));
 
@@ -66,6 +67,7 @@ const morningCheckCategorySort = (a, b) => {
 };
 
 const productUsageCountBefore = (productId, date) => state.usages.reduce((sum, usage) => {
+  if (isVendorManagedProduct?.(productById(productId))) return sum;
   if (!usage?.date || usage.date >= date) return sum;
   return sum + (usage.productIds || []).filter((id) => sameId(id, productId)).length;
 }, 0);
@@ -82,7 +84,9 @@ const productReceiptDeltaAll = (productId) => state.receipts.reduce((sum, receip
 ), 0);
 
 const productUsageCountAll = (productId) => state.usages.reduce((sum, usage) => (
-  sum + (usage.productIds || []).filter((id) => sameId(id, productId)).length
+  isVendorManagedProduct?.(productById(productId))
+    ? sum
+    : sum + (usage.productIds || []).filter((id) => sameId(id, productId)).length
 ), 0);
 
 const productBaseStockForCheck = (product) => Number.isFinite(Number(product.baseStock))
