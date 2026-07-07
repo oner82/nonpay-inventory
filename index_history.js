@@ -12,6 +12,7 @@
       product: false,
       patient: false,
       categories: new Set(),
+      companies: new Set(),
       products: new Set()
     };
 
@@ -25,6 +26,7 @@
         product: false,
         patient: false,
         categories: new Set(),
+        companies: new Set(),
         products: new Set()
       };
     };
@@ -44,6 +46,11 @@
         Array.from(document.querySelectorAll("[data-history-category]"))
           .filter((details) => details.open)
           .map((details) => details.dataset.historyCategory)
+      );
+      historyOpenState.companies = new Set(
+        Array.from(document.querySelectorAll("[data-history-company]"))
+          .filter((details) => details.open)
+          .map((details) => details.dataset.historyCompany)
       );
       historyOpenState.products = new Set(
         Array.from(document.querySelectorAll("[data-history-product]"))
@@ -288,7 +295,7 @@
         : historyPeriodText(start, end);
       const groups = context.productCategories.map((category) => {
         const productRows = productUsageSummaryRows(category, effectiveStart, effectiveEnd, query);
-        const rows = productRows.map(({ product, received, used }) => {
+        const renderProductRow = ({ product, received, used }) => {
           const isNonpay = context.productCategory(product.category) === "비급여";
           const vendorManaged = context.isVendorManagedProduct?.(product);
           const patientRows = productUsagePatientRows(product.id, effectiveStart, effectiveEnd);
@@ -320,7 +327,28 @@
               </div>
             </details>
           `;
-        }).join("");
+        };
+        // 비급여는 기존 평면 목록 유지, 나머지 제품군은 회사 기준으로 접이식 묶음(기본 접힘)
+        const rows = context.productCategory(category) === "비급여"
+          ? productRows.map(renderProductRow).join("")
+          : Array.from(productRows.reduce((map, row) => {
+              const company = row.product.company || "업체 없음";
+              if (!map.has(company)) map.set(company, []);
+              map.get(company).push(row);
+              return map;
+            }, new Map()).entries())
+            .sort((a, b) => context.alphaFirstCompare(a[0], b[0]))
+            .map(([company, companyRows]) => {
+              const companyKey = `${category}::${company}`;
+              // 검색어가 있으면 결과가 바로 보이도록 자동으로 펼친다
+              const companyOpen = historyOpenState.companies.has(companyKey) || Boolean(String(query || "").trim());
+              return `
+                <details class="summary-company-group" data-history-company="${context.escapeHtml(companyKey)}" ${companyOpen ? "open" : ""}>
+                  <summary class="summary-company-header"><span>${context.escapeHtml(company)}</span><span class="pill">${companyRows.length}</span></summary>
+                  <div class="summary-company-body">${companyRows.map(renderProductRow).join("")}</div>
+                </details>
+              `;
+            }).join("");
         const categoryOpen = historyOpenState.categories.has(String(category));
         return `
           <details class="item" data-history-category="${context.escapeHtml(category)}" ${categoryOpen ? "open" : ""}>

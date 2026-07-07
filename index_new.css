@@ -487,6 +487,13 @@
     .usage-product-chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .usage-chip { display: inline-flex; align-items: center; min-height: 30px; padding: 5px 8px; border: 1px solid rgba(15,23,42,.08); border-radius: 10px; background: rgba(255,255,255,.78); color: var(--ink); font-size: 13px; font-weight: 800; }
     .summary-table { display: grid; gap: 6px; }
+    .summary-company-group { display: grid; gap: 6px; }
+    .summary-company-group + .summary-company-group { margin-top: 4px; }
+    .summary-company-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 38px; padding: 6px 10px; border-radius: 8px; background: #f1f5f9; color: var(--ink); font-size: 13px; font-weight: 900; cursor: pointer; list-style: none; }
+    .summary-company-header::-webkit-details-marker { display: none; }
+    .summary-company-header > span:first-child::before { content: "▸ "; color: var(--muted); }
+    details[open] > .summary-company-header > span:first-child::before { content: "▾ "; }
+    .summary-company-body { display: grid; gap: 6px; }
     .summary-row { display: grid; grid-template-columns: 1fr; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
     details.summary-row { padding: 0; overflow: hidden; }
     details.summary-row > summary { display: grid; grid-template-columns: minmax(180px, 1fr) auto; gap: 10px; align-items: center; min-height: 46px; padding: 8px 12px; cursor: pointer; list-style: none; }
