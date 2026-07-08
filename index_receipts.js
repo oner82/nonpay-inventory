@@ -397,6 +397,7 @@ const bindReceiptHistoryControls = (prefix, listId) => {
     const products = state.products
       .slice()
       .sort(byName)
+      .filter((product) => !isVendorManagedProduct?.(product))
       .filter((product) => !query || normalizedName(product.name).includes(query))
       .slice(0, 20);
     if (!products.length) {

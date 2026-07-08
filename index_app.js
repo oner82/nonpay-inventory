@@ -1664,6 +1664,8 @@ const landingUsageLines = (includeReceived = true) => {
     return Array.from(counts.entries()).map(([productId, qty]) => {
     const product = productById(productId);
     if (!product || productCategory(product.category) === "비급여") return null;
+    // 업체관리품은 업체가 장부를 관리하므로 랜딩 입고 확인 대상에서 제외한다.
+    if (isVendorManagedProduct(product)) return null;
     const receipt = received.get(landingReceiptKey(usage.id, productId));
     if (!includeReceived && receipt) return null;
     return { usage, product, receipt, qty };
@@ -1919,6 +1921,7 @@ const getUsageRulesModule = () => {
       productCategory,
       productCategoryLabel,
       productDisplaySort,
+      isVendorManagedProduct,
       qtyStepper,
       PRODUCT_CATEGORIES,
       alphaFirstCompare,

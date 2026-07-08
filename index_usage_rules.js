@@ -18,6 +18,7 @@
       productCategory,
       productCategoryLabel,
       productDisplaySort,
+      isVendorManagedProduct,
       qtyStepper,
       PRODUCT_CATEGORIES,
       alphaFirstCompare,
@@ -121,13 +122,18 @@ const renderRuleProductSelector = () => {
   }).join("");
 };
 
-const ruleProductItem = (item) => `
+const ruleProductItem = (item) => {
+  // 업체관리품은 병원이 재고를 관리하지 않으므로 재고량을 표시하지 않는다.
+  const vendorManaged = isVendorManagedProduct?.(item);
+  const stockText = vendorManaged ? "업체관리 · 재고차감 제외" : `현재고 ${num(item.stock)}`;
+  return `
   <label class="check-card rule-card">
     <input type="checkbox" value="${item.id}" data-rule-product>
-    <span>${escapeHtml(item.name)}<br><span class="muted">${escapeHtml(productCategoryLabel(item.category))}${item.company ? ` · ${escapeHtml(item.company)}` : ""}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ""} · 현재고 ${num(item.stock)}</span></span>
-    ${qtyStepper(`data-rule-product-qty="${item.id}" aria-label="${escapeHtml(item.name)} 추천 수량"`, 1, Math.max(1, num(item.stock)))}
+    <span>${escapeHtml(item.name)}<br><span class="muted">${escapeHtml(productCategoryLabel(item.category))}${item.company ? ` · ${escapeHtml(item.company)}` : ""}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ""} · ${stockText}</span></span>
+    ${qtyStepper(`data-rule-product-qty="${item.id}" aria-label="${escapeHtml(item.name)} 추천 수량"`, 1, vendorManaged ? 999 : Math.max(1, num(item.stock)))}
   </label>
 `;
+};
 
 const sortedUsageRules = () => state.usageRules.slice().sort((a, b) =>
   departmentCompare(a.department || "", b.department || "") ||
