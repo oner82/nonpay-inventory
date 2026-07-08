@@ -275,6 +275,9 @@ let implantRecordsUnsubscribe;
 let implantVendorsUnsubscribe;
 let pendingUsagesUnsubscribe;
 let hydrated = false;
+// 저장 진행 여부는 카운터로 관리한다. 저장이 겹쳐도(예: 사용내역 저장 직후
+// 임플란트 사진 저장) 모든 저장이 끝나기 전에는 onSnapshot 가드가 풀리지 않게 한다.
+let savingCount = 0;
 let saving = false;
 let implantRecords = [];
 let implantVendors = [];
@@ -994,20 +997,27 @@ const saveState = async (message = "저장 완료", options = {}) => {
     setStatus("Firebase 연결 전입니다", "error");
     return;
   }
+  savingCount += 1;
   saving = true;
   savingToast(options.savingMessage || "저장 중입니다...");
   state.updatedAt = new Date().toISOString();
   try {
     if (runTransaction && db) {
       const merged = await runTransaction(db, async (transaction) => {
-        if (options.authoritative) {
-          const nextState = normalizeState(state);
-          transaction.set(ref, nextState);
-          return nextState;
-        }
         const serverSnap = await transaction.get(ref);
         const remoteData = serverSnap.exists() ? serverSnap.data() : blankState();
-        const nextState = mergeStates(remoteData, state);
+        // 항상 최신 서버 데이터를 읽어 로컬 변경과 병합한다(동시저장 클로버링 방지).
+        let nextState = mergeStates(remoteData, state);
+        // 삭제·수정처럼 병합만으로는 표현되지 않는 동작(병합은 remote에 남은
+        // 항목을 되살린다)은 apply 변환을 최신 서버 상태 위에 덧입힌다.
+        if (typeof options.apply === "function") {
+          const before = state;
+          state = nextState;
+          options.apply(state);
+          reconcileProductStocks();
+          nextState = normalizeState(state);
+          state = before;
+        }
         transaction.set(ref, nextState);
         return nextState;
       });
@@ -1022,8 +1032,24 @@ const saveState = async (message = "저장 완료", options = {}) => {
     console.error(error);
     setStatus(`저장 실패: ${error.message}`, "error");
     saveErrorToast(`저장 실패: ${error.message}`);
+    // 저장 실패 시 낙관적으로 반영했던 로컬 변경을 서버 진실로 되돌린다.
+    // 실패한 트랜잭션은 서버를 바꾸지 않았으므로, 재읽기 = 원복이다.
+    // (다른 저장이 아직 진행 중이면 그 저장이 끝나며 상태를 정리하므로 건너뛴다.)
+    if (getDoc && ref && savingCount <= 1) {
+      try {
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          state = normalizeState(snap.data());
+          reconcileProductStocks();
+          render();
+        }
+      } catch (rollbackError) {
+        console.error(rollbackError);
+      }
+    }
   } finally {
-    saving = false;
+    savingCount = Math.max(0, savingCount - 1);
+    saving = savingCount > 0;
   }
 };
 
@@ -1152,11 +1178,14 @@ const bindCommon = () => {
       const productUsed = state.usages.some((usage) => usage.productIds.some((productId) => sameId(productId, id)));
       const productReceived = state.receipts.some((receipt) => sameId(receipt.productId, id));
       if ((productUsed || productReceived) && !confirm("내역에 사용된 제품입니다. 그래도 삭제할까요?")) return;
-      state.products = state.products.filter((item) => !sameId(item.id, id));
-      state.receipts = state.receipts.filter((item) => !sameId(item.productId, id));
-      state.usages = state.usages.map((usage) => ({ ...usage, productIds: usage.productIds.filter((productId) => !sameId(productId, id)) }));
+      const applyProductDelete = (s) => {
+        s.products = s.products.filter((item) => !sameId(item.id, id));
+        s.receipts = s.receipts.filter((item) => !sameId(item.productId, id));
+        s.usages = s.usages.map((usage) => ({ ...usage, productIds: usage.productIds.filter((productId) => !sameId(productId, id)) }));
+      };
+      applyProductDelete(state);
       render();
-      await saveState("제품 삭제 완료", { authoritative: true });
+      await saveState("제품 삭제 완료", { apply: applyProductDelete });
       return;
     }
 
@@ -1213,10 +1242,14 @@ const bindCommon = () => {
       const id = deleteDoctorBtn.dataset.deleteDoctor;
       const doctorToDelete = state.doctors.find((item) => sameId(item.id, id));
       if (!confirm("과를 삭제할까요?")) return;
-      state.doctors = state.doctors.filter((item) => !sameId(item.id, id));
-      state.surgeries = state.surgeries.filter((item) => item.department !== doctorToDelete?.name);
+      const doctorName = doctorToDelete?.name;
+      const applyDoctorDelete = (s) => {
+        s.doctors = s.doctors.filter((item) => !sameId(item.id, id));
+        s.surgeries = s.surgeries.filter((item) => item.department !== doctorName);
+      };
+      applyDoctorDelete(state);
       render();
-      await saveState("과 삭제 완료", { authoritative: true });
+      await saveState("과 삭제 완료", { apply: applyDoctorDelete });
       return;
     }
 
@@ -1248,9 +1281,12 @@ const bindCommon = () => {
       }
       const id = deleteSurgeryBtn.dataset.deleteSurgery;
       if (!confirm("수술을 삭제할까요?")) return;
-      state.surgeries = state.surgeries.filter((item) => !sameId(item.id, id));
+      const applySurgeryDelete = (s) => {
+        s.surgeries = s.surgeries.filter((item) => !sameId(item.id, id));
+      };
+      applySurgeryDelete(state);
       render();
-      await saveState("수술 삭제 완료", { authoritative: true });
+      await saveState("수술 삭제 완료", { apply: applySurgeryDelete });
       return;
     }
 
@@ -1287,9 +1323,13 @@ const bindCommon = () => {
         return;
       }
       if (!confirm("수술별 사용관리 규칙을 삭제할까요?")) return;
-      state.usageRules = state.usageRules.filter((item) => !sameId(item.id, deleteRuleBtn.dataset.deleteRule));
+      const ruleId = deleteRuleBtn.dataset.deleteRule;
+      const applyRuleDelete = (s) => {
+        s.usageRules = s.usageRules.filter((item) => !sameId(item.id, ruleId));
+      };
+      applyRuleDelete(state);
       render();
-      await saveState("수술별 사용관리 삭제 완료", { authoritative: true });
+      await saveState("수술별 사용관리 삭제 완료", { apply: applyRuleDelete });
       return;
     }
   });
@@ -5369,8 +5409,12 @@ const deleteUsageRecord = async (usageId, { onSuccess } = {}) => {
     const product = productById(id);
     if (product && !isVendorManagedProduct(product)) product.stock = num(product.stock) + 1;
   });
-  state.usages = state.usages.filter((item) => String(item.id) !== String(usage.id));
-  await saveState("사용내역 삭제 완료 · 재고 복구", { authoritative: true });
+  const deletedUsageId = usage.id;
+  const applyUsageDelete = (s) => {
+    s.usages = s.usages.filter((item) => String(item.id) !== String(deletedUsageId));
+  };
+  applyUsageDelete(state);
+  await saveState("사용내역 삭제 완료 · 재고 복구", { apply: applyUsageDelete });
   try {
     await deleteImplantRecordsForUsage(usage.id);
   } catch (error) {

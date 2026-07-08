@@ -341,17 +341,23 @@ const updateReceiptRecord = async (receiptId, values) => {
   const receipt = state.receipts.find((item) => sameId(item.id, receiptId));
   if (!receipt) return false;
   const product = receiptProduct(receipt);
-  Object.assign(receipt, {
+  const patch = {
     qty: Math.max(1, num(values.qty)),
     date: values.date || receiptDateValue(receipt) || today(),
     productName: product?.name || receipt.productName || "",
     memo: values.memo || "",
     updatedAt: new Date().toISOString(),
     ...auditUpdateFields()
-  });
+  };
+  // 최신 서버 상태의 해당 입고건에 동일 수정을 덧입힌다(동시 추가분 보존).
+  const applyReceiptEdit = (s) => {
+    const target = s.receipts.find((item) => sameId(item.id, receiptId));
+    if (target) Object.assign(target, patch);
+  };
+  Object.assign(receipt, patch);
   reconcileProductStocks();
   render();
-  await saveState("입고이력 수정 완료", { authoritative: true });
+  await saveState("입고이력 수정 완료", { apply: applyReceiptEdit });
   return true;
 };
 
@@ -362,10 +368,13 @@ const deleteReceiptRecord = async (receiptId) => {
   }
   const receipt = state.receipts.find((item) => sameId(item.id, receiptId));
   if (!receipt || !confirm("입고이력을 삭제하고 현재고를 다시 계산할까요?")) return false;
-  state.receipts = state.receipts.filter((item) => !sameId(item.id, receiptId));
+  const applyReceiptDelete = (s) => {
+    s.receipts = s.receipts.filter((item) => !sameId(item.id, receiptId));
+  };
+  applyReceiptDelete(state);
   reconcileProductStocks();
   render();
-  await saveState("입고이력 삭제 완료", { authoritative: true });
+  await saveState("입고이력 삭제 완료", { apply: applyReceiptDelete });
   return true;
 };
 
@@ -571,7 +580,8 @@ const bindReceipts = () => {
     });
     reconcileProductStocks();
     render();
-    await saveState("타부서 대여 저장 완료", { authoritative: true });
+    // 대여도 receipt 추가(push)이므로 병합 경로로 안전하게 저장한다.
+    await saveState("타부서 대여 저장 완료");
   });
   document.getElementById("landingCarryoverReceiptForm")?.addEventListener("submit", async (event) => {
     event.preventDefault();
