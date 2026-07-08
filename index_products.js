@@ -80,7 +80,7 @@ const renderProducts = () => `
         <input id="productLanding" type="number" min="0" value="0">
       </div>
       <div id="productVendorManagedWrap">
-        <label class="toggle-line"><input id="productVendorManaged" type="checkbox"> 업체관리품</label>
+        <label><input id="productVendorManaged" type="checkbox"> 업체관리품</label>
         <div class="helper">병원은 보관만 하고 업체가 재고를 관리하는 인체조직입니다. 사용입력에는 표시되지만 재고 차감과 재고확인에서는 제외됩니다.</div>
       </div>
       <div class="actions">
