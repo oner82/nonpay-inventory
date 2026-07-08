@@ -520,6 +520,7 @@
     .check-card.use-card { grid-template-columns: 28px 1fr 82px; }
     .toggle-line { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; cursor: pointer; font-weight: 900; }
     .toggle-line input { width: 24px; min-height: 24px; margin: 0; flex: 0 0 auto; }
+    #productVendorManagedWrap .toggle-line { margin-top: 12px; }
     .doctor-scope-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; margin-top: 8px; }
     .doctor-scope-option { display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); font-size: 13px; font-weight: 900; }
     .doctor-scope-option input { width: 20px; min-height: 20px; margin: 0; flex: 0 0 auto; }

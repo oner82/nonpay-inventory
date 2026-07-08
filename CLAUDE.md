@@ -1,0 +1,70 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## 언어 규칙
+
+**모든 답변과 코드 주석 설명은 한국어로 작성한다.**
+
+## What this is
+
+A hospital operating-room inventory web app (수술실 비급여·재고관리) for tracking non-reimbursable supplies (비급여), human tissue / 인체조직 (historically called "DBM" — always call it **인체조직** now), treatment materials (치료재료), and implants. The primary users are OR nurses on tablets/phones. The UI is entirely in Korean. There is **no build step, no framework, no package.json** — it is plain ES-era JavaScript loaded via `<script>` tags and served as static files. Firebase (Firestore + Storage) is the backend, accessed directly from the browser via CDN ES module imports.
+
+There is a detailed domain/workflow skill at `.codex/skills/or-nonpay-inventory/SKILL.md` — read it before non-trivial changes. Key rules from it: **do not change Firebase config, collection names, storage/delete/edit logic, deployment config, auth, or the working stock formula** unless explicitly asked; explain impact before touching data logic; prioritize mobile/tablet usability and fast, error-resistant input.
+
+Stock formula: `현재고 = 기존재고 + 입고수량 - 사용수량` (current = prior + received − used).
+
+## Commands
+
+- **Run locally:** `python3 -m http.server 5177` then open `http://localhost:5177/auth_shell.html` (VS Code task "local server: auth_shell" + launch config "Open auth_shell in Chrome" do this). `index.html` just redirects to `auth_shell.html`.
+- **Syntax check (the only "test"):** `node --check <file.js>`. There is no test suite, linter, or type checker. Verify by running the app and exercising the flow — see the SKILL.md test checklist (입고 save, 사용 save, delete, refresh persistence, stock math, mobile header/tabs).
+- **Deploy:** push to `main` → GitHub Actions (`.github/workflows/firebase-hosting.yml`) runs `firebase deploy --only hosting --project nonpay-inventory`. **Pushing to main deploys to the live production site.** Hosting serves the repo root as-is (`firebase.json` `public: "."`).
+
+## Architecture
+
+### Two-layer shell + iframe
+
+1. **`auth_shell.html` / `auth_shell.js`** — the login/session outer shell. Handles PIN auth, account requests, and account management (admin). Stores the logged-in user in `sessionStorage`+`localStorage` (`orInventoryUser`). On success it loads the actual app into an `<iframe>` pointing at `index_new.html`. PINs are stored as salted SHA-256 (`sha256(loginId::pin::salt)`), never plaintext.
+2. **`index_new.html`** — the real app. Loads the CSS and, in a **fixed order**, ~13 classic (non-module) `<script>` files ending with `index_app.js` as the orchestrator.
+
+### Module pattern (important)
+
+These are **not ES modules** — they are plain scripts sharing the global scope, wrapped in IIFEs. Each feature file exposes a single factory on `window`:
+
+- `window.create<Feature>Module = (context) => ({ render..., bind... })` — e.g. `createDashboardModule`, `createReceiptsModule`, `createUsageEntryModule`, `createHistoryModule`, `createProductsModule`, `createImplantsModule`, `createSettingsModule`, `createDepartmentsModule`, `createImplantVendorsModule`, `createUsageRulesModule`, `createBackupResetModule`.
+- Shared helpers live on `window.ORInventoryUtils` (`index_utils.js`: `uid`, `today`, `num`, `escapeHtml`, `productCategory`, …) and `window.ORInventoryExportUtils` (`index_export_utils.js`: Excel/report export).
+
+`index_app.js` (the big ~5500-line orchestrator) owns the Firebase connection and the app `state`, then lazily instantiates each module by calling its factory with a **`context` object of injected dependencies** (`getState`, `render`, `saveState`, helper fns, etc.). Modules never import each other and never touch Firebase directly — they read/write through the injected context and call back into `index_app.js`. When adding a module method that needs new data or a helper, thread it through the `context` object in `index_app.js`, don't reach for globals.
+
+Version query strings on every script/link (`?v=20260707-...`) are manual cache-busters — bump them when you change a file so the live site picks it up.
+
+### Firestore data model
+
+Firebase is initialized in both `auth_shell.js` and `index_app.js` via dynamic `import()` from `https://www.gstatic.com/firebasejs/10.12.5/...` (config is just `{ projectId: "nonpay-inventory" }`).
+
+- **`app/main`** — a single document holding the entire core inventory `state` (products, doctors, surgeries, receipts, usages, usageRules, backupVersions, …). Loaded with `getDoc`, kept live with `onSnapshot`, saved by rewriting the whole doc via `setDoc`/`runTransaction`. `blankState()` and `normalizeState()` in `index_app.js` define/repair its shape.
+- **`app/users`** — accounts + roles (managed by `auth_shell.js`).
+- **`implantRecords`**, **`implantVendors`**, **`pendingUsages`** — per-document collections (each item is its own doc), streamed with `onSnapshot`.
+
+Because `app/main` is one big document mutated by whole-doc writes, the `onSnapshot` handler guards against clobbering in-flight edits (`saving` flag, `renderOrDeferForUseEntry` protects active 사용입력 forms). Preserve that guarding when touching save/subscribe logic.
+
+### Roles
+
+`admin` (관리자, all + account mgmt), `manager` (책임사용자, all except accounts), `receiver` (입고담당자, receipts/implants only), `staff` (일반사용자, use/edit/history, no delete). `roleAllowedViews` gates nav in **both** `auth_shell.js` and `index_app.js` — keep them in sync.
+
+### Exports & vendored libs
+
+Excel/PDF report generation runs client-side. `vendor/jspdf.umd.min.js` and `vendor/html2canvas.min.js` are lazy-loaded on demand (`loadExternalScriptOnce`) and used from `index_export_utils.js` / `index_implants.js`. `vendor/` is the only third-party code (no npm).
+
+## Domain rules (beyond the stock formula)
+
+- **업체관리 인체조직 (vendor-managed tissue):** products with `vendorManaged: true` (only valid for category 인체조직; see `isVendorManagedProduct` in `index_app.js`). They are selectable in 사용입력 like any 인체조직, but are **excluded from stock deduction, low-stock warnings, and stock checks** — the vendor keeps the ledger. Every place that mutates or checks `product.stock` must keep the `isVendorManagedProduct` guard. In UI copy about these items, never phrase photo requirements as "사진 첨부 필수" in a way that implies other items don't need photos.
+- **사용입력 two-step save:** 임시저장 writes to the `pendingUsages` collection ("스크럽 확인 대기") and does **not** deduct stock or create a 사용내역 entry; only 최종저장 does both. Don't collapse or reorder these steps.
+- **Duplicate-patient warning:** saving a usage checks same-day same-patient records (`sameDayPatientUsageWarning` in `index_app.js`) and asks for confirmation — duplicates are allowed (재수술/co-op) but must warn first. Pending drafts also match on patient name+ID to resume instead of duplicating.
+
+## Repo notes
+
+- `output/` and `tmp/` are local scratch/backup dumps (JSON snapshots, generated PDFs) and are untracked — not part of the app.
+- `index_backup_reset.js` provides in-app backup/restore of `app/main`; treat as destructive.
+- Indentation is 2 spaces; final newline + trimmed trailing whitespace enforced by `.vscode/settings.json`.
+- **App version:** `version.js` is the single source of truth for the displayed version (`window.OR_APP_VERSION`), loaded by both `auth_shell.html` (login screen, shows `v… · date`) and `index_new.html` (app header, shows `v…` only) via `data-app-version` attributes. Bump `VERSION`/`RELEASE_DATE` there when shipping a feature. Current: **v1.10.1** (v1.9.0 was retroactively estimated from the project's ~9 feature epochs since its 2026-05-03 launch — the "Claude era" starting point).
