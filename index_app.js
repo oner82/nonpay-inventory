@@ -1089,7 +1089,13 @@ const ensureImplantRecordsSubscription = () => {
     }, (error) => {
       console.error(error);
       implantRecordsLoading = false;
-      setStatus(`임플란트 기록 연결 오류: ${error.message}`, "error");
+      // 연결 오류 시 구독 핸들을 정리해 다음 렌더(화면 이동)에서 자동 재시도한다.
+      // 정리하지 않으면 재구독 조건이 막혀 "불러오는 중" 화면이 영구히 남는다.
+      if (implantRecordsUnsubscribe) {
+        implantRecordsUnsubscribe();
+        implantRecordsUnsubscribe = null;
+      }
+      setStatus(`임플란트 기록 연결 오류: ${error.message} · 화면을 이동하면 다시 시도합니다`, "error");
     });
   }
   return false;
@@ -1097,6 +1103,8 @@ const ensureImplantRecordsSubscription = () => {
 
 const render = () => {
   if (!ensureLocalSession() || !ensureCurrentViewAllowed()) return;
+  // 연결 오류로 끊긴 임플란트 업체·임시저장 대기 구독을 재시도한다(구독 중이면 no-op).
+  subscribeImplantCollections();
   renderedDate = today();
   renderSessionControls();
   renderNav();
@@ -5497,6 +5505,11 @@ const subscribeImplantCollections = () => {
       }
     }, (error) => {
       console.error(error);
+      // 구독 핸들을 정리해 다음 렌더에서 자동 재구독되게 한다.
+      if (implantVendorsUnsubscribe) {
+        implantVendorsUnsubscribe();
+        implantVendorsUnsubscribe = null;
+      }
       setStatus(`임플란트 업체 연결 오류: ${error.message}`, "error");
     });
   }
@@ -5515,6 +5528,11 @@ const subscribeImplantCollections = () => {
       }
     }, (error) => {
       console.error(error);
+      // 구독 핸들을 정리해 다음 렌더에서 자동 재구독되게 한다.
+      if (pendingUsagesUnsubscribe) {
+        pendingUsagesUnsubscribe();
+        pendingUsagesUnsubscribe = null;
+      }
       setStatus(`임시저장 대기목록 연결 오류: ${error.message}`, "error");
     });
   }
