@@ -4873,6 +4873,21 @@ const bindUse = () => {
       if (!confirm("이 임시저장 대기 기록을 삭제할까요? 기존 사용내역과 재고에는 영향이 없습니다.")) return;
       try {
         await deleteDoc(doc(db, "pendingUsages", pending.id));
+        // 입력 중인 사용입력 보호로 전체 재렌더가 연기되어도 삭제가 바로 보이도록,
+        // 로컬 목록에서 제거하고 해당 카드만 화면에서 걷어낸다.
+        pendingUsages = pendingUsages.filter((item) => !sameId(item.id, pending.id));
+        const pendingCard = button.closest(".pending-usage-card");
+        const pendingDetails = button.closest(".pending-usage-details");
+        pendingCard?.remove();
+        if (pendingDetails) {
+          const remainingCards = pendingDetails.querySelectorAll(".pending-usage-card").length;
+          if (remainingCards === 0) {
+            pendingDetails.remove();
+          } else {
+            const badge = pendingDetails.querySelector(".use-draft-status");
+            if (badge) badge.textContent = `${remainingCards}건`;
+          }
+        }
         if (sameId(loadedPendingUsageId, pending.id)) {
           loadedPendingUsageId = "";
           useDraftSnapshot = null;
