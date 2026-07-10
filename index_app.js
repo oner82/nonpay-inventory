@@ -279,6 +279,8 @@ let hydrated = false;
 // 임플란트 사진 저장) 모든 저장이 끝나기 전에는 onSnapshot 가드가 풀리지 않게 한다.
 let savingCount = 0;
 let saving = false;
+// 마지막 로컬 저장 시각 — 저장 직후 도착하는 과거 스냅샷 에코를 걸러내는 데 쓴다.
+let lastLocalSaveAt = 0;
 let implantRecords = [];
 let implantVendors = [];
 let pendingUsages = [];
@@ -1028,6 +1030,7 @@ const saveState = async (message = "저장 완료", options = {}) => {
       reconcileProductStocks();
       await setDoc(ref, state);
     }
+    lastLocalSaveAt = Date.now();
     setStatus(`${message} · 동시저장 보호`, "ok");
     saveDoneToast(options.doneMessage || "저장 완료");
   } catch (error) {
@@ -1106,6 +1109,8 @@ const ensureImplantRecordsSubscription = () => {
 
 const render = () => {
   if (!ensureLocalSession() || !ensureCurrentViewAllowed()) return;
+  // 랜딩보드의 펼침/접힘 상태를 렌더 직전에 캡처해, 원격 갱신 재렌더에도 유지한다.
+  if (currentView === "receipts") captureLandingBoardOpenState();
   // 연결 오류로 끊긴 임플란트 업체·임시저장 대기 구독을 재시도한다(구독 중이면 no-op).
   subscribeImplantCollections();
   renderedDate = today();
@@ -5616,7 +5621,13 @@ const boot = async () => {
     render();
     unsubscribe = onSnapshot(ref, (snapshot) => {
       if (!snapshot.exists() || saving) return;
-      state = normalizeState(snapshot.data());
+      const incoming = snapshot.data();
+      // 저장 직후 뒤늦게 도착하는, 방금 저장분이 반영되기 전의 과거 스냅샷을 무시한다
+      // (랜딩 입고 확인 항목이 사라졌다 다시 나타나는 깜빡임 방지).
+      // 기기 간 시계 오차로 다른 태블릿의 정상 갱신까지 계속 놓치지 않도록
+      // 마지막 로컬 저장 후 15초 동안만 적용한다.
+      if (Date.now() - lastLocalSaveAt < 15000 && String(incoming.updatedAt || "") < String(state.updatedAt || "")) return;
+      state = normalizeState(incoming);
       reconcileProductStocks();
       if (hydrated) renderOrDeferForUseEntry("Firebase 데이터가 갱신됐습니다. 입력 중인 사용입력을 보호하고 있습니다.");
     }, (error) => {

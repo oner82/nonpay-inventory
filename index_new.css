@@ -550,6 +550,14 @@
       .summary-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .summary-headline { white-space: normal; }
       .summary-name { white-space: normal; }
+      /* 랜딩 입고 확인: 좁은 화면에서 한 줄 강제 배치가 화면 폭을 넘어
+         가로 스크롤(옆으로 밀림)을 만들던 문제 — 줄바꿈을 허용한다. */
+      .compact-line { flex-wrap: wrap; }
+      .compact-main { white-space: normal; overflow-wrap: anywhere; }
+      .compact-meta { white-space: normal; }
+      /* 화면 폭을 넘는 요소가 있어도 본문 전체가 옆으로 밀리지 않게 차단
+         (가로 스크롤이 핀치 확대/축소 제스처를 방해하던 문제 완화) */
+      body { overflow-x: hidden; }
     }
 
     @media (min-width: 720px) {
