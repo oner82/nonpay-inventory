@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "public": ".",
+    "public": "maintenance",
     "ignore": [
       "firebase.json",
       ".firebaserc",
