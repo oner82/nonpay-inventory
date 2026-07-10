@@ -666,7 +666,11 @@ const loadImageFromUrl = async (url) => {
       image.dataset.objectUrl = objectUrl;
       resolve(image);
     };
-    image.onerror = reject;
+    // Event 객체 대신 명확한 Error로 거부해 "undefined" 오류 메시지를 막는다.
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("사진을 이미지로 읽지 못했습니다. 지원하지 않는 형식(HEIC 등)이거나 손상된 파일일 수 있습니다."));
+    };
     image.src = objectUrl;
   });
 };

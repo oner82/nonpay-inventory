@@ -287,6 +287,7 @@ let implantRecordsLoaded = false;
 let implantRecordsLoading = false;
 let productCategoryToKeepOpen = "";
 let useEntryDirty = false;
+let editEntryDirty = false;
 let productFormDirty = false;
 let deferredUseEntryRender = false;
 const useEntryAutosaveKey = "orInventoryUseEntryPatientDraft";
@@ -360,10 +361,11 @@ const setStatus = (message, type = "ok") => {
 };
 
 const isUseEntryProtected = () => currentView === "use" && useEntryDirty;
+const isEditEntryProtected = () => currentView === "edit" && editEntryDirty;
 const isProductFormProtected = () => currentView === "settings" && currentSettingsView === "products" && productFormDirty;
 
 const renderOrDeferForUseEntry = (message = "새 데이터가 들어왔습니다. 입력 중인 사용입력을 보호하고 있습니다.") => {
-  if (isUseEntryProtected() || isProductFormProtected()) {
+  if (isUseEntryProtected() || isEditEntryProtected() || isProductFormProtected()) {
     deferredUseEntryRender = true;
     setStatus(message, "ok");
     return false;
@@ -1085,7 +1087,8 @@ const ensureImplantRecordsSubscription = () => {
       implantRecords = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
       implantRecordsLoaded = true;
       implantRecordsLoading = false;
-      if (hydrated && currentViewNeedsImplantRecords()) render();
+      // 수정 화면에서 입력 중이면 재렌더를 연기해 편집 내용을 보호한다.
+      if (hydrated && currentViewNeedsImplantRecords()) renderOrDeferForUseEntry("임플란트 장부가 갱신됐습니다. 입력 중인 화면을 보호하고 있습니다.");
     }, (error) => {
       console.error(error);
       implantRecordsLoading = false;
@@ -2658,6 +2661,8 @@ const renderEditUsage = () => {
 
 const bindEditUsage = () => {
   if (!canEditUsage()) return;
+  // 수정 화면이 새로 그려질 때 편집 보호 상태를 초기화한다.
+  editEntryDirty = false;
   const dateInput = document.getElementById("editUsageSelectDate");
   const select = document.getElementById("editUsageSelect");
   const patientNameSearch = document.getElementById("editUsagePatientNameSearch");
@@ -2684,6 +2689,11 @@ const bindEditUsage = () => {
   const editCommonImplantCamera = document.getElementById("editCommonImplantCamera");
   const addEditImplantRow = document.getElementById("addEditImplantRow");
   const deleteButton = document.getElementById("editUsageDelete");
+  // 폼 입력·사진 첨부·임플란트 행 조작이 시작되면 원격 갱신 재렌더를 연기해
+  // 편집 중인 내용(첨부한 사진 포함)이 초기화되지 않게 보호한다.
+  form?.addEventListener("input", () => { editEntryDirty = true; });
+  form?.addEventListener("change", () => { editEntryDirty = true; });
+  editImplantSection?.addEventListener("click", () => { editEntryDirty = true; });
   let editImplantRecordId = "";
   let editImplantRows = [];
   const editCommonImplantPhotos = [];
@@ -3496,6 +3506,7 @@ const bindEditUsage = () => {
       updatedAt: new Date().toISOString()
     };
     state.usages = state.usages.map((item) => item.id === usage.id ? next : item);
+    editEntryDirty = false;
     currentView = "dashboard";
     pendingEditUsageId = "";
     await saveState("수정 완료", {
@@ -3505,7 +3516,7 @@ const bindEditUsage = () => {
     if (editImplantCanModify) {
       try {
         let photoUploadFailed = 0;
-        await saveImplantRecordFromEdit(next, editImplantRecordId, nextImplants, {
+        const editImplantResult = await saveImplantRecordFromEdit(next, editImplantRecordId, nextImplants, {
           onPhotoProgress: ({ done, total, failed }) => {
             photoUploadFailed = failed;
             const failText = failed ? ` · 실패 ${failed}장` : "";
@@ -3513,6 +3524,10 @@ const bindEditUsage = () => {
           }
         });
         saveDoneToast(photoUploadFailed ? "수정 완료 · 사진은 앱에 보관됨" : (countEditImplantPhotosToUpload(nextImplants) ? "수정과 사진 저장 완료" : "수정 저장 완료"));
+        const skippedNames = editImplantResult?.skippedPhotoNames || [];
+        if (skippedNames.length) {
+          alert(`사진 ${skippedNames.length}장은 이미지로 읽을 수 없어 제외하고 저장했습니다.\n(${skippedNames.join(", ")})\n아이폰 HEIC 등 지원하지 않는 형식이면 JPEG로 변환해 다시 첨부해 주세요.`);
+        }
       } catch (error) {
         saveErrorToast(`임플란트 사진 저장 실패: ${error.message}`);
         alert(`사용내역은 저장됐지만 임플란트 기록 수정에 실패했습니다: ${error.message}`);
@@ -3800,9 +3815,14 @@ const bindImplants = () => getImplantsModule().bindImplants();
 
 const loadImageFromFile = (file) => new Promise((resolve, reject) => {
   const image = new Image();
+  const objectUrl = URL.createObjectURL(file);
   image.onload = () => resolve(image);
-  image.onerror = reject;
-  image.src = URL.createObjectURL(file);
+  // Event 객체 대신 명확한 Error로 거부해 "undefined" 오류 메시지를 막는다.
+  image.onerror = () => {
+    URL.revokeObjectURL(objectUrl);
+    reject(new Error(`사진(${file?.name || "이름 없음"})을 이미지로 읽지 못했습니다. 지원하지 않는 형식(HEIC 등)이거나 손상된 파일일 수 있습니다.`));
+  };
+  image.src = objectUrl;
 });
 
 const loadImageFromUrl = (url) => getImplantsModule().loadImageFromUrl(url);
@@ -3974,10 +3994,17 @@ const saveImplantRecordFromEdit = async (usage, recordId, implants, options = {}
     : (existing?.patientNo ? { patientNo: existing.patientNo } : { patientNo: "" });
   const cleanImplants = [];
   const initialPhotoCache = new Map();
+  const skippedPhotoNames = [];
   for (const implant of implants) {
     const initialPhotos = [];
     for (const photo of implant.photos || []) {
-      initialPhotos.push(await initialImplantPhotoPayload(photo, initialPhotoCache));
+      try {
+        initialPhotos.push(await initialImplantPhotoPayload(photo, initialPhotoCache));
+      } catch (error) {
+        // 사진 한 장을 읽지 못해도 장부 저장 자체는 계속한다.
+        console.error("임플란트 사진 처리 실패", error);
+        skippedPhotoNames.push(photo.file?.name || photo.name || "이름 없는 사진");
+      }
     }
     cleanImplants.push({
       id: implant.id || uid(),
@@ -4021,7 +4048,12 @@ const saveImplantRecordFromEdit = async (usage, recordId, implants, options = {}
           ));
         } catch (error) {
           console.error(error);
-          photos.push(await implantPhotoFallbackPayload(photo, error.message || "사진 업로드 실패"));
+          try {
+            photos.push(await implantPhotoFallbackPayload(photo, error.message || "사진 업로드 실패"));
+          } catch (fallbackError) {
+            // 대체 저장(축소본)도 실패하면 해당 사진만 제외하고 계속한다.
+            console.error("임플란트 사진 대체 저장 실패", fallbackError);
+          }
           photoUploadErrors.push(error.message || "사진 업로드 실패");
           uploadFailed += 1;
         } finally {
@@ -4045,6 +4077,7 @@ const saveImplantRecordFromEdit = async (usage, recordId, implants, options = {}
     updatedAt: new Date().toISOString(),
     hasPhotoUploadError: uploadedImplants.some((implant) => (implant.photoUploadErrors || []).length)
   }, { merge: true });
+  return { skippedPhotoNames };
 };
 
 const createImplantRecordFromUsage = async (usage, implantDrafts, options = {}) => {
@@ -4066,7 +4099,12 @@ const createImplantRecordFromUsage = async (usage, implantDrafts, options = {}) 
       : (implantVendorById(draft.vendorId)?.name || draft.customVendor || "").trim();
     const initialPhotos = [];
     for (const photo of draft.photos || []) {
-      initialPhotos.push(await initialImplantPhotoPayload(photo, initialPhotoCache));
+      try {
+        initialPhotos.push(await initialImplantPhotoPayload(photo, initialPhotoCache));
+      } catch (error) {
+        // 사진 한 장을 읽지 못해도 장부 생성 자체는 계속한다(장부 누락 방지).
+        console.error("임플란트 사진 처리 실패", error);
+      }
     }
     implants.push({
       id: draft.id || uid(),
@@ -4123,7 +4161,12 @@ const createImplantRecordFromUsage = async (usage, implantDrafts, options = {}) 
         }
       } catch (error) {
         console.error(error);
-        photos.push(await implantPhotoFallbackPayload(photo, error.message || "사진 업로드 실패"));
+        try {
+          photos.push(await implantPhotoFallbackPayload(photo, error.message || "사진 업로드 실패"));
+        } catch (fallbackError) {
+          // 대체 저장(축소본)도 실패하면 해당 사진만 제외하고 계속한다.
+          console.error("임플란트 사진 대체 저장 실패", fallbackError);
+        }
         photoUploadErrors.push(error.message || "사진 업로드 실패");
         uploadFailed += 1;
       } finally {
