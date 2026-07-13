@@ -86,8 +86,8 @@
                 </datalist>
               </div>
               <div>
-                <label for="historyPatientSearch">환자 검색</label>
-                <input id="historyPatientSearch" autocomplete="off" placeholder="환자명 또는 등록번호" value="${context.escapeHtml(filters.patientQuery)}">
+                <label for="historyPatientSearch">케이스 검색</label>
+                <input id="historyPatientSearch" autocomplete="off" placeholder="케이스 번호 (예: 1-1)" value="${context.escapeHtml(filters.patientQuery)}">
               </div>
             </div>
             <div class="actions">
@@ -104,7 +104,7 @@
           </div>
           <div class="card">
             <details class="item" id="historyPatientDetails" ${historyOpenState.patient ? "open" : ""}>
-              <summary><span>환자별 사용내역</span><span class="pill">${defaultPatientCount}</span></summary>
+              <summary><span>케이스별 사용내역</span><span class="pill">${defaultPatientCount}</span></summary>
               <div class="details-body">
                 <div class="actions"><button class="secondary" type="button" id="exportHistoryPatients">엑셀 저장</button></div>
                 <div id="historyPatientList">${patientHistoryListHtml(filters.start, filters.end, filters.query, filters.patientQuery)}</div>
@@ -124,15 +124,10 @@
 
     const filteredHistoryUsages = (start, end, query, patientQuery = "") => {
       const normalizedQuery = context.normalizedName(query || "");
-      const normalizedPatientQuery = context.normalizedName(patientQuery || "");
-      const patientIdQuery = String(patientQuery || "").replace(/\D/g, "");
+      const caseQuery = String(patientQuery || "").trim();
       return context.getState().usages.filter((usage) => {
         if (!context.inDateRange(usage.date, start, end)) return false;
-        if (normalizedPatientQuery) {
-          const patientText = context.normalizedName(`${usage.patientName || ""} ${context.patientIdText(usage)}`);
-          const patientId = context.patientIdText(usage).replace(/\D/g, "");
-          if (!patientText.includes(normalizedPatientQuery) && (!patientIdQuery || !patientId.includes(patientIdQuery))) return false;
-        }
+        if (caseQuery && !context.patientIdText(usage).includes(caseQuery)) return false;
         if (!normalizedQuery) return true;
         const doctor = context.departmentById(usage.doctorId);
         const surgery = context.surgeryById(usage.surgeryId);
@@ -153,7 +148,7 @@
         return { usage, qty, doctor, surgery };
       })
       .filter(Boolean)
-      .sort((a, b) => context.alphaFirstCompare(b.usage.date, a.usage.date) || context.alphaFirstCompare(a.usage.patientName, b.usage.patientName));
+      .sort((a, b) => context.alphaFirstCompare(b.usage.date, a.usage.date) || (context.num(a.usage.caseRoom) - context.num(b.usage.caseRoom)) || (context.num(a.usage.caseOrder) - context.num(b.usage.caseOrder)));
 
     const historyMovementCounts = (start = "", end = "") => {
       const usageCounts = new Map();
@@ -323,7 +318,7 @@
                       <span>과/원장 코드: ${context.escapeHtml(doctor?.name || "-")} · 수술: ${context.escapeHtml(surgery?.department || context.inferSurgeryDepartment(surgery?.name || ""))} - ${context.escapeHtml(surgery?.name || "-")}</span>
                     </div>
                   </div>
-                `).join("") : `<div class="empty">해당 기간 사용 환자가 없습니다.</div>`}
+                `).join("") : `<div class="empty">해당 기간 사용 케이스가 없습니다.</div>`}
               </div>
             </details>
           `;
@@ -566,7 +561,6 @@
         return [
           historyPeriodText(start, end),
           usage.date,
-          usage.patientName,
           context.patientIdText(usage),
           context.auditUserText(usage),
           context.auditTimeText(usage),
@@ -577,8 +571,8 @@
         ];
       });
       context.downloadExcel(
-        `환자별_사용내역_${start || "all"}_${end || "all"}.xlsx`,
-        ["조회기간", "사용일", "환자명", "환자ID", "입력자", "입력시각", "원장코드", "과", "수술", "사용제품"],
+        `케이스별_사용내역_${start || "all"}_${end || "all"}.xlsx`,
+        ["조회기간", "사용일", "케이스", "입력자", "입력시각", "원장코드", "과", "수술", "사용제품"],
         rows
       );
     };

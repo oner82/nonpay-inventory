@@ -129,16 +129,12 @@
             <input id="implantFilterDate" type="date" value="${escapeHtml(date)}">
           </div>
           <div>
-            <label for="implantFilterPatientNo">환자번호</label>
+            <label for="implantFilterPatientNo">장부번호</label>
             <input id="implantFilterPatientNo" inputmode="numeric" autocomplete="off" placeholder="1">
           </div>
           <div>
-            <label for="implantFilterName">환자명</label>
-            <input id="implantFilterName" autocomplete="off">
-          </div>
-          <div>
-            <label for="implantFilterPatientId">환자ID</label>
-            <input id="implantFilterPatientId" autocomplete="off">
+            <label for="implantFilterCase">케이스 번호</label>
+            <input id="implantFilterCase" autocomplete="off" placeholder="예: 1-1">
           </div>
         </div>
         <div class="actions">
@@ -179,7 +175,7 @@
       </div>
       <div class="card" id="implantSendPanel" data-implant-panel="send" ${implantPanelVisible("send") ? "" : "hidden"}>
         <h2>업체별 장부 확인</h2>
-        <div class="implant-send-preview">환자명과 환자ID는 업체 발송자료에서 제외됩니다. 실제 자동 발송은 병원 메일/SMS API 연결 후 같은 자료를 그대로 사용할 수 있습니다.</div>
+        <div class="implant-send-preview">장부에는 환자정보가 저장되지 않습니다(케이스 번호만 기록). 실제 자동 발송은 병원 메일/SMS API 연결 후 같은 자료를 그대로 사용할 수 있습니다.</div>
         <div id="implantSendList"></div>
       </div>
       <div class="card" data-implant-panel="today admin" ${implantPanelVisible("today admin") ? "" : "hidden"}>
@@ -211,14 +207,18 @@
   `;
     };
 
-const filteredImplantRecords = (date, patientName, patientId, patientNo) => {
-  const nameQuery = normalizedName(patientName || "");
-  const idQuery = normalizedName(patientId || "");
+const recordCaseLabel = (record = {}) => {
+  const room = String(record.caseRoom || "").trim();
+  const order = String(record.caseOrder || "").trim();
+  return room && order ? `${room}-${order}` : "";
+};
+
+const filteredImplantRecords = (date, caseNo, patientNo) => {
+  const caseQuery = String(caseNo || "").trim();
   const noQuery = normalizedName(patientNo || "");
   return sortImplantRecords(getImplantRecords()).filter((record) => {
     if (date && implantRecordDate(record) !== date) return false;
-    if (nameQuery && !normalizedName(record.patientName || "").includes(nameQuery)) return false;
-    if (idQuery && !normalizedName(record.patientId || "").includes(idQuery)) return false;
+    if (caseQuery && !recordCaseLabel(record).includes(caseQuery)) return false;
     if (noQuery && !normalizedName(implantPatientNoText(record)).includes(noQuery)) return false;
     return true;
   });
@@ -231,7 +231,7 @@ const implantLedgerTableHtml = (records) => {
       ${records.map((record) => `
         <div class="item implant-record-card">
           <div class="item-title">
-            <span>${escapeHtml(implantPatientNoText(record) ? `#${implantPatientNoText(record)} ` : "미마감 ")}${escapeHtml(record.patientName || "이름 없음")}${record.patientId ? ` (${escapeHtml(record.patientId)})` : ""}</span>
+            <span>${escapeHtml(implantPatientNoText(record) ? `#${implantPatientNoText(record)} ` : "미마감 ")}${escapeHtml(recordCaseLabel(record) || "케이스 미지정")}</span>
             <span class="pill">${escapeHtml(implantRecordDate(record))}</span>
           </div>
           <div class="meta">
@@ -307,7 +307,7 @@ const implantPhotoStatusPanelHtml = (date) => {
         ${rows.map(({ record, implant, pending, failed, retry, missing, errors }) => `
           <div class="implant-status-row">
             <div class="item-title">
-              <span>${escapeHtml(implantPatientNoText(record) ? `#${implantPatientNoText(record)} ` : "")}${escapeHtml(record.patientName || "이름 없음")} · ${escapeHtml(implant.vendor || "업체 없음")}</span>
+              <span>${escapeHtml(implantPatientNoText(record) ? `#${implantPatientNoText(record)} ` : "")}${escapeHtml(recordCaseLabel(record) || "케이스 미지정")} · ${escapeHtml(implant.vendor || "업체 없음")}</span>
               <span class="pill">${escapeHtml(implantRecordDate(record))}</span>
             </div>
             <div class="meta">
@@ -336,7 +336,7 @@ const implantRecordCardHtml = (record, options = {}) => {
   return `
     <div class="card implant-record-card" data-implant-record="${escapeHtml(record.id)}">
       <div class="item-title">
-        <span>${patientNo ? `${escapeHtml(patientNo)}번 ` : ""}${escapeHtml(record.patientName || "이름 없음")}${record.patientId ? ` (${escapeHtml(record.patientId)})` : ""}</span>
+        <span>${patientNo ? `${escapeHtml(patientNo)}번 ` : ""}${escapeHtml(recordCaseLabel(record) || "케이스 미지정")}</span>
         <span class="pill">${escapeHtml(implantRecordDate(record) || "-")}</span>
       </div>
       <div class="meta">
@@ -361,7 +361,7 @@ const implantRecordCardHtml = (record, options = {}) => {
       ${showAdminTools ? `
         <div class="row two">
           <div>
-            <label for="implantPatientNo-${escapeHtml(record.id)}">환자번호 수동 수정</label>
+            <label for="implantPatientNo-${escapeHtml(record.id)}">장부번호 수동 수정</label>
             <input id="implantPatientNo-${escapeHtml(record.id)}" data-implant-patient-no-input="${escapeHtml(record.id)}" value="${escapeHtml(patientNo)}" inputmode="numeric" autocomplete="off">
           </div>
           <div class="actions">
@@ -383,7 +383,7 @@ const implantRecordCardHtml = (record, options = {}) => {
         </div>
       `).join("") : `<div class="empty">업체별 기록이 없습니다.</div>`}
       <div class="implant-send-preview">
-        업체 발송용 데이터 준비: 환자명/환자ID 제외, 환자번호 ${escapeHtml(patientNo || "미부여")} · ${escapeHtml(doctorText)} · ${escapeHtml(surgeryText)} · 업체별 사용내용만 출력 가능
+        업체 발송용 데이터 준비: 환자정보 미포함, 장부번호 ${escapeHtml(patientNo || "미부여")} · ${escapeHtml(doctorText)} · ${escapeHtml(surgeryText)} · 업체별 사용내용만 출력 가능
       </div>
     </div>
   `;
@@ -398,8 +398,7 @@ const implantLedgerRows = (records) => records.flatMap((record) => {
   return implants.map((implant) => [
     implantRecordDate(record),
     implantPatientNoText(record) ? `#${implantPatientNoText(record)}` : "",
-    record.patientName || "",
-    record.patientId || "",
+    recordCaseLabel(record),
     record.surgeryName || surgeryById(record.surgeryId)?.name || "",
     record.surgeonCode || departmentById(record.doctorId)?.name || "",
     auditUserText(record) || "",
@@ -604,7 +603,7 @@ const exportImplantMonthlyBackup = async (month, onProgress) => {
   if (!month) throw new Error("백업할 월을 선택해 주세요.");
   const records = implantRecordsForMonth(month);
   if (!records.length) throw new Error("선택한 월의 임플란트 기록이 없습니다.");
-  const headers = ["날짜", "번호", "환자명", "ID", "수술명", "원장코드", "저장자", "저장시간", "업체", "사용분", "사진수"];
+  const headers = ["날짜", "번호", "케이스", "수술명", "원장코드", "저장자", "저장시간", "업체", "사용분", "사진수"];
   const photoRefs = [];
   records.forEach((record) => {
     (record.implants || []).forEach((implant) => {
@@ -621,8 +620,7 @@ const exportImplantMonthlyBackup = async (month, onProgress) => {
     { name: "photo-urls.txt", content: photoRefs.map(({ record, implant, src, index }) => [
       implantRecordDate(record),
       implantPatientNoText(record) ? `#${implantPatientNoText(record)}` : "미마감",
-      record.patientName || "",
-      record.patientId || "",
+      recordCaseLabel(record),
       implant.vendor || "업체 없음",
       `photo ${index + 1}`,
       src
@@ -640,13 +638,13 @@ const exportImplantMonthlyBackup = async (month, onProgress) => {
       const photoName = [
         item.record.surgeryDate || implantRecordDate(item.record),
         implantPatientNoText(item.record) ? `no-${implantPatientNoText(item.record)}` : "no-pending",
-        item.record.patientName || "patient",
+        recordCaseLabel(item.record) || "case",
         item.implant.vendor || "vendor",
         `photo-${item.index + 1}.${ext}`
       ].map(safeBackupFileName).join("_");
       files.push({ name: `photos/${photoName}`, content: bytes });
     } catch (error) {
-      errors.push(`${implantRecordDate(item.record)} ${item.record.patientName || ""} ${item.implant.vendor || ""} photo ${item.index + 1}: ${error.message}`);
+      errors.push(`${implantRecordDate(item.record)} ${recordCaseLabel(item.record)} ${item.implant.vendor || ""} photo ${item.index + 1}: ${error.message}`);
     } finally {
       done += 1;
       onProgress?.({ done, total: photoRefs.length, failed: errors.length });
@@ -864,7 +862,7 @@ const implantSendPrintHtml = (date, group) => `<!doctype html>
   </head>
   <body>
     <h1>${escapeHtml(date)} ${escapeHtml(group.vendor)} 임플란트 장부</h1>
-    <p class="note">환자명/환자ID 제외 · 환자번호, 원장코드, 수술명, 사용내용, 사진 포함</p>
+    <p class="note">환자정보 미포함 · 장부번호, 원장코드, 수술명, 사용내용, 사진 포함</p>
     ${group.lines.map(({ record, implant }) => {
       const photos = implant.photos || [];
       const patientNo = implantPatientNoText(record) || "미마감";
@@ -927,8 +925,8 @@ const hospitalImplantLedgerPrintRowsHtml = (records) => {
         ${firstForPatient ? `
           <td class="date" rowspan="${patientRowspan}">${escapeHtml(implantRecordDate(record) || "-")}</td>
           <td class="no" rowspan="${patientRowspan}">#${escapeHtml(patientNo)}</td>
-          <td class="id" rowspan="${patientRowspan}">${escapeHtml(record.patientId || "")}</td>
-          <td class="name" rowspan="${patientRowspan}">${escapeHtml(record.patientName || "")}</td>
+          <td class="id" rowspan="${patientRowspan}">${escapeHtml(recordCaseLabel(record))}</td>
+          <td class="name" rowspan="${patientRowspan}"></td>
           <td class="op" rowspan="${patientRowspan}">${escapeHtml(opText || "-")}</td>
         ` : ""}
         <td class="vendor">${escapeHtml(implant.vendor || "업체 없음")}</td>
@@ -1143,7 +1141,7 @@ const implantSendPrintTableHtml = (date, group) => `<!doctype html>
   </head>
   <body>
     <h1>${escapeHtml(date)} ${escapeHtml(group.vendor)} 임플란트 장부</h1>
-    <p class="note">환자명/환자ID 제외 · 환자번호, 원장코드, 수술명, 사용내용, 사진 포함</p>
+    <p class="note">환자정보 미포함 · 장부번호, 원장코드, 수술명, 사용내용, 사진 포함</p>
     <table>
       <thead>
         <tr>
@@ -1191,12 +1189,12 @@ const implantSendStatementCardsHtml = (group) => `
           <div class="implant-statement-head">
             <div>
               <div class="implant-statement-title">임플란트 사용 내용</div>
-              <div class="muted">환자명/환자ID 제외</div>
+              <div class="muted">환자정보 미포함</div>
             </div>
           </div>
           <div class="implant-statement-meta">
             <div><span>DATE</span><strong>${escapeHtml(implantRecordDate(record) || "-")}</strong></div>
-            <div><span>환자번호</span><strong>#${escapeHtml(patientNo)}</strong></div>
+            <div><span>장부번호</span><strong>#${escapeHtml(patientNo)}</strong></div>
             <div><span>업체명</span><strong>${escapeHtml(group.vendor)}</strong></div>
             <div><span>원장코드</span><strong>${escapeHtml(doctorText)}</strong></div>
             <div><span>OP</span><strong>${escapeHtml(surgeryText)}</strong></div>
@@ -1260,7 +1258,7 @@ const implantSendStatementPrintHtml = (date, group) => `<!doctype html>
           <div class="head">
             <div>
               <div class="title">임플란트 사용 내용</div>
-              <div class="note">${escapeHtml(date)} · ${escapeHtml(group.vendor)} · 환자명/환자ID 제외</div>
+              <div class="note">${escapeHtml(date)} · ${escapeHtml(group.vendor)} · 환자정보 미포함</div>
             </div>
             <div class="no">#${escapeHtml(patientNo)}</div>
           </div>
@@ -1337,12 +1335,12 @@ const implantSendStatementPrintHtmlV2 = (date, group) => `<!doctype html>
             <div class="head">
               <div>
                 <div class="title">임플란트 사용 내용</div>
-                <div class="note">${escapeHtml(date)} · ${escapeHtml(group.vendor)} · 환자명/환자ID 제외</div>
+                <div class="note">${escapeHtml(date)} · ${escapeHtml(group.vendor)} · 환자정보 미포함</div>
               </div>
             </div>
             <div class="meta">
               <div><span>DATE</span><strong>${escapeHtml(implantRecordDate(record) || "-")}</strong></div>
-              <div><span>환자번호</span><strong>#${escapeHtml(patientNo)}${pageLabel ? ` · 사진 ${escapeHtml(pageLabel.trim())}` : ""}</strong></div>
+              <div><span>장부번호</span><strong>#${escapeHtml(patientNo)}${pageLabel ? ` · 사진 ${escapeHtml(pageLabel.trim())}` : ""}</strong></div>
               <div><span>업체명</span><strong>${escapeHtml(group.vendor)}</strong></div>
               <div><span>원장코드</span><strong>${escapeHtml(doctorText)}</strong></div>
               <div><span>OP</span><strong>${escapeHtml(surgeryText)}</strong></div>
@@ -1472,7 +1470,7 @@ const implantStatementCanvasPage = async ({ date, group, record, photos, descrip
   ctx.fillText("임플란트 사용 내용", margin, 82);
   ctx.fillStyle = "#475569";
   ctx.font = '800 20px Arial, "Malgun Gothic", sans-serif';
-  ctx.fillText("환자명/환자ID 제외", margin, 116);
+  ctx.fillText("환자정보 미포함", margin, 116);
   ctx.strokeStyle = "#111827";
   ctx.lineWidth = 5;
   ctx.beginPath();
@@ -1486,7 +1484,7 @@ const implantStatementCanvasPage = async ({ date, group, record, photos, descrip
   let metaX = margin;
   [
     ["DATE", implantRecordDate(record) || date || "-"],
-    ["환자번호", `#${patientNo}${pageLabel}`],
+    ["장부번호", `#${patientNo}${pageLabel}`],
     ["업체명", group.vendor],
     ["원장코드", doctorText],
     ["OP", surgeryText]
@@ -1667,7 +1665,7 @@ const implantSendPanelOrganizedHtml = (date) => {
   if (!groups.length) return `<div class="empty">업체별로 발송할 임플란트 기록이 없습니다.</div>`;
   const unnumberedTotal = implantRecordsForDate(date).filter((record) => !implantPatientNoText(record)).length;
   return `
-    ${unnumberedTotal ? `<div class="implant-send-preview">선택 날짜에 환자번호가 없는 기록 ${unnumberedTotal}건이 있습니다. 업체 발송 전 마감 또는 번호 부여가 필요합니다.</div>` : ""}
+    ${unnumberedTotal ? `<div class="implant-send-preview">선택 날짜에 장부번호가 없는 기록 ${unnumberedTotal}건이 있습니다. 업체 발송 전 마감 또는 번호 부여가 필요합니다.</div>` : ""}
     <div class="implant-send-list">
       ${groups.map((group) => {
         const message = implantSendMessage(date, group.vendor, group.lines);
@@ -1684,7 +1682,7 @@ const implantSendPanelOrganizedHtml = (date) => {
                 </div>
                 <div class="implant-send-compact-meta">
                   <span>${escapeHtml(date)}</span>
-                  <span>환자 ${stats.patients}명</span>
+                  <span>케이스 ${stats.patients}건</span>
                   <span>기록 ${group.lines.length}건</span>
                   <span>사진 ${stats.photos}장</span>
                   ${stats.unnumbered ? `<span>미마감 ${stats.unnumbered}건</span>` : ""}
@@ -1712,7 +1710,7 @@ const implantSendPanelOrganizedHtml = (date) => {
             <details class="implant-send-details">
               <summary>사진 포함 A4 명세서 미리보기</summary>
               <div class="implant-send-details-body">
-                <div class="implant-send-preview">환자 1명당 A4 1장 기준입니다. 사진이 4장을 넘으면 다음 장으로 자동 분리됩니다. PDF 저장/공유를 누르면 파일 저장 후 지원 기기에서 공유창이 열립니다.</div>
+                <div class="implant-send-preview">케이스 1건당 A4 1장 기준입니다. 사진이 4장을 넘으면 다음 장으로 자동 분리됩니다. PDF 저장/공유를 누르면 파일 저장 후 지원 기기에서 공유창이 열립니다.</div>
                 ${implantSendStatementCardsHtml(group)}
               </div>
             </details>
@@ -1726,8 +1724,7 @@ const implantSendPanelOrganizedHtml = (date) => {
 const bindImplants = () => {
   const list = document.getElementById("implantLedgerList");
   const dateInput = document.getElementById("implantFilterDate");
-  const nameInput = document.getElementById("implantFilterName");
-  const idInput = document.getElementById("implantFilterPatientId");
+  const caseInput = document.getElementById("implantFilterCase");
   const noInput = document.getElementById("implantFilterPatientNo");
   const summary = document.getElementById("implantCloseSummary");
   const sendPanel = document.getElementById("implantSendPanel");
@@ -1749,7 +1746,7 @@ const bindImplants = () => {
     }
   };
   const renderList = () => {
-    const filteredRecords = filteredImplantRecords(dateInput.value, nameInput.value, idInput.value, noInput.value);
+    const filteredRecords = filteredImplantRecords(dateInput.value, caseInput.value, noInput.value);
     const listRecords = filteredRecords.slice().reverse();
     list.innerHTML = listRecords.length
       ? listRecords.map((record) => implantRecordCardHtml(record, { showAdminTools: getCurrentImplantSubView() === "admin" })).join("")
@@ -1771,7 +1768,7 @@ const bindImplants = () => {
     if (backupMonthInput && dateInput.value) backupMonthInput.value = dateInput.value.slice(0, 7);
     renderList();
   });
-  [nameInput, idInput, noInput].forEach((input) => input.addEventListener("input", renderList));
+  [caseInput, noInput].forEach((input) => input.addEventListener("input", renderList));
   document.getElementById("implantFilterReset")?.addEventListener("click", async () => {
     if (!canAssignImplantPatientNo()) return;
     const date = dateInput.value;
@@ -1780,7 +1777,7 @@ const bindImplants = () => {
       alert("선택 날짜의 임플란트 기록이 없습니다.");
       return;
     }
-    if (!confirm(`${date} 임플란트 장부의 환자번호와 마감상태를 삭제하고 모두 미마감으로 되돌릴까요?`)) return;
+    if (!confirm(`${date} 임플란트 장부의 장부번호와 마감상태를 삭제하고 모두 미마감으로 되돌릴까요?`)) return;
     try {
       const count = await clearImplantPatientNosForDate(date);
       alert(count ? `${count}건을 미마감으로 초기화했습니다.` : "선택 날짜에 초기화할 마감 기록이 없습니다.");
@@ -1795,7 +1792,7 @@ const bindImplants = () => {
     try {
       const count = await assignImplantPatientNosForDate(date);
       const total = implantRecordsForDate(date).length;
-      alert(count ? `${count}건의 환자번호를 1번부터 다시 부여했습니다.` : (total ? "선택 날짜의 임플란트 기록은 이미 번호가 부여되어 있습니다." : "선택 날짜의 임플란트 기록이 없습니다."));
+      alert(count ? `${count}건의 장부번호를 1번부터 다시 부여했습니다.` : (total ? "선택 날짜의 임플란트 기록은 이미 번호가 부여되어 있습니다." : "선택 날짜의 임플란트 기록이 없습니다."));
       renderList();
     } catch (error) {
       alert(error.message);
@@ -1823,7 +1820,7 @@ const bindImplants = () => {
     const date = dateInput.value || today();
     const unnumbered = implantRecordsForDate(date).filter((record) => !implantPatientNoText(record));
     if (unnumbered.length) {
-      if (canAssignImplantPatientNo() && confirm(`${unnumbered.length}건에 환자번호가 없습니다. 먼저 마감하고 발송자료를 만들까요?`)) {
+      if (canAssignImplantPatientNo() && confirm(`${unnumbered.length}건에 장부번호가 없습니다. 먼저 마감하고 발송자료를 만들까요?`)) {
         try {
           await assignImplantPatientNosForDate(date);
         } catch (error) {
@@ -1831,7 +1828,7 @@ const bindImplants = () => {
           return;
         }
       } else {
-        alert("업체 발송 전 환자번호가 필요합니다.");
+        alert("업체 발송 전 장부번호가 필요합니다.");
         return;
       }
     }
@@ -2072,7 +2069,7 @@ const bindImplants = () => {
       const input = list.querySelector(`[data-implant-patient-no-input="${id}"]`);
       const nextNo = String(input?.value || "").trim();
       if (!record || !nextNo) {
-        alert("환자번호를 입력해 주세요.");
+        alert("장부번호를 입력해 주세요.");
         return;
       }
       const duplicate = getImplantRecords().some((item) =>
@@ -2081,7 +2078,7 @@ const bindImplants = () => {
         implantPatientNoText(item) === nextNo
       );
       if (duplicate) {
-        alert("같은 날짜에 이미 사용 중인 환자번호입니다.");
+        alert("같은 날짜에 이미 사용 중인 장부번호입니다.");
         return;
       }
       await setDoc(doc(db, "implantRecords", id), {
@@ -2093,7 +2090,7 @@ const bindImplants = () => {
         updatedAt: new Date().toISOString(),
         ...auditUpdateFields()
       }, { merge: true });
-      saveDoneToast("환자번호 저장 및 마감 잠금 완료");
+      saveDoneToast("장부번호 저장 및 마감 잠금 완료");
       renderList();
     }
   });

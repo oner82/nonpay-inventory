@@ -76,7 +76,7 @@
       return `
         <section class="dashboard-shell">
           <div class="stats">
-            ${statCard("오늘 사용 환자", todayUsages.length.toLocaleString(), "P")}
+            ${statCard("오늘 사용 케이스", todayUsages.length.toLocaleString(), "P")}
             ${statCard("오늘 사용 제품", todayProductCount.toLocaleString(), "✓")}
             ${statCard("전날 대여", yesterdayLoanQty.toLocaleString(), "대여")}
             ${statCard("스크럽 확인 대기", openPendingUsageItems.length.toLocaleString(), "확인")}

@@ -599,10 +599,23 @@ const normalizeState = (data) => ({
 });
 
 const PRODUCT_CATEGORIES = ["비급여", "인체조직", "ANCHOR", "URO_LANDING", "GS_LANDING", "IMPLANT"];
-const patientIdText = (usage) => String(usage?.patientId || "").trim();
-const patientDisplayName = (usage) => patientIdText(usage)
-  ? `${usage.patientName || ""} (${patientIdText(usage)})`
-  : (usage.patientName || "");
+// 환자정보 대신 비식별 케이스 번호(수술실-순서, 예: "1-1")를 쓴다.
+const CASE_ROOM_COUNT = 10;
+const caseRoomText = (item) => String(item?.caseRoom || "").trim();
+const caseOrderText = (item) => String(item?.caseOrder || "").trim();
+const caseLabel = (item) => (caseRoomText(item) && caseOrderText(item))
+  ? `${caseRoomText(item)}-${caseOrderText(item)}`
+  : "";
+// 기존 호출부 호환용: 화면에 보이는 "식별 표시"는 이제 케이스 번호다.
+const patientIdText = (usage) => caseLabel(usage);
+const patientDisplayName = (usage) => caseLabel(usage) || "케이스 미지정";
+const caseNumberValidationMessage = (room, order) => {
+  const r = Number(room);
+  const o = Number(order);
+  if (!Number.isInteger(r) || r < 1 || r > CASE_ROOM_COUNT) return `수술실은 1~${CASE_ROOM_COUNT}번 중에서 선택해 주세요.`;
+  if (!Number.isInteger(o) || o < 1 || o > 99) return "오늘 순서는 1~99 사이 숫자로 입력해 주세요.";
+  return "";
+};
 const canAssignImplantPatientNo = () => getImplantsModule().canAssignImplantPatientNo();
 const canEditImplantPatientNo = () => getImplantsModule().canEditImplantPatientNo();
 const implantRecordsForUsage = (usageId) => sortImplantRecords(implantRecords.filter((record) => sameId(record.usageId, usageId)));
@@ -1700,8 +1713,8 @@ const landingReceiptLineSummary = (receipt) => {
   const usage = landingReceiptUsage(receipt);
   const date = receipt?.usageDate || usage?.date || receiptDateValue(receipt);
   const patientNo = landingImplantPatientNo(receipt?.usageId);
-  const patientName = receipt?.patientName || usage?.patientName || "-";
-  return `${shortCompactDate(date)} · ${patientNo} · ${patientName} · ${Math.max(1, num(receipt?.qty))}개`;
+  const caseText = receipt?.caseNo || caseLabel(usage) || "-";
+  return `${shortCompactDate(date)} · ${patientNo} · ${caseText} · ${Math.max(1, num(receipt?.qty))}개`;
 };
 let landingBoardOpenKeys = new Set();
 const landingBoardOpenAttr = (key) => landingBoardOpenKeys.has(key) ? "open" : "";
@@ -1734,7 +1747,7 @@ const renderLandingBoard = () => {
             const product = productById(productId);
             const productLines = companyLines
               .filter((line) => line.product.id === productId)
-              .sort((a, b) => alphaFirstCompare(a.usage.date, b.usage.date) || alphaFirstCompare(a.usage.patientName, b.usage.patientName));
+              .sort((a, b) => alphaFirstCompare(a.usage.date, b.usage.date) || (num(a.usage.caseRoom) - num(b.usage.caseRoom)) || (num(a.usage.caseOrder) - num(b.usage.caseOrder)));
             const productPending = productLines.filter((line) => !line.receipt).length;
             const productKey = `product:${company}:${productId}`;
             return `
@@ -1756,7 +1769,7 @@ const renderLandingBoard = () => {
 const landingLineItem = ({ usage, product, receipt, qty }) => `
   <div class="item landing-line ${receipt ? "received" : "pending"}">
     <div class="compact-line">
-      <div class="compact-main">${escapeHtml(shortCompactDate(usage.date))} · ${escapeHtml(landingImplantPatientNo(usage.id))} · ${escapeHtml(usage.patientName || "-")} · ${Math.max(1, num(qty))}개</div>
+      <div class="compact-main">${escapeHtml(shortCompactDate(usage.date))} · ${escapeHtml(landingImplantPatientNo(usage.id))} · ${escapeHtml(caseLabel(usage) || "-")} · ${Math.max(1, num(qty))}개</div>
       <div class="compact-meta">${escapeHtml(product?.name || "삭제된 제품")}${product?.subcategory ? ` · ${escapeHtml(product.subcategory)}` : ""}</div>
       <div class="compact-meta">${receipt ? `입고 ${escapeHtml(receipt.date)} · ${num(receipt.qty)}개 · 입고자: ${escapeHtml(auditUserText(receipt) || "-")} · 입고시각: ${escapeHtml(auditTimeText(receipt))}` : "입고 대기"}</div>
       <span class="pill ${receipt ? "" : "low"}">${receipt ? "확인" : "대기"}</span>
@@ -2007,7 +2020,7 @@ const getReceiptsModule = () => {
 const renderReceipts = () => getReceiptsModule().renderReceipts();
 const bindReceipts = () => getReceiptsModule().bindReceipts();
 
-const filteredImplantRecords = (date, patientName, patientId, patientNo) => getImplantsModule().filteredImplantRecords(date, patientName, patientId, patientNo);
+const filteredImplantRecords = (date, caseNo, patientNo) => getImplantsModule().filteredImplantRecords(date, caseNo, patientNo);
 
 const implantRecordsForDate = (date) => sortImplantRecords(implantRecords.filter((record) => implantRecordDate(record) === date));
 const implantPhotoViewSrc = (photo) => getImplantsModule().implantPhotoViewSrc(photo);
@@ -2084,7 +2097,7 @@ const exportImplantLedgerExcel = (date) => {
   }
   downloadExcel(
     `임플란트장부_${date || "all"}.xlsx`,
-    ["날짜", "번호", "환자이름", "ID", "수술명", "원장코드", "저장자", "저장시각", "업체", "사용분", "사진수"],
+    ["날짜", "번호", "케이스", "수술명", "원장코드", "저장자", "저장시각", "업체", "사용분", "사진수"],
     implantLedgerRows(records)
   );
 };
@@ -2361,7 +2374,7 @@ const renderUse = () => `
     <form class="card" id="useForm">
       <div class="use-form-head">
         <h2>사용입력</h2>
-        <button class="secondary" type="button" id="resetUseEntryForm">새 환자 입력</button>
+        <button class="secondary" type="button" id="resetUseEntryForm">새 케이스 입력</button>
       </div>
       <div class="row four">
         <div>
@@ -2369,12 +2382,16 @@ const renderUse = () => `
           <input id="useDate" type="date" value="${today()}" required>
         </div>
         <div>
-          <label for="patientName">환자명</label>
-          <input id="patientName" required autocomplete="off">
+          <label for="caseRoom">수술실</label>
+          <select id="caseRoom" required>
+            <option value="">선택</option>
+            ${Array.from({ length: CASE_ROOM_COUNT }, (_, i) => `<option value="${i + 1}">${i + 1}번방</option>`).join("")}
+          </select>
         </div>
         <div>
-          <label for="patientId">환자 등록번호</label>
-          <input id="patientId" required inputmode="numeric" pattern="[0-9]{8}" autocomplete="off" placeholder="숫자 8자리">
+          <label for="caseOrder">오늘 순서</label>
+          <input id="caseOrder" type="number" min="1" max="99" inputmode="numeric" required placeholder="1">
+          <div class="helper">케이스 번호(수술실-순서)로 저장됩니다. 환자명·등록번호는 입력하지 마세요.</div>
         </div>
         <div>
           <label>비급여 제한</label>
@@ -2425,7 +2442,7 @@ const renderUse = () => `
         <span>임플란트 기록</span>
       </label>
       <div id="implantUsePanel" class="implant-panel" hidden>
-        <div class="implant-send-preview">환자명, 환자ID, 과, 원장코드, 수술명, 수술일은 위 사용입력 정보로 자동 저장됩니다.</div>
+        <div class="implant-send-preview">케이스 번호, 과, 원장코드, 수술명, 수술일은 위 사용입력 정보로 자동 저장됩니다.</div>
         <div class="implant-common-photos">
           <div class="implant-common-head">
             <strong>공용 사진함</strong>
@@ -2506,7 +2523,6 @@ const removeImplantDraftById = (drafts, id) => getUsageEntryModule().removeImpla
 const mergeDuplicateImplantDraftsInList = (drafts) => getUsageEntryModule().mergeDuplicateImplantDrafts(drafts);
 const implantDraftPayloadFromList = (drafts, enabled) => getUsageEntryModule().implantDraftPayloadFromList(drafts, enabled);
 const useDraftValidationMessage = (useItems, implantDraftPayload) => getUsageEntryModule().useDraftValidationMessage(useItems, implantDraftPayload);
-const patientIdValidationMessage = (patientId) => getUsageEntryModule().patientIdValidationMessage(patientId);
 const buildUseDraftSnapshot = (options) => getUsageEntryModule().buildUseDraftSnapshot(options);
 const pendingUsagePhotoCount = (implantDraftPayload) => getUsageEntryModule().pendingUsagePhotoCount(implantDraftPayload);
 const pendingUsagePhotoProgressMessage = (done, total, failed) => getUsageEntryModule().pendingUsagePhotoProgressMessage(done, total, failed);
@@ -2527,7 +2543,7 @@ const renderEditUsage = () => {
   return `
   <section class="grid">
     <div class="card">
-      <h2>환자 사용내역 선택</h2>
+      <h2>케이스 사용내역 선택</h2>
       <div>
         <label for="editUsageSelectDate">사용일 선택</label>
         <input id="editUsageSelectDate" type="date" value="${escapeHtml(editSelectDate)}">
@@ -2535,17 +2551,13 @@ const renderEditUsage = () => {
       <input type="hidden" id="editUsageSelect" value="${escapeHtml(pendingUsage?.id || "")}">
       <div class="row two edit-patient-search-row">
         <div>
-          <label for="editUsagePatientNameSearch">환자명 검색</label>
-          <input id="editUsagePatientNameSearch" autocomplete="off" placeholder="환자 이름 입력">
-        </div>
-        <div>
-          <label for="editUsagePatientIdSearch">등록번호 검색</label>
-          <input id="editUsagePatientIdSearch" inputmode="numeric" autocomplete="off" placeholder="등록번호 입력">
+          <label for="editUsageCaseSearch">케이스 번호 검색</label>
+          <input id="editUsageCaseSearch" autocomplete="off" placeholder="예: 1-1">
         </div>
       </div>
-      <p class="helper">기본값은 오늘 날짜입니다. 환자명이나 등록번호를 입력하면 아래 접힌 목록이 열리고 해당 환자만 표시됩니다.</p>
+      <p class="helper">기본값은 오늘 날짜입니다. 케이스 번호(수술실-순서)를 입력하면 아래 접힌 목록이 열리고 해당 케이스만 표시됩니다.</p>
       <details class="item edit-patient-details" id="editUsagePatientDetails">
-        <summary><span>환자 목록 보기</span><span class="pill" id="editUsagePatientCount">${editUsagePatientsForDate(editSelectDate).length}</span></summary>
+        <summary><span>케이스 목록 보기</span><span class="pill" id="editUsagePatientCount">${editUsagePatientsForDate(editSelectDate).length}</span></summary>
         <div class="details-body">
           <div id="editUsagePatientList" class="edit-patient-list">
             ${editUsagePatientListHtml(editSelectDate, pendingUsage?.id || "")}
@@ -2559,12 +2571,15 @@ const renderEditUsage = () => {
       <input type="hidden" id="editUsageId">
       <div class="row three">
         <div>
-          <label for="editPatientName">환자명</label>
-          <input id="editPatientName" required autocomplete="off">
+          <label for="editCaseRoom">수술실</label>
+          <select id="editCaseRoom" required>
+            <option value="">선택</option>
+            ${Array.from({ length: CASE_ROOM_COUNT }, (_, i) => `<option value="${i + 1}">${i + 1}번방</option>`).join("")}
+          </select>
         </div>
         <div>
-          <label for="editPatientId">환자 등록번호</label>
-          <input id="editPatientId" required inputmode="numeric" pattern="[0-9]{8}" autocomplete="off" placeholder="숫자 8자리">
+          <label for="editCaseOrder">오늘 순서</label>
+          <input id="editCaseOrder" type="number" min="1" max="99" inputmode="numeric" required placeholder="1">
         </div>
         <div>
           <label for="editUsageDate">사용일</label>
@@ -2604,7 +2619,7 @@ const renderEditUsage = () => {
       </div>
       <div class="card" id="editImplantSection" hidden>
         <h3>임플란트 기록 수정</h3>
-        <p class="helper">선택한 환자 사용내역과 연결된 임플란트 업체명·사용내용과 사진을 함께 수정합니다. 기존 사진은 유지되며, 필요하면 이 화면에서 사진을 추가하거나 기존 사진 삭제 후 새 사진으로 교체할 수 있습니다.</p>
+        <p class="helper">선택한 케이스 사용내역과 연결된 임플란트 업체명·사용내용과 사진을 함께 수정합니다. 기존 사진은 유지되며, 필요하면 이 화면에서 사진을 추가하거나 기존 사진 삭제 후 새 사진으로 교체할 수 있습니다.</p>
         <div id="editImplantLockNote"></div>
         <div class="implant-common-photos" id="editCommonImplantWrap">
           <div class="implant-common-head">
@@ -2670,8 +2685,7 @@ const bindEditUsage = () => {
   editEntryDirty = false;
   const dateInput = document.getElementById("editUsageSelectDate");
   const select = document.getElementById("editUsageSelect");
-  const patientNameSearch = document.getElementById("editUsagePatientNameSearch");
-  const patientIdSearch = document.getElementById("editUsagePatientIdSearch");
+  const caseSearch = document.getElementById("editUsageCaseSearch");
   const patientDetails = document.getElementById("editUsagePatientDetails");
   const patientCount = document.getElementById("editUsagePatientCount");
   const form = document.getElementById("editUsageForm");
@@ -2712,8 +2726,7 @@ const bindEditUsage = () => {
     editCommonImplantPhotos.splice(0, editCommonImplantPhotos.length);
   };
   const editPatientFilters = () => ({
-    name: patientNameSearch?.value || "",
-    patientId: patientIdSearch?.value || ""
+    caseNo: caseSearch?.value || ""
   });
   const renderUsageSelectOptions = (date, selectedId = "", filters = editPatientFilters()) => {
     const validSelectedId = selectedId && state.usages.some((usage) => usage.id === selectedId && (usage.date || "") === date) ? selectedId : "";
@@ -3180,8 +3193,8 @@ const bindEditUsage = () => {
     if (deleteButton) deleteButton.disabled = !canDeleteUsageRecord(usage);
     syncEditStockLimits(usage);
     document.getElementById("editUsageId").value = usage.id;
-    document.getElementById("editPatientName").value = usage.patientName || "";
-    document.getElementById("editPatientId").value = patientIdText(usage);
+    document.getElementById("editCaseRoom").value = caseRoomText(usage);
+    document.getElementById("editCaseOrder").value = caseOrderText(usage);
     document.getElementById("editUsageDate").value = usage.date || today();
     const surgery = surgeryById(usage.surgeryId);
     useDepartment.value = surgery?.department || inferSurgeryDepartment(surgery?.name || "") || departmentCode(departmentById(usage.doctorId)?.name || "");
@@ -3222,7 +3235,7 @@ const bindEditUsage = () => {
     renderUsageSelectOptions(dateInput.value);
     resetLoadedUsage();
   });
-  [patientNameSearch, patientIdSearch].forEach((input) => {
+  [caseSearch].forEach((input) => {
     input?.addEventListener("input", () => {
       renderUsageSelectOptions(dateInput.value, select.value);
       if (patientDetails) patientDetails.open = true;
@@ -3444,15 +3457,16 @@ const bindEditUsage = () => {
     }
     const newItems = selectedItems();
     const newProductIds = newItems.flatMap((item) => Array.from({ length: item.qty }, () => item.productId));
-    const editPatientId = document.getElementById("editPatientId").value.trim();
-    const editPatientIdMessage = patientIdValidationMessage(editPatientId);
-    if (editPatientIdMessage) {
-      alert(editPatientIdMessage);
-      document.getElementById("editPatientId").focus();
+    const editCaseRoom = document.getElementById("editCaseRoom").value.trim();
+    const editCaseOrder = document.getElementById("editCaseOrder").value.trim();
+    const editCaseMessage = caseNumberValidationMessage(editCaseRoom, editCaseOrder);
+    if (editCaseMessage) {
+      alert(editCaseMessage);
+      document.getElementById(editCaseRoom ? "editCaseOrder" : "editCaseRoom").focus();
       return;
     }
-    if (!document.getElementById("editPatientName").value.trim() || !doctorSelect.value || !surgerySelect.value) {
-      alert("환자명, 원장 코드, 수술을 모두 입력해 주세요.");
+    if (!doctorSelect.value || !surgerySelect.value) {
+      alert("케이스 번호, 원장 코드, 수술을 모두 입력해 주세요.");
       return;
     }
     if (!newProductIds.length) {
@@ -3502,8 +3516,8 @@ const bindEditUsage = () => {
     });
     const next = {
       ...usage,
-      patientName: document.getElementById("editPatientName").value.trim(),
-      patientId: editPatientId,
+      caseRoom: editCaseRoom,
+      caseOrder: editCaseOrder,
       doctorId: doctorSelect.value,
       surgeryId: surgerySelect.value,
       productIds: newProductIds,
@@ -3957,8 +3971,8 @@ const implantRecordBasePayload = (usage) => {
     usageId: usage.id,
     surgeryDate: usage.date || today(),
     surgeryTime: usage.surgeryTime || "",
-    patientName: usage.patientName || "",
-    patientId: usage.patientId || "",
+    caseRoom: caseRoomText(usage),
+    caseOrder: caseOrderText(usage),
     department: surgery?.department || inferSurgeryDepartment(surgery?.name || "") || departmentCode(doctor?.name || ""),
     doctorId: usage.doctorId || "",
     surgeonCode: doctor?.name || "",
@@ -4126,8 +4140,8 @@ const createImplantRecordFromUsage = async (usage, implantDrafts, options = {}) 
     surgeryDate,
     surgeryTime: usage.surgeryTime || "",
     patientNo: "",
-    patientName: usage.patientName || "",
-    patientId: usage.patientId || "",
+    caseRoom: caseRoomText(usage),
+    caseOrder: caseOrderText(usage),
     department: surgery?.department || inferSurgeryDepartment(surgery?.name || "") || departmentCode(doctor?.name || ""),
     doctorId: usage.doctorId || "",
     surgeonCode: doctor?.name || "",
@@ -4223,8 +4237,8 @@ const bindUse = () => {
   const editUseDraftButton = document.getElementById("editUseDraft");
   const finalSaveUseDraftButton = document.getElementById("finalSaveUseDraft");
   const cancelUseDraftButton = document.getElementById("cancelUseDraft");
-  const patientNameInput = document.getElementById("patientName");
-  const patientIdInput = document.getElementById("patientId");
+  const caseRoomInput = document.getElementById("caseRoom");
+  const caseOrderInput = document.getElementById("caseOrder");
   const implantDrafts = [];
   const commonImplantPhotos = [];
   let activeImplantEditPair = "";
@@ -4238,8 +4252,8 @@ const bindUse = () => {
   const selectedUseDate = () => useDate?.value || today();
   const useEntryPatientFields = () => ({
     date: selectedUseDate(),
-    patientName: document.getElementById("patientName")?.value.trim() || "",
-    patientId: document.getElementById("patientId")?.value.trim() || "",
+    caseRoom: caseRoomInput?.value?.trim() || "",
+    caseOrder: caseOrderInput?.value?.trim() || "",
     department: useDepartment?.value || "",
     doctorId: departmentSelect?.value || "",
     surgeryId: surgerySelect?.value || "",
@@ -4247,24 +4261,26 @@ const bindUse = () => {
   });
   const saveUseEntryPatientAutosave = () => {
     const payload = useEntryPatientFields();
-    const hasContent = payload.patientName || payload.patientId || payload.department || payload.doctorId || payload.surgeryId;
+    const hasContent = payload.caseRoom || payload.caseOrder || payload.department || payload.doctorId || payload.surgeryId;
     if (hasContent) {
       writeUseEntryAutosave(payload);
     } else {
       clearUseEntryAutosave();
     }
   };
-  const contextNormalizedPatientName = (value = "") => normalizedName(value);
-  const pendingUsagePatientKey = (pending) =>
-    `${contextNormalizedPatientName(pending?.patientName || "")}::${String(pending?.patientId || "").trim()}`;
+  const formCaseKey = () => {
+    const room = String(caseRoomInput?.value || "").trim();
+    const order = String(caseOrderInput?.value || "").trim();
+    return room && order ? `${room}-${order}` : "";
+  };
+  const pendingUsagePatientKey = (pending) => `${pending?.date || ""}::${caseLabel(pending)}`;
   const matchingPendingUsageForPatient = () => {
-    const patientName = contextNormalizedPatientName(patientNameInput?.value || "");
-    const patientId = String(patientIdInput?.value || "").trim();
-    if (!patientName || !patientId) return null;
+    const key = formCaseKey();
+    if (!key) return null;
+    const date = selectedUseDate();
     return pendingUsagesOpen().find((pending) => {
       if (sameId(pending.id, loadedPendingUsageId)) return false;
-      return contextNormalizedPatientName(pending.patientName || "") === patientName &&
-        String(pending.patientId || "").trim() === patientId;
+      return (pending.date || "") === date && caseLabel(pending) === key;
     }) || null;
   };
   const warnPendingUsagePatientIfNeeded = () => {
@@ -4275,8 +4291,8 @@ const bindUse = () => {
     lastPendingPatientWarningKey = key;
     const pendingTime = formatDateTime(pending.updatedAt || pending.createdAt || "");
     const message = [
-      "스크럽 확인 대기에 같은 이름과 같은 등록번호의 환자가 있습니다.",
-      `환자: ${pending.patientName || "-"} (${pending.patientId || "-"})`,
+      "스크럽 확인 대기에 같은 날 같은 케이스 번호의 기록이 있습니다.",
+      `케이스: ${caseLabel(pending) || "-"}`,
       pendingTime ? `임시저장: ${pendingTime}` : "",
       "",
       "정말 새로 사용입력 하시겠습니까?",
@@ -4285,19 +4301,15 @@ const bindUse = () => {
     ].filter(Boolean).join("\n");
     if (confirm(message)) return;
     loadPendingUsageIntoForm(pending);
-    saveDoneToast("같은 환자의 스크럽 확인 대기 기록을 불러왔습니다.");
+    saveDoneToast("같은 케이스의 스크럽 확인 대기 기록을 불러왔습니다.");
   };
-  const savedUsagePatientKey = (usage) =>
-    `${usage?.date || selectedUseDate()}::${contextNormalizedPatientName(usage?.patientName || "")}::${String(usage?.patientId || "").trim()}`;
+  const savedUsagePatientKey = (usage) => `${usage?.date || selectedUseDate()}::${caseLabel(usage)}`;
   const matchingSavedUsageForPatient = () => {
     const date = selectedUseDate();
-    const patientName = contextNormalizedPatientName(patientNameInput?.value || "");
-    const patientId = String(patientIdInput?.value || "").trim();
-    if (!date || !patientName || !patientId) return null;
+    const key = formCaseKey();
+    if (!date || !key) return null;
     return state.usages.find((usage) =>
-      (usage.date || "") === date &&
-      contextNormalizedPatientName(usage.patientName || "") === patientName &&
-      String(usage.patientId || "").trim() === patientId
+      (usage.date || "") === date && caseLabel(usage) === key
     ) || null;
   };
   const warnSavedUsagePatientIfNeeded = () => {
@@ -4310,8 +4322,8 @@ const bindUse = () => {
     const surgery = surgeryById(usage.surgeryId)?.name || "-";
     const dateText = (usage.date || selectedUseDate()) === today() ? "오늘" : `${usage.date || selectedUseDate()}에`;
     const message = [
-      `이미 ${dateText} 저장된 환자입니다.`,
-      `환자: ${usage.patientName || "-"} (${patientIdText(usage) || "-"})`,
+      `이미 ${dateText} 저장된 케이스 번호입니다.`,
+      `케이스: ${caseLabel(usage) || "-"}`,
       `기존 기록: ${doctor} · ${surgery}`,
       "",
       "추가로 사용입력하시겠습니까?",
@@ -4333,8 +4345,8 @@ const bindUse = () => {
   };
   const useDraftRequiredFieldMessage = () => {
     const missing = [
-      { label: "환자명", field: patientNameInput, missing: !String(patientNameInput?.value || "").trim() },
-      { label: "환자 등록번호", field: patientIdInput, missing: !String(patientIdInput?.value || "").trim() },
+      { label: "수술실", field: caseRoomInput, missing: !String(caseRoomInput?.value || "").trim() },
+      { label: "오늘 순서", field: caseOrderInput, missing: !String(caseOrderInput?.value || "").trim() },
       { label: "과", field: useDepartment, missing: !useDepartment.value },
       { label: "원장 코드", field: departmentSelect, missing: !departmentSelect.value },
       { label: "수술명", field: surgerySelect, missing: !surgerySelect.value }
@@ -4345,7 +4357,7 @@ const bindUse = () => {
       "임시저장을 할 수 없습니다.",
       `빠진 항목: ${missing.map((item) => item.label).join(", ")}`,
       "",
-      "환자 기본정보에서 빠진 항목을 선택한 뒤 다시 임시저장을 눌러 주세요."
+      "케이스 기본정보에서 빠진 항목을 선택한 뒤 다시 임시저장을 눌러 주세요."
     ].join("\n");
   };
   const markUseEntryDirty = () => {
@@ -4516,8 +4528,8 @@ const bindUse = () => {
     implantEntriesWrap.innerHTML = implantDraftsHtml(implantDrafts, commonImplantPhotos.length);
   };
   const resetUseEntryForm = () => {
-    const hasInput = document.getElementById("patientName")?.value.trim() ||
-      document.getElementById("patientId")?.value.trim() ||
+    const hasInput = caseRoomInput?.value?.trim() ||
+      caseOrderInput?.value?.trim() ||
       useDepartment.value ||
       departmentSelect.value ||
       surgerySelect.value ||
@@ -4525,10 +4537,10 @@ const bindUse = () => {
       implantDrafts.length ||
       commonImplantPhotos.length ||
       useDraftSnapshot;
-    if (hasInput && !confirm("현재 사용입력 내용을 비우고 새 환자를 입력할까요? 임시저장 대기 기록은 삭제되지 않습니다.")) return;
+    if (hasInput && !confirm("현재 사용입력 내용을 비우고 새 케이스를 입력할까요? 임시저장 대기 기록은 삭제되지 않습니다.")) return;
     if (useDate) useDate.value = today();
-    document.getElementById("patientName").value = "";
-    document.getElementById("patientId").value = "";
+    if (caseRoomInput) caseRoomInput.value = "";
+    if (caseOrderInput) caseOrderInput.value = "";
     useDepartment.value = "";
     departmentSelect.value = "";
     surgerySelect.value = "";
@@ -4553,8 +4565,8 @@ const bindUse = () => {
     renderCommonImplantPhotos();
     renderImplantDrafts();
     resetUseEntryProtection();
-    setStatus("새 환자 입력을 시작할 수 있습니다.", "ok");
-    document.getElementById("patientName")?.focus();
+    setStatus("새 케이스 입력을 시작할 수 있습니다.", "ok");
+    caseRoomInput?.focus();
   };
   const collectUseDraftSnapshot = () => {
     const requiredMessage = useDraftRequiredFieldMessage();
@@ -4563,11 +4575,12 @@ const bindUse = () => {
       return null;
     }
     if (!form.reportValidity()) return null;
-    const patientId = document.getElementById("patientId").value.trim();
-    const patientIdMessage = patientIdValidationMessage(patientId);
-    if (patientIdMessage) {
-      alert(patientIdMessage);
-      document.getElementById("patientId").focus();
+    const caseRoom = String(caseRoomInput?.value || "").trim();
+    const caseOrder = String(caseOrderInput?.value || "").trim();
+    const caseMessage = caseNumberValidationMessage(caseRoom, caseOrder);
+    if (caseMessage) {
+      alert(caseMessage);
+      (caseRoom ? caseOrderInput : caseRoomInput)?.focus();
       return null;
     }
     const useItems = selectedUseItems();
@@ -4579,8 +4592,8 @@ const bindUse = () => {
     }
     return buildUseDraftSnapshot({
       date: selectedUseDate(),
-      patientName: document.getElementById("patientName").value.trim(),
-      patientId,
+      caseRoom,
+      caseOrder,
       doctorId: departmentSelect.value,
       surgeryId: surgerySelect.value,
       doctorText: departmentSelect.selectedOptions[0]?.textContent || "-",
@@ -4638,8 +4651,8 @@ const bindUse = () => {
     return {
       id: pendingId,
       status: "pending",
-      patientName: snapshot.patientName,
-      patientId: snapshot.patientId,
+      caseRoom: snapshot.caseRoom,
+      caseOrder: snapshot.caseOrder,
       doctorId: departmentSelect.value,
       surgeryId: surgerySelect.value,
       date: snapshot.date || today(),
@@ -4694,8 +4707,8 @@ const bindUse = () => {
   const loadPendingUsageIntoForm = (pending) => {
     if (!pending) return;
     if (useDate) useDate.value = pending.date || today();
-    document.getElementById("patientName").value = pending.patientName || "";
-    document.getElementById("patientId").value = pending.patientId || "";
+    if (caseRoomInput) caseRoomInput.value = caseRoomText(pending);
+    if (caseOrderInput) caseOrderInput.value = caseOrderText(pending);
     const doctor = departmentById(pending.doctorId);
     if (doctor) {
       useDepartment.value = departmentCode(doctor.name);
@@ -4851,15 +4864,15 @@ const bindUse = () => {
   const restoreUseEntryPatientAutosave = () => {
     const draft = readUseEntryAutosave();
     if (!draft) return;
-    const hasCurrentInput = document.getElementById("patientName")?.value.trim() ||
-      document.getElementById("patientId")?.value.trim() ||
+    const hasCurrentInput = caseRoomInput?.value?.trim() ||
+      caseOrderInput?.value?.trim() ||
       useDepartment.value ||
       departmentSelect.value ||
       surgerySelect.value;
     if (hasCurrentInput) return;
     if (useDate) useDate.value = draft.date || today();
-    document.getElementById("patientName").value = draft.patientName || "";
-    document.getElementById("patientId").value = draft.patientId || "";
+    if (caseRoomInput) caseRoomInput.value = draft.caseRoom || "";
+    if (caseOrderInput) caseOrderInput.value = draft.caseOrder || "";
     useDepartment.value = draft.department || "";
     filterUseOptions();
     departmentSelect.value = draft.doctorId || "";
@@ -4868,7 +4881,7 @@ const bindUse = () => {
     setRestrictButton(Boolean(draft.restrictNonpay));
     renderUseRecommendation();
     useEntryDirty = true;
-    setStatus("작성 중이던 환자 기본정보를 복원했습니다.", "ok");
+    setStatus("작성 중이던 케이스 기본정보를 복원했습니다.", "ok");
   };
   restoreUseEntryPatientAutosave();
   useDepartment.addEventListener("change", () => {
@@ -4889,7 +4902,7 @@ const bindUse = () => {
     renderUseRecommendation();
   });
   resetUseEntryButton?.addEventListener("click", resetUseEntryForm);
-  [patientNameInput, patientIdInput].forEach((input) => {
+  [caseRoomInput, caseOrderInput].forEach((input) => {
     input?.addEventListener("input", warnPatientReuseIfNeeded);
     input?.addEventListener("change", warnPatientReuseIfNeeded);
     input?.addEventListener("blur", warnPatientReuseIfNeeded);
@@ -5242,12 +5255,12 @@ const bindUse = () => {
     }));
     const implantDraftPayload = useDraftSnapshot.implantDraftPayload || [];
     const usageDate = useDraftSnapshot.date || selectedUseDate();
-    const patientName = String(useDraftSnapshot.patientName || document.getElementById("patientName").value).trim();
-    const patientId = String(useDraftSnapshot.patientId || document.getElementById("patientId").value).trim();
-    const patientIdMessage = patientIdValidationMessage(patientId);
-    if (patientIdMessage) {
-      alert(patientIdMessage);
-      document.getElementById("patientId").focus();
+    const finalCaseRoom = String(useDraftSnapshot.caseRoom || caseRoomInput?.value || "").trim();
+    const finalCaseOrder = String(useDraftSnapshot.caseOrder || caseOrderInput?.value || "").trim();
+    const caseMessage = caseNumberValidationMessage(finalCaseRoom, finalCaseOrder);
+    if (caseMessage) {
+      alert(caseMessage);
+      (finalCaseRoom ? caseOrderInput : caseRoomInput)?.focus();
       return;
     }
     if (usageDate !== today() && !confirm(`${usageDate} 사용분으로 저장합니다. 계속할까요?`)) {
@@ -5281,7 +5294,7 @@ const bindUse = () => {
       alert(validationMessage);
       return;
     }
-    const duplicatePatientWarning = sameDayPatientUsageWarning({ usageDate, patientName, patientId });
+    const duplicatePatientWarning = sameDayPatientUsageWarning({ usageDate, caseRoom: finalCaseRoom, caseOrder: finalCaseOrder });
     if (duplicatePatientWarning && !confirm(duplicatePatientWarning)) {
       return;
     }
@@ -5292,8 +5305,8 @@ const bindUse = () => {
     });
     const finalSavedAt = new Date().toISOString();
     const usageRecord = buildFinalUsageRecord({
-      patientName,
-      patientId,
+      caseRoom: finalCaseRoom,
+      caseOrder: finalCaseOrder,
       doctorId: useDraftSnapshot.doctorId || document.getElementById("useDoctor").value,
       surgeryId: useDraftSnapshot.surgeryId || document.getElementById("useSurgery").value,
       productIds,
@@ -5444,8 +5457,7 @@ const exportReceiptHistory = (start = "", end = "", query = "", type = "") => {
         receiptProductName(receipt),
         product?.company || receipt.company || "",
         product?.subcategory || receipt.subcategory || "",
-        receipt.patientName || usage?.patientName || "",
-        patientIdText(usage),
+        receipt.caseNo || caseLabel(usage) || "",
         receipt.usageDate || usage?.date || "",
         receipt.type === "landing" ? landingReceiptLineSummary(receipt) : "",
         receipt.loanDepartment || "",
@@ -5457,7 +5469,7 @@ const exportReceiptHistory = (start = "", end = "", query = "", type = "") => {
     });
   downloadExcel(
     `${type === "landing" ? "랜딩" : type === "loan" ? "타부서대여" : "비급여"}_입고내역.xlsx`,
-    ["날짜", "입력시각", "입력자", "구분", "제품군", "제품명", "업체명", "세부분류", "환자명", "환자ID", "사용일", "랜딩표시", "대여부서", "수량", "메모", "수정자", "수정시각"],
+    ["날짜", "입력시각", "입력자", "구분", "제품군", "제품명", "업체명", "세부분류", "케이스", "사용일", "랜딩표시", "대여부서", "수량", "메모", "수정자", "수정시각"],
     rows
   );
 };

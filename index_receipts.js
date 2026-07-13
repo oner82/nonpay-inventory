@@ -287,7 +287,7 @@ const renderReceipts = () => {
     ${receiptView === "landing" ? `
       <form class="card receipt-wide" id="landingCarryoverReceiptForm">
         <h2>이월 랜딩 입고 등록</h2>
-        <p class="helper">프로그램 사용 시작 전 이미 사용했지만 아직 받지 못했던 랜딩 제품을 받았을 때 사용합니다. 환자 사용내역과 연결하지 않고 현재고와 입고내역에만 반영됩니다.</p>
+        <p class="helper">프로그램 사용 시작 전 이미 사용했지만 아직 받지 못했던 랜딩 제품을 받았을 때 사용합니다. 사용내역과 연결하지 않고 현재고와 입고내역에만 반영됩니다.</p>
         <label for="landingCarryoverProduct">제품 선택</label>
         <select id="landingCarryoverProduct" required>
           <option value="">랜딩 제품을 선택하세요</option>
@@ -635,7 +635,7 @@ const bindReceipts = () => {
       qty,
       date: today(),
       usageDate: usage.date,
-      patientName: usage.patientName,
+      caseNo: `${String(usage.caseRoom || "").trim()}-${String(usage.caseOrder || "").trim()}`,
       company: product.company || "",
       subcategory: product.subcategory || "",
       createdAt: new Date().toISOString(),
@@ -669,7 +669,7 @@ const bindReceipts = () => {
           qty,
           date: today(),
           usageDate: line.usage.date,
-          patientName: line.usage.patientName,
+          caseNo: `${String(line.usage.caseRoom || "").trim()}-${String(line.usage.caseOrder || "").trim()}`,
           company: product.company || "",
           subcategory: product.subcategory || "",
           createdAt: new Date().toISOString(),

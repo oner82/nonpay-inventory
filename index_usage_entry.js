@@ -16,7 +16,7 @@
       });
       const implantPhotoCount = implantDrafts.reduce((sum, draft) => sum + (draft.photos || []).length, 0);
       return `
-        <div><span>환자</span> ${context.escapeHtml(snapshot.patientName || "-")} ${snapshot.patientId ? `(${context.escapeHtml(snapshot.patientId)})` : ""}</div>
+        <div><span>케이스</span> ${context.escapeHtml(snapshot.caseRoom && snapshot.caseOrder ? `${snapshot.caseRoom}-${snapshot.caseOrder}` : "-")}</div>
         <div><span>사용일</span> ${context.escapeHtml(snapshot.date || context.today())}</div>
         <div><span>수술</span> ${context.escapeHtml(snapshot.doctorText)} · ${context.escapeHtml(snapshot.surgeryText)}</div>
         <div><span>사용제품</span> ${context.escapeHtml(productLines.join(", ") || "-")}</div>
@@ -33,7 +33,7 @@
           <summary class="use-draft-head">
             <div>
               <h3 style="margin:0;">스크럽 확인 대기</h3>
-              <div class="muted">임시저장된 기록은 새로고침 후에도 남아 있습니다. 확인할 환자를 불러와 최종저장하세요.</div>
+              <div class="muted">임시저장된 기록은 새로고침 후에도 남아 있습니다. 확인할 케이스를 불러와 최종저장하세요.</div>
             </div>
             <span class="use-draft-status">${items.length}건</span>
           </summary>
@@ -45,7 +45,7 @@
               return `
                 <div class="pending-usage-card">
                   <div class="pending-usage-head">
-                    <strong>${context.escapeHtml(context.patientDisplayName(item) || "환자 정보 없음")}</strong>
+                    <strong>${context.escapeHtml(context.patientDisplayName(item) || "케이스 미지정")}</strong>
                     <span class="pill">${context.escapeHtml(item.date || context.today())}</span>
                   </div>
                   <div class="pending-usage-meta">
@@ -312,15 +312,15 @@
       return { missingNames, changedNames };
     };
 
-    const sameDayPatientUsageWarning = ({ usageDate = "", patientName = "", patientId = "" } = {}) => {
+    const sameDayPatientUsageWarning = ({ usageDate = "", caseRoom = "", caseOrder = "" } = {}) => {
       const date = usageDate || context.today();
-      const patientIdKey = String(patientId || "").trim();
-      const patientNameKey = context.normalizedName(patientName || "");
-      if (!date || (!patientIdKey && !patientNameKey)) return "";
+      const room = String(caseRoom || "").trim();
+      const order = String(caseOrder || "").trim();
+      if (!date || !room || !order) return "";
+      const key = `${room}-${order}`;
       const matches = context.getState().usages.filter((usage) => {
         if ((usage.date || "") !== date) return false;
-        if (patientIdKey) return String(usage.patientId || "").trim() === patientIdKey;
-        return context.normalizedName(usage.patientName || "") === patientNameKey;
+        return `${String(usage.caseRoom || "").trim()}-${String(usage.caseOrder || "").trim()}` === key;
       });
       if (!matches.length) return "";
       const lines = matches.slice(0, 3).map((usage, index) => {
@@ -331,17 +331,17 @@
       });
       const extra = matches.length > lines.length ? `\n외 ${matches.length - lines.length}건` : "";
       return [
-        `${date}에 같은 환자${patientIdKey ? `ID(${patientIdKey})` : "명"} 사용기록이 이미 ${matches.length}건 있습니다.`,
+        `${date}에 같은 케이스 번호(${key}) 사용기록이 이미 ${matches.length}건 있습니다.`,
         ...lines,
         extra,
-        "같은 환자의 추가 수술 또는 co-op 건이면 별도 기록으로 계속 저장하세요.",
+        "같은 케이스의 추가 기록이면 별도 기록으로 계속 저장하세요.",
         "기존 기록을 수정해야 하는 경우 취소 후 수정 메뉴에서 고쳐 주세요."
       ].filter(Boolean).join("\n");
     };
 
     const buildFinalUsageRecord = ({
-      patientName = "",
-      patientId = "",
+      caseRoom = "",
+      caseOrder = "",
       doctorId = "",
       surgeryId = "",
       productIds = [],
@@ -352,8 +352,8 @@
       auditFields = {}
     } = {}) => ({
       id: context.uid(),
-      patientName,
-      patientId,
+      caseRoom,
+      caseOrder,
       doctorId,
       surgeryId,
       productIds,
@@ -379,7 +379,7 @@
             <span>${restrictActive ? "비급여 제한" : "추천 항목"}</span>
             <span class="pill ${restrictActive ? "low" : ""}">${recommended.length}</span>
           </div>
-          <div class="meta"><span>${context.escapeHtml(restrictActive ? "이 환자는 비급여 제한으로 선택되어 있습니다. 추천 비급여만 숨겨지고, 인체조직/ANCHOR 추천은 선택할 수 있습니다." : "추천 항목을 선택하고 수량을 조절해 사용내용에 넣을 수 있습니다.")}</span></div>
+          <div class="meta"><span>${context.escapeHtml(restrictActive ? "이 케이스는 비급여 제한으로 선택되어 있습니다. 추천 비급여만 숨겨지고, 인체조직/ANCHOR 추천은 선택할 수 있습니다." : "추천 항목을 선택하고 수량을 조절해 사용내용에 넣을 수 있습니다.")}</span></div>
           ${visibleItems.map((item) => {
             const selectedQty = selectedQtyById.get(item.productId);
             const qty = selectedQty || Math.max(1, context.num(item.qty));
@@ -542,16 +542,10 @@
       return "";
     };
 
-    const patientIdValidationMessage = (patientId = "") => {
-      const value = String(patientId || "").trim();
-      if (/^\d{8}$/.test(value)) return "";
-      return "환자 등록번호는 숫자 8자리로 입력해 주세요.";
-    };
-
     const buildUseDraftSnapshot = ({
       date = context.today(),
-      patientName = "",
-      patientId = "",
+      caseRoom = "",
+      caseOrder = "",
       doctorId = "",
       surgeryId = "",
       doctorText = "-",
@@ -561,8 +555,8 @@
       implantDraftPayload = []
     } = {}) => ({
       date,
-      patientName,
-      patientId,
+      caseRoom,
+      caseOrder,
       doctorId,
       surgeryId,
       doctorText,
@@ -648,17 +642,14 @@
     `).join("") || `<div class="empty">임플란트 업체를 추가해 주세요.</div>`;
 
     const editUsagePatientsForDate = (date, filters = {}) => {
-      const nameQuery = context.normalizedName(filters.name || "");
-      const patientIdQuery = String(filters.patientId || "").replace(/\D/g, "");
+      const caseQuery = String(filters.caseNo || "").trim();
       return context.getState().usages
       .filter((usage) => (usage.date || "") === date)
-      .filter((usage) => {
-        if (nameQuery && !context.normalizedName(usage.patientName || "").includes(nameQuery)) return false;
-        if (patientIdQuery && !context.patientIdText(usage).replace(/\D/g, "").includes(patientIdQuery)) return false;
-        return true;
-      })
+      .filter((usage) => !caseQuery || context.patientIdText(usage).includes(caseQuery))
       .slice()
-      .sort((a, b) => context.alphaFirstCompare(a.patientName, b.patientName) || context.alphaFirstCompare(context.patientIdText(a), context.patientIdText(b)));
+      .sort((a, b) =>
+        (context.num(a.caseRoom) - context.num(b.caseRoom)) ||
+        (context.num(a.caseOrder) - context.num(b.caseOrder)));
     };
 
     const editUsagePatientCardHtml = (usage, selectedId = "") => {
@@ -675,7 +666,7 @@
       return `
         <button class="edit-patient-card ${selectedId === usage.id ? "active" : ""} ${locked ? "locked" : ""}" type="button" data-edit-usage-card="${context.escapeHtml(usage.id)}">
           <div class="edit-patient-card-head">
-            <span>${context.escapeHtml(context.patientDisplayName(usage) || "이름 없음")}</span>
+            <span>${context.escapeHtml(context.patientDisplayName(usage))}</span>
             <span class="pill ${locked ? "low" : ""}">${locked ? "관리자 전용" : "수정 가능"}</span>
           </div>
           <div class="edit-patient-card-meta">
@@ -690,7 +681,7 @@
     const editUsagePatientListHtml = (date, selectedId = "", filters = {}) => {
       const patients = editUsagePatientsForDate(date, filters);
       if (!patients.length) {
-        return filters.name || filters.patientId
+        return filters.caseNo
           ? `<div class="empty">검색 결과가 없습니다.</div>`
           : `<div class="empty">선택한 날짜에 사용내역이 없습니다.</div>`;
       }
@@ -783,7 +774,6 @@
       mergeDuplicateImplantDrafts,
       implantDraftPayloadFromList,
       useDraftValidationMessage,
-      patientIdValidationMessage,
       buildUseDraftSnapshot,
       pendingUsagePhotoCount,
       pendingUsagePhotoProgressMessage,
