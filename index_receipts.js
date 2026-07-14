@@ -66,11 +66,20 @@ const morningCheckCategorySort = (a, b) => {
   return leftOrder - rightOrder || String(a || "").localeCompare(String(b || ""), "ko");
 };
 
-const productUsageCountBefore = (productId, date) => state.usages.reduce((sum, usage) => {
-  if (isVendorManagedProduct?.(productById(productId))) return sum;
-  if (!usage?.date || usage.date >= date) return sum;
-  return sum + (usage.productIds || []).filter((id) => sameId(id, productId)).length;
-}, 0);
+const productUsageCountBefore = (productId, date) => {
+  if (isVendorManagedProduct?.(productById(productId))) return 0;
+  const fromUsages = state.usages.reduce((sum, usage) => {
+    if (!usage?.date || usage.date >= date) return sum;
+    return sum + (usage.productIds || []).filter((id) => sameId(id, productId)).length;
+  }, 0);
+  // 방 마감 보충 기록(비급여)도 사용량으로 계산
+  const fromRefills = (state.roomRefills || []).reduce((sum, refill) => {
+    if (!refill?.date || refill.date >= date) return sum;
+    return sum + (refill.items || []).filter((item) => sameId(item.productId, productId))
+      .reduce((qty, item) => qty + Math.max(0, num(item.qty)), 0);
+  }, 0);
+  return fromUsages + fromRefills;
+};
 
 const productReceiptDeltaBefore = (productId, date) => state.receipts.reduce((sum, receipt) => {
   if (!sameId(receipt.productId, productId)) return sum;
@@ -83,11 +92,17 @@ const productReceiptDeltaAll = (productId) => state.receipts.reduce((sum, receip
   sameId(receipt.productId, productId) ? sum + receiptStockDelta(receipt) : sum
 ), 0);
 
-const productUsageCountAll = (productId) => state.usages.reduce((sum, usage) => (
-  isVendorManagedProduct?.(productById(productId))
-    ? sum
-    : sum + (usage.productIds || []).filter((id) => sameId(id, productId)).length
-), 0);
+const productUsageCountAll = (productId) => {
+  if (isVendorManagedProduct?.(productById(productId))) return 0;
+  const fromUsages = state.usages.reduce((sum, usage) => (
+    sum + (usage.productIds || []).filter((id) => sameId(id, productId)).length
+  ), 0);
+  const fromRefills = (state.roomRefills || []).reduce((sum, refill) => (
+    sum + (refill.items || []).filter((item) => sameId(item.productId, productId))
+      .reduce((qty, item) => qty + Math.max(0, num(item.qty)), 0)
+  ), 0);
+  return fromUsages + fromRefills;
+};
 
 const productBaseStockForCheck = (product) => Number.isFinite(Number(product.baseStock))
   ? num(product.baseStock)

@@ -64,6 +64,7 @@ const firebaseConfig = {
 const menus = [
   ["dashboard", "대시보드"],
   ["use", "사용입력"],
+  ["roomclose", "방 마감"],
   ["edit", "수정"],
   ["history", "사용내역"],
   ["receipts", "입고관리"],
@@ -72,10 +73,10 @@ const menus = [
 ];
 
 const roleAllowedViews = {
-  admin: ["dashboard", "use", "edit", "history", "receipts", "implants", "settings"],
-  manager: ["dashboard", "use", "edit", "history", "receipts", "implants", "settings"],
+  admin: ["dashboard", "use", "roomclose", "edit", "history", "receipts", "implants", "settings"],
+  manager: ["dashboard", "use", "roomclose", "edit", "history", "receipts", "implants", "settings"],
   receiver: ["receipts", "implants"],
-  staff: ["dashboard", "use", "edit", "history", "implants"]
+  staff: ["dashboard", "use", "roomclose", "edit", "history", "implants"]
 };
 
 const roleLabels = {
@@ -100,6 +101,7 @@ const blankState = () => ({
   surgeries: [],
   receipts: [],
   usages: [],
+  roomRefills: [],
   usageRules: [],
   hiddenLowProductIds: [],
   backupVersions: [],
@@ -593,6 +595,7 @@ const normalizeState = (data) => ({
   surgeries: Array.isArray(data?.surgeries) ? data.surgeries : [],
   receipts: Array.isArray(data?.receipts) ? data.receipts : [],
   usages: Array.isArray(data?.usages) ? data.usages : [],
+  roomRefills: Array.isArray(data?.roomRefills) ? data.roomRefills : [],
   usageRules: Array.isArray(data?.usageRules) ? data.usageRules : [],
   hiddenLowProductIds: Array.isArray(data?.hiddenLowProductIds) ? data.hiddenLowProductIds : [],
   backupVersions: Array.isArray(data?.backupVersions) ? data.backupVersions : []
@@ -931,6 +934,13 @@ const productMovementCounts = () => {
       used.set(id, (used.get(id) || 0) + 1);
     });
   });
+  // 방 마감 보충 기록: 채운 수량 = 그날 그 방의 비급여 사용량으로 집계한다.
+  (state.roomRefills || []).forEach((refill) => {
+    (refill.items || []).forEach((item) => {
+      if (isVendorManagedProduct(productById(item.productId))) return;
+      used.set(item.productId, (used.get(item.productId) || 0) + Math.max(0, num(item.qty)));
+    });
+  });
   state.receipts.forEach((receipt) => {
     received.set(receipt.productId, (received.get(receipt.productId) || 0) + receiptStockDelta(receipt));
   });
@@ -997,6 +1007,7 @@ const mergeStates = (remoteData, localData) => {
     surgeries: mergeArrayById(remote.surgeries, local.surgeries, remote.updatedAt, local.updatedAt),
     receipts: mergeArrayById(remote.receipts, local.receipts, remote.updatedAt, local.updatedAt),
     usages: mergeArrayById(remote.usages, local.usages, remote.updatedAt, local.updatedAt),
+    roomRefills: mergeArrayById(remote.roomRefills || [], local.roomRefills || [], remote.updatedAt, local.updatedAt),
     usageRules: mergeArrayById(remote.usageRules, local.usageRules, remote.updatedAt, local.updatedAt),
     backupVersions: mergeArrayById(remote.backupVersions || [], local.backupVersions || [], remote.updatedAt, local.updatedAt),
     hiddenLowProductIds: [...new Set([...(remote.hiddenLowProductIds || []), ...(local.hiddenLowProductIds || [])])]
@@ -1149,6 +1160,7 @@ const render = () => {
     receipts: renderReceipts,
     implants: renderImplants,
     use: renderUse,
+    roomclose: renderRoomClose,
     history: renderHistory,
     edit: renderEditUsage,
     settings: renderSettings
@@ -1370,6 +1382,7 @@ const bindView = () => {
     receipts: bindReceipts,
     implants: bindImplants,
     use: bindUse,
+    roomclose: bindRoomClose,
     history: bindHistory,
     edit: bindEditUsage,
     settings: bindSettings
@@ -1499,6 +1512,8 @@ const renderGroupedProducts = (withActions) => {
   if (!state.products.length) return `<div class="empty">제품을 추가해 주세요.</div>`;
   const categories = PRODUCT_CATEGORIES;
   return categories.map((category) => {
+    // 사용입력(withActions=false)에서는 비급여를 숨긴다 — 비급여는 방 마감에서 집계.
+    if (!withActions && category === "비급여") return "";
     const categoryItems = state.products.filter((item) => productCategory(item.category) === category).sort(productDisplaySort(category));
     if (!categoryItems.length) return "";
     if (category === "비급여") {
@@ -1571,9 +1586,10 @@ window.adjustQtyButton = (button, delta) => {
   const wrap = button.closest('.qty-stepper');
   const input = wrap?.querySelector('input');
   if (!input) return;
-  const min = Math.max(1, num(input.min || 1));
+  // input의 min 속성을 존중한다 (방 마감 보충 입력은 0부터 시작).
+  const min = Math.max(0, num(input.min === "" ? 1 : input.min));
   const max = Math.max(min, num(input.max || 9999));
-  const next = Math.min(max, Math.max(min, num(input.value || 1) + delta));
+  const next = Math.min(max, Math.max(min, num(input.value || 0) + delta));
   input.value = next;
   input.dispatchEvent(new Event('input', { bubbles: true }));
   input.dispatchEvent(new Event('change', { bubbles: true }));
@@ -2393,7 +2409,7 @@ const renderUse = () => `
           <input id="caseOrder" type="number" min="1" max="99" inputmode="numeric" required placeholder="1">
           <div class="helper">케이스 번호(수술실-순서)로 저장됩니다. 환자명·등록번호는 입력하지 마세요.</div>
         </div>
-        <div>
+        <div hidden>
           <label>비급여 제한</label>
           <button class="secondary" type="button" id="useRestrictNonpay" data-restrict="false">비급여 제한 꺼짐</button>
         </div>
@@ -5552,6 +5568,37 @@ const getBackupResetModule = () => {
 
 const renderBackup = () => getBackupResetModule().renderBackup();
 const bindBackup = () => getBackupResetModule().bindBackup();
+
+let roomCloseModule = null;
+const getRoomCloseModule = () => {
+  if (!window.createRoomCloseModule) throw new Error("방 마감 모듈을 불러오지 못했습니다.");
+  if (!roomCloseModule) {
+    roomCloseModule = window.createRoomCloseModule({
+      getState: () => state,
+      getApp: () => app,
+      escapeHtml,
+      num,
+      today,
+      uid,
+      sameId,
+      productCategory,
+      productDisplaySort,
+      productById,
+      formatDateTime,
+      auditCreateFields,
+      auditUpdateFields,
+      auditUserText,
+      saveState,
+      render,
+      setButtonBusy,
+      saveDoneToast,
+      CASE_ROOM_COUNT
+    });
+  }
+  return roomCloseModule;
+};
+const renderRoomClose = () => getRoomCloseModule().renderRoomClose();
+const bindRoomClose = () => getRoomCloseModule().bindRoomClose();
 
 const subscribeImplantCollections = () => {
   if (!db || !collection || !onSnapshot) return;
