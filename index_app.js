@@ -1219,6 +1219,7 @@ const bindCommon = () => {
       document.getElementById("productLanding").value = num(item.landingQty);
       document.getElementById("productVendorManaged").checked = isVendorManagedProduct(item);
       document.getElementById("productRoomStocked").checked = Boolean(item.roomStocked);
+      document.getElementById("productRoomPar").value = num(item.roomParQty) || 10;
       syncProductFields?.();
       document.getElementById("productForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;

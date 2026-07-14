@@ -31,10 +31,11 @@
     let selectedRoom = "";
 
     // 0부터 시작하는 수량 스테퍼 (기본 qtyStepper는 최소 1이라 별도 정의)
-    const zeroStepper = (inputAttrs, value) => `
+    // 최대값은 방 기본 수량(par) — 하루 보충량이 기본 수량을 넘을 수 없다.
+    const zeroStepper = (inputAttrs, value, max = 99) => `
       <div class="qty-stepper">
         <button type="button" onclick="event.preventDefault();event.stopPropagation();adjustQtyButton(this,-1)" aria-label="수량 줄이기">−</button>
-        <input type="number" min="0" max="99" value="${Math.max(0, num(value))}" ${inputAttrs} readonly>
+        <input type="number" min="0" max="${Math.max(1, num(max))}" value="${Math.max(0, num(value))}" ${inputAttrs} readonly>
         <button type="button" onclick="event.preventDefault();event.stopPropagation();adjustQtyButton(this,1)" aria-label="수량 늘리기">+</button>
       </div>
     `;
@@ -102,8 +103,8 @@
         <div class="room-close-items">
           ${listProducts.map((product) => `
             <label class="check-card use-card room-close-item">
-              <span>${escapeHtml(product.name)}<br><span class="muted">${escapeHtml(product.company || "")}${product.subcategory ? ` · ${escapeHtml(product.subcategory)}` : ""} · 현재고 ${num(product.stock)}</span></span>
-              ${zeroStepper(`data-room-close-qty="${product.id}" aria-label="${escapeHtml(product.name)} 보충 수량"`, qtyById.get(String(product.id)) || 0)}
+              <span>${escapeHtml(product.name)}<br><span class="muted">${escapeHtml(product.company || "")}${product.subcategory ? ` · ${escapeHtml(product.subcategory)}` : ""}${num(product.roomParQty) ? ` · 기본 ${num(product.roomParQty)}개` : ""} · 총재고 ${num(product.stock)}</span></span>
+              ${zeroStepper(`data-room-close-qty="${product.id}" aria-label="${escapeHtml(product.name)} 보충 수량"`, qtyById.get(String(product.id)) || 0, num(product.roomParQty) || 99)}
             </label>
           `).join("")}
         </div>

@@ -73,7 +73,7 @@ const renderProducts = () => `
       <div>
         <label for="productOpeningStockToday">오늘 시작 전 현재고</label>
         <input id="productOpeningStockToday" type="number" min="0" placeholder="오늘 이미 사용한 뒤 시작 전 재고를 맞출 때만 입력">
-        <div class="helper">입력하면 오늘 사용/입고는 그대로 두고, 오늘 시작 시점 재고가 이 수량이 되도록 기준재고를 보정합니다.</div>
+        <div class="helper">입력하면 오늘 사용/입고는 그대로 두고, 오늘 시작 시점 재고가 이 수량이 되도록 기준재고를 보정합니다. <strong>비급여는 보관실과 각 방 상자에 있는 수량을 합한 총량</strong> 기준으로 세어 입력하세요.</div>
       </div>
       <div id="productLandingWrap">
         <label for="productLanding">랜딩수량</label>
@@ -86,6 +86,11 @@ const renderProducts = () => `
       <div id="productRoomStockedWrap">
         <label class="toggle-line"><input id="productRoomStocked" type="checkbox"> 방 배치 품목</label>
         <div class="helper">각 수술실 비급여 상자에 들어가는 품목입니다. 체크하면 방 마감 입력 목록에 기본으로 표시됩니다.</div>
+        <div style="margin-top:8px;">
+          <label for="productRoomPar">방 기본 수량 (상자당 채워두는 개수)</label>
+          <input id="productRoomPar" type="number" min="1" max="99" value="10">
+          <div class="helper">방 마감 입력에서 이 수량이 하루 최대 보충량이 됩니다 (기본 10).</div>
+        </div>
       </div>
       <div class="actions">
         <button type="submit">제품 저장</button>
@@ -177,6 +182,9 @@ const bindProducts = () => {
       landingQty: category === "비급여" ? 0 : num(document.getElementById("productLanding").value),
       vendorManaged: category === "인체조직" && document.getElementById("productVendorManaged").checked,
       roomStocked: category === "비급여" && document.getElementById("productRoomStocked").checked,
+      roomParQty: category === "비급여" && document.getElementById("productRoomStocked").checked
+        ? Math.max(1, num(document.getElementById("productRoomPar").value) || 10)
+        : 0,
       sortOrder: category === "비급여" ? (productSortOrderValue(existingProduct) || nextNonpaySortOrder(id)) : 0
     };
     if (!next.name) return;
