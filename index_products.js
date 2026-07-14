@@ -86,7 +86,7 @@ const renderProducts = () => `
       <div id="productRoomStockedWrap">
         <label class="toggle-line"><input id="productRoomStocked" type="checkbox"> 방 배치 품목</label>
         <div class="helper">각 수술실 비급여 상자에 들어가는 품목입니다. 체크하면 방 마감 입력 목록에 기본으로 표시됩니다.</div>
-        <div style="margin-top:8px;">
+        <div id="productRoomParWrap" style="display:none;margin-top:8px;">
           <label for="productRoomPar">방 기본 수량 (상자당 채워두는 개수)</label>
           <input id="productRoomPar" type="number" min="1" max="99" value="10">
           <div class="helper">방 마감 입력에서 이 수량이 하루 최대 보충량이 됩니다 (기본 10).</div>
@@ -118,6 +118,8 @@ const bindProducts = () => {
     document.getElementById("productLandingWrap").style.display = category === "비급여" ? "none" : "block";
     document.getElementById("productVendorManagedWrap").style.display = category === "인체조직" ? "block" : "none";
     document.getElementById("productRoomStockedWrap").style.display = category === "비급여" ? "block" : "none";
+    document.getElementById("productRoomParWrap").style.display =
+      category === "비급여" && document.getElementById("productRoomStocked").checked ? "block" : "none";
     if (category === "비급여") {
       companySelect.value = "";
       document.getElementById("productSubcategory").value = "";
@@ -133,6 +135,7 @@ const bindProducts = () => {
   };
   context.setSyncProductFields(syncProductFields);
   document.getElementById("productCategory").addEventListener("change", syncProductFields);
+  document.getElementById("productRoomStocked").addEventListener("change", syncProductFields);
   form.addEventListener("input", markProductFormDirty);
   form.addEventListener("change", markProductFormDirty);
   document.getElementById("productReset").addEventListener("click", () => {
