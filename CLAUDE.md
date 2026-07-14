@@ -30,7 +30,7 @@ Stock formula: `현재고 = 기존재고 + 입고수량 - 사용수량` (current
 3. **문법 검사** — 바꾼 JS마다 `node --check <file.js>`. (node가 없는 환경이면 4번 로드 프로브로 대체.)
 4. **전 모듈 로드 프로브** — 헤드리스로 앱을 실제 부팅해 모든 `create<Feature>Module` 전역이 정의됐는지 확인한다. 세션을 위조(`localStorage.orInventoryUser = {id,loginId,name,role}`)해 로그인 리다이렉트를 피하고, 로드 후 `typeof window.createUsageRulesModule` 등이 전부 `"function"`인지 검사. 하나라도 `undefined`면 스크립트 태그/파싱 문제다. (조용한 실패라 눈으로는 안 보인다.)
 5. **바꾼 기능을 실제로 눌러본다** — 특히 스크럽 필수 흐름(입고 저장, **임시저장→최종저장**, 삭제, 새로고침 지속성, 재고 계산)을 로컬(`python3 -m http.server 5177`)에서 로그인해 직접 실행. SKILL.md 테스트 체크리스트 참고.
-6. **버전 반영** — `version.js`의 `VERSION`/`RELEASE_DATE`를 올리고, 바꾼 파일의 캐시버스터도 갱신했는지 확인.
+6. **버전 반영** — `version.js`의 `VERSION`/`RELEASE_DATE`를 올리고, 바꾼 파일의 캐시버스터도 갱신했는지 확인. **`auth_shell.js`를 바꿨다면 `auth_shell.html`의 캐시버스터도 반드시 갱신** — 셸은 2초 주기로 iframe 탭 권한을 재적용하므로, 구버전 셸이 캐시되면 새 메뉴 탭이 깜빡이며 숨는다(2026-07-14 방 마감 탭 사고).
 7. **배포 후 검증** — 푸시 뒤 GitHub Actions가 `success`인지, 라이브(`nonpay-inventory.web.app`)의 `version.js`가 새 버전인지 확인하고, 스크럽들에게 강력 새로고침을 안내한다.
 
 문제가 생기면 즉시 롤백: 직전 정상 커밋으로 `git revert <bad-sha>` 후 푸시(force-push 불필요).
