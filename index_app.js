@@ -63,9 +63,9 @@ const firebaseConfig = {
 
 const menus = [
   ["dashboard", "대시보드"],
-  ["use", "사용입력"],
+  ["use", "케이스 입력"],
   ["roomclose", "방 마감"],
-  ["edit", "수정"],
+  ["edit", "케이스 수정"],
   ["history", "사용내역"],
   ["receipts", "입고관리"],
   ["implants", "임플란트"],
@@ -1218,6 +1218,7 @@ const bindCommon = () => {
       document.getElementById("productWarning").value = num(item.warningStock);
       document.getElementById("productLanding").value = num(item.landingQty);
       document.getElementById("productVendorManaged").checked = isVendorManagedProduct(item);
+      document.getElementById("productRoomStocked").checked = Boolean(item.roomStocked);
       syncProductFields?.();
       document.getElementById("productForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
@@ -1457,6 +1458,7 @@ const getDashboardModule = () => {
       landingUsageLines,
       pendingUsagesOpen,
       PRODUCT_CATEGORIES,
+      CASE_ROOM_COUNT,
       escapeHtml,
       usageItem,
       lowProductItem
@@ -2406,7 +2408,7 @@ const renderUse = () => `
         <h2>사용입력</h2>
         <button class="secondary" type="button" id="resetUseEntryForm">새 케이스 입력</button>
       </div>
-      <div class="row four">
+      <div class="row three">
         <div>
           <label for="useDate">사용일</label>
           <input id="useDate" type="date" value="${today()}" required>
@@ -2422,10 +2424,6 @@ const renderUse = () => `
           <label for="caseOrder">오늘 순서</label>
           <input id="caseOrder" type="number" min="1" max="99" inputmode="numeric" required placeholder="1">
           <div class="helper">케이스 번호(수술실-순서)로 저장됩니다. 환자명·등록번호는 입력하지 마세요.</div>
-        </div>
-        <div hidden>
-          <label>비급여 제한</label>
-          <button class="secondary" type="button" id="useRestrictNonpay" data-restrict="false">비급여 제한 꺼짐</button>
         </div>
       </div>
       <div class="row two">

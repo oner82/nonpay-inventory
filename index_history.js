@@ -69,6 +69,7 @@
         <section class="grid">
           <div class="card">
             <h2>사용내역 검색</h2>
+            <p class="helper">비급여 사용은 방 단위로 집계됩니다 — 개별 마감 내역은 <strong>방 마감</strong> 메뉴의 "방 마감 이력"에서 조회·엑셀 저장할 수 있습니다. 아래 제품별 집계에는 방 마감 수량이 포함되어 있습니다.</p>
             <div class="row history-filter-grid">
               <div>
                 <label for="historyStart">시작일</label>

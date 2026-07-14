@@ -542,7 +542,10 @@
         const product = context.productById(item.productId);
         return !context.isVendorManagedProduct?.(product) && context.num(product?.stock) < item.qty;
       });
-      if (unavailable) return "재고가 부족한 제품이 있습니다.";
+      if (unavailable) {
+        const product = context.productById(unavailable.productId);
+        return `재고가 부족한 제품이 있습니다: ${product?.name || "알 수 없는 제품"} (현재고 ${context.num(product?.stock)}개 · 선택 ${Math.max(1, context.num(unavailable.qty))}개)`;
+      }
       if (invalidImplantDraft(implantDraftPayload)) return "임플란트 장부가 작성되지 않았습니다. 업체명과 사용내용 또는 사진을 확인해 주세요.";
       return "";
     };

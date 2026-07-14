@@ -44,6 +44,18 @@
       .slice()
       .sort(productDisplaySort("비급여"));
 
+    // 방 상자에는 비급여 일부 품목만 들어간다 — 기본은 '방 배치 품목'만 표시.
+    let showAllNonpay = false;
+    const roomBoxProducts = () => {
+      const all = nonpayProducts();
+      const stocked = all.filter((item) => item.roomStocked);
+      // 방 배치 품목이 아직 지정되지 않았으면 전체를 보여준다(설정 안내 겸용).
+      if (!stocked.length) return { products: all, usingAll: true, hasStockedConfig: false };
+      return showAllNonpay
+        ? { products: all, usingAll: true, hasStockedConfig: true }
+        : { products: stocked, usingAll: false, hasStockedConfig: true };
+    };
+
     const refillFor = (date, room) => (state.roomRefills || []).find((refill) =>
       (refill.date || "") === date && String(refill.room || "") === String(room || ""));
 
@@ -68,14 +80,27 @@
     };
 
     const refillItemsHtml = (date, room) => {
-      const products = nonpayProducts();
+      const { products, usingAll, hasStockedConfig } = roomBoxProducts();
       if (!products.length) return `<div class="empty">비급여 제품이 없습니다. 설정에서 제품을 등록해 주세요.</div>`;
       const existing = refillFor(date, room);
       const qtyById = new Map((existing?.items || []).map((item) => [String(item.productId), Math.max(0, num(item.qty))]));
+      // 기존 마감에 들어있는 품목은 필터와 무관하게 항상 표시한다(수정 저장 시 소실 방지).
+      const visibleIds = new Set(products.map((item) => String(item.id)));
+      const extraFromExisting = nonpayProducts().filter((item) =>
+        qtyById.has(String(item.id)) && !visibleIds.has(String(item.id)));
+      const listProducts = [...products, ...extraFromExisting];
+      const dateWarning = date !== today()
+        ? `<div class="helper" style="color:#c2410c;font-weight:900;">⚠️ 오늘(${escapeHtml(today())})이 아닌 ${escapeHtml(date)} 날짜로 저장됩니다. 날짜를 확인해 주세요.</div>`
+        : "";
+      const scopeNote = hasStockedConfig
+        ? `<label class="toggle-line" style="margin-top:8px;"><input id="roomCloseShowAll" type="checkbox" ${showAllNonpay ? "checked" : ""}> 전체 비급여 품목 보기</label>`
+        : `<div class="helper">설정 > 제품관리에서 비급여 제품에 "방 배치 품목"을 체크하면 이 목록이 방 상자 품목만으로 줄어듭니다.</div>`;
       return `
+        ${dateWarning}
         ${existing ? `<div class="helper">이미 마감된 방입니다 (${escapeHtml(auditUserText(existing) || "-")} · ${escapeHtml(formatDateTime(existing.updatedAt || existing.createdAt || ""))}). 수량을 고쳐 저장하면 덮어씁니다.</div>` : `<div class="helper">방 상자를 채운 수량만 입력하세요. 채운 수량이 그날 이 방의 사용량으로 기록되고 재고에서 차감됩니다.</div>`}
+        ${scopeNote}
         <div class="room-close-items">
-          ${products.map((product) => `
+          ${listProducts.map((product) => `
             <label class="check-card use-card room-close-item">
               <span>${escapeHtml(product.name)}<br><span class="muted">${escapeHtml(product.company || "")}${product.subcategory ? ` · ${escapeHtml(product.subcategory)}` : ""} · 현재고 ${num(product.stock)}</span></span>
               ${zeroStepper(`data-room-close-qty="${product.id}" aria-label="${escapeHtml(product.name)} 보충 수량"`, qtyById.get(String(product.id)) || 0)}
@@ -196,6 +221,7 @@
       const saveRoomClose = async () => {
         const date = selectedDate();
         if (!selectedRoom) return;
+        if (date !== today() && !confirm(`오늘이 아닌 ${date} 날짜로 마감을 저장합니다. 계속할까요?`)) return;
         const items = collectItems();
         if (!items.length && !refillFor(date, selectedRoom)) {
           alert("채운 수량이 없습니다. 보충한 제품의 수량을 입력해 주세요.");
@@ -231,6 +257,10 @@
           });
         });
         document.getElementById("saveRoomClose")?.addEventListener("click", saveRoomClose);
+        document.getElementById("roomCloseShowAll")?.addEventListener("change", (event) => {
+          showAllNonpay = Boolean(event.target.checked);
+          refresh();
+        });
       };
       dateInput.addEventListener("change", refresh);
       bindControls();
