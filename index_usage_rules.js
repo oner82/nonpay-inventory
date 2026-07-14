@@ -109,6 +109,8 @@ const renderRuleProductSelector = () => {
   if (!state.products.length) return `<div class="empty">제품이 없습니다.</div>`;
   const categories = PRODUCT_CATEGORIES;
   return categories.map((category) => {
+    // 비급여는 방 마감에서 집계 — 사용입력 추천 대상이 아니므로 규칙 설정에서도 제외한다.
+    if (category === "비급여") return "";
     const items = state.products.filter((item) => productCategory(item.category) === category).sort(productDisplaySort(category));
     if (!items.length) return "";
     return `

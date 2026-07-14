@@ -587,6 +587,20 @@ const ensureCurrentViewAllowed = () => {
   return true;
 };
 
+// 같은 날 같은 방의 방 마감 기록이 중복되면(동시 저장 등) 최신 것만 남긴다 — 이중 차감 방지.
+const dedupeRoomRefills = (refills = []) => {
+  const byKey = new Map();
+  refills.forEach((refill) => {
+    if (!refill) return;
+    const key = `${refill.date || ""}::${String(refill.room || "")}`;
+    const current = byKey.get(key);
+    const nextTime = String(refill.updatedAt || refill.createdAt || "");
+    const currentTime = String(current?.updatedAt || current?.createdAt || "");
+    if (!current || nextTime >= currentTime) byKey.set(key, refill);
+  });
+  return Array.from(byKey.values());
+};
+
 const normalizeState = (data) => ({
   ...blankState(),
   ...data,
@@ -595,7 +609,7 @@ const normalizeState = (data) => ({
   surgeries: Array.isArray(data?.surgeries) ? data.surgeries : [],
   receipts: Array.isArray(data?.receipts) ? data.receipts : [],
   usages: Array.isArray(data?.usages) ? data.usages : [],
-  roomRefills: Array.isArray(data?.roomRefills) ? data.roomRefills : [],
+  roomRefills: dedupeRoomRefills(Array.isArray(data?.roomRefills) ? data.roomRefills : []),
   usageRules: Array.isArray(data?.usageRules) ? data.usageRules : [],
   hiddenLowProductIds: Array.isArray(data?.hiddenLowProductIds) ? data.hiddenLowProductIds : [],
   backupVersions: Array.isArray(data?.backupVersions) ? data.backupVersions : []
@@ -3156,6 +3170,8 @@ const bindEditUsage = () => {
       return;
     }
     const results = state.products
+      // 비급여는 방 마감에서 집계 — 수정 화면 검색에서도 제외한다(이중 차감 방지).
+      .filter((item) => productCategory(item.category) !== "비급여")
       .filter((item) => normalizedName(`${item.name} ${item.company || ""} ${item.subcategory || ""} ${productCategoryLabel(item.category)}`).includes(query))
       .sort(byName)
       .slice(0, 12);
@@ -3483,6 +3499,14 @@ const bindEditUsage = () => {
     }
     if (!doctorSelect.value || !surgerySelect.value) {
       alert("케이스 번호, 원장 코드, 수술을 모두 입력해 주세요.");
+      return;
+    }
+    // 생성 저장과 동일하게, 같은 날 같은 케이스 번호의 다른 기록이 있으면 확인을 받는다.
+    const editDateValue = document.getElementById("editUsageDate").value;
+    const editCaseKey = `${editCaseRoom}-${editCaseOrder}`;
+    const duplicateCase = state.usages.find((item) =>
+      item.id !== usage.id && (item.date || "") === editDateValue && caseLabel(item) === editCaseKey);
+    if (duplicateCase && !confirm(`${editDateValue}에 같은 케이스 번호(${editCaseKey}) 기록이 이미 있습니다.\n그래도 저장할까요?`)) {
       return;
     }
     if (!newProductIds.length) {
@@ -5592,6 +5616,7 @@ const getRoomCloseModule = () => {
       render,
       setButtonBusy,
       saveDoneToast,
+      downloadExcel,
       CASE_ROOM_COUNT
     });
   }

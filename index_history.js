@@ -155,6 +155,12 @@
       filteredHistoryUsages(start, end, "").forEach((usage) => {
         usage.productIds.forEach((id) => usageCounts.set(id, (usageCounts.get(id) || 0) + 1));
       });
+      // 방 마감 보충(비급여 사용량)도 사용 집계에 합산한다.
+      (context.getState().roomRefills || [])
+        .filter((refill) => context.inDateRange(refill.date, start, end))
+        .forEach((refill) => (refill.items || []).forEach((item) => {
+          usageCounts.set(item.productId, (usageCounts.get(item.productId) || 0) + Math.max(0, context.num(item.qty)));
+        }));
       const receiptCounts = new Map();
       context.getState().receipts
         .filter((receipt) => context.inDateRange(context.receiptDateValue(receipt), start, end))
@@ -211,10 +217,17 @@
           return sum + context.receiptStockDelta(receipt);
         }, 0);
       }
-      return state.usages.reduce((sum, usage) => {
+      const fromUsages = state.usages.reduce((sum, usage) => {
         if (!dateMatch(usageDateValue(usage))) return sum;
         return sum + (Array.isArray(usage.productIds) ? usage.productIds : []).filter((id) => context.sameId(id, productId)).length;
       }, 0);
+      // 방 마감 보충(비급여 사용량)도 합산 — 보고서·재고흐름 계산의 근거 함수다.
+      const fromRefills = (state.roomRefills || []).reduce((sum, refill) => {
+        if (!dateMatch(refill.date || "")) return sum;
+        return sum + (refill.items || []).filter((item) => context.sameId(item.productId, productId))
+          .reduce((qty, item) => qty + Math.max(0, context.num(item.qty)), 0);
+      }, 0);
+      return fromUsages + fromRefills;
     };
 
     const productInitialStock = (product, totalReceived, totalUsed) => {

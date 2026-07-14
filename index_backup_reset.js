@@ -120,6 +120,7 @@
       clear: {
         usages: state.usages.length,
         receipts: state.receipts.length,
+        roomRefills: (state.roomRefills || []).length,
         pendingUsages: pendingUsages.length,
         implantRecords: implantRecords.length
       }
@@ -129,6 +130,7 @@
       const snapshot = stateSnapshotForBackup();
       snapshot.usages = [];
       snapshot.receipts = [];
+      snapshot.roomRefills = [];
       snapshot.updatedAt = new Date().toISOString();
       return snapshot;
     };
@@ -243,6 +245,8 @@
       });
       state.usages = [];
       state.receipts = [];
+      // 방 마감 기록도 비운다 — 남기면 기준재고 고정 후 유령 사용량으로 이중 차감된다.
+      state.roomRefills = [];
       state.updatedAt = new Date().toISOString();
     };
 

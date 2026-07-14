@@ -39,19 +39,33 @@
         const distance = dateDistance(item.date);
         return distance >= 0 && distance <= 6;
       });
-      const todayProductCount = todayUsages.reduce((sum, item) => sum + (item.productIds || []).length, 0);
+      // 방 마감 보충 기록 = 비급여 사용량 (오늘/최근 7일)
+      const todayRefills = (state.roomRefills || []).filter((refill) => refill.date === todayText);
+      const recentRefills = (state.roomRefills || []).filter((refill) => {
+        const distance = dateDistance(refill.date);
+        return distance >= 0 && distance <= 6;
+      });
+      const refillQtySum = (refills) => refills.reduce((sum, refill) =>
+        sum + (refill.items || []).reduce((qty, item) => qty + Math.max(0, context.num(item.qty)), 0), 0);
+      const todayProductCount = todayUsages.reduce((sum, item) => sum + (item.productIds || []).length, 0) + refillQtySum(todayRefills);
       const pendingLandingLines = context.landingUsageLines(false);
       const openPendingUsageItems = context.pendingUsagesOpen();
 
       const todayCategoryCounts = context.PRODUCT_CATEGORIES.map((category) => ({
         category,
         count: todayUsages.reduce((sum, usage) => sum + (usage.productIds || []).filter((id) => context.productCategory(context.productById(id)?.category) === category).length, 0)
+          + (category === "비급여" ? refillQtySum(todayRefills) : 0)
       }));
 
       const productUseMap = new Map();
       recentUsages.forEach((usage) => {
         (usage.productIds || []).forEach((productId) => {
           productUseMap.set(productId, (productUseMap.get(productId) || 0) + 1);
+        });
+      });
+      recentRefills.forEach((refill) => {
+        (refill.items || []).forEach((item) => {
+          productUseMap.set(item.productId, (productUseMap.get(item.productId) || 0) + Math.max(0, context.num(item.qty)));
         });
       });
       const topUsedProducts = Array.from(productUseMap.entries())
