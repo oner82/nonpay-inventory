@@ -1478,7 +1478,8 @@ const productItem = (item, options = {}) => {
     `분류: ${escapeHtml(productCategoryLabel(item.category))}`,
     item.company ? `업체: ${escapeHtml(item.company)}` : "",
     item.subcategory ? `세부: ${escapeHtml(item.subcategory)}` : "",
-    vendorManaged ? "업체관리 · 재고차감 제외" : ""
+    vendorManaged ? "업체관리 · 재고차감 제외" : "",
+    item.roomStocked ? `방 배치 · 기본 ${num(item.roomParQty) || 10}개/방` : ""
   ].filter(Boolean).join(" · ");
   return `
     <div class="item">
@@ -1488,7 +1489,7 @@ const productItem = (item, options = {}) => {
       </div>
       <div class="meta">
         <span>${detail}</span>
-        <span>${vendorManaged ? "업체관리품 · 업체 장부 기록" : `현재고: ${num(item.stock)} · 경고수량: ${num(item.warningStock)}${item.category === "비급여" ? "" : ` · 랜딩수량: ${num(item.landingQty)}`}`}</span>
+        <span>${vendorManaged ? "업체관리품 · 업체 장부 기록" : `${item.roomStocked ? "총재고(보관실+방 합계)" : "현재고"}: ${num(item.stock)} · 경고수량: ${num(item.warningStock)}${item.category === "비급여" ? "" : ` · 랜딩수량: ${num(item.landingQty)}`}`}</span>
       </div>
       ${canManageSettings() ? `<div class="actions">
         ${options.showSort ? `
@@ -1505,7 +1506,7 @@ const productItem = (item, options = {}) => {
 const lowProductItem = (item, hidden = false) => {
   const shortage = Math.max(0, num(item.warningStock) - num(item.stock));
   const reason = num(item.stock) <= num(item.warningStock)
-    ? `현재고 ${num(item.stock)}개가 경고수량 ${num(item.warningStock)}개 이하입니다.${shortage ? ` ${shortage}개 더 있어야 경고에서 벗어납니다.` : ""}`
+    ? `${item.roomStocked ? "총재고(보관실+방 합계)" : "현재고"} ${num(item.stock)}개가 경고수량 ${num(item.warningStock)}개 이하입니다.${shortage ? ` ${shortage}개 더 있어야 경고에서 벗어납니다.` : ""}`
     : "";
   return `
     <div class="item">
@@ -1515,7 +1516,7 @@ const lowProductItem = (item, hidden = false) => {
       </div>
       <div class="meta">
         <span>분류: ${escapeHtml(productCategoryLabel(item.category))}${item.company ? ` · 업체: ${escapeHtml(item.company)}` : ""}${item.subcategory ? ` · 세부: ${escapeHtml(item.subcategory)}` : ""}</span>
-        <span>현재고: ${num(item.stock)} · 경고수량: ${num(item.warningStock)}${item.category === "비급여" ? "" : ` · 랜딩수량: ${num(item.landingQty)}`}</span>
+        <span>${item.roomStocked ? "총재고(보관실+방 합계)" : "현재고"}: ${num(item.stock)} · 경고수량: ${num(item.warningStock)}${item.category === "비급여" ? "" : ` · 랜딩수량: ${num(item.landingQty)}`}</span>
         <span>${escapeHtml(reason)}</span>
       </div>
       <div class="actions">
