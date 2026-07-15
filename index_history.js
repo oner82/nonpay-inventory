@@ -34,6 +34,8 @@
     const inputDateOffset = (days) => {
       const date = new Date(`${context.today()}T00:00:00`);
       date.setDate(date.getDate() + days);
+      // toISOString은 UTC 기준이라 KST 자정이 전날로 밀린다 — 타임존 보정 후 변환.
+      date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
       return date.toISOString().slice(0, 10);
     };
 

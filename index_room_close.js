@@ -23,12 +23,17 @@
       setButtonBusy,
       saveDoneToast,
       downloadExcel,
+      setRoomCloseDirty,
       CASE_ROOM_COUNT
     } = context;
 
     // 방 마감 원리: 방 상자는 항상 정수(par)로 채우므로, 채운 수량 = 그날 그 방의 사용량.
     // 저장된 items가 재고 집계(productMovementCounts)에서 사용량으로 차감된다.
     let selectedRoom = "";
+    // 사용자가 고른 마감 날짜. 렌더마다 today()로 리셋되면 과거 날짜 연속 마감(백필) 시
+    // 두 번째 방부터 조용히 오늘 날짜로 저장되므로, 선택값을 모듈 변수로 보존한다.
+    let closeDate = "";
+    const effectiveDate = () => closeDate || today();
     // 제품별 입력 방식: 기본은 채운 수량(=사용량) 직접 입력.
     // remainIds에 든 제품만 남은 개수 입력(사용량 = 기본수량 − 남은 개수)으로 전환된다.
     // 보관소 부족으로 특정 제품만 못 채운 날, 그 제품의 사용량이 누락되지 않게 하기 위한 장치.
@@ -66,7 +71,7 @@
     const refillFor = (date, room) => (state.roomRefills || []).find((refill) =>
       (refill.date || "") === date && String(refill.room || "") === String(room || ""));
 
-    const selectedDate = () => document.getElementById("roomCloseDate")?.value || today();
+    const selectedDate = () => document.getElementById("roomCloseDate")?.value || effectiveDate();
 
     const roomStatusHtml = (date) => {
       const rooms = Array.from({ length: CASE_ROOM_COUNT }, (_, i) => String(i + 1));
@@ -197,11 +202,11 @@
           <div class="row two">
             <div>
               <label for="roomCloseDate">마감 날짜</label>
-              <input id="roomCloseDate" type="date" value="${today()}">
+              <input id="roomCloseDate" type="date" value="${effectiveDate()}">
             </div>
           </div>
-          <div id="roomCloseStatus">${roomStatusHtml(today())}</div>
-          <div id="roomCloseItems">${selectedRoom ? refillItemsHtml(today(), selectedRoom) : `<div class="empty">마감할 방을 선택해 주세요.</div>`}</div>
+          <div id="roomCloseStatus">${roomStatusHtml(effectiveDate())}</div>
+          <div id="roomCloseItems">${selectedRoom ? refillItemsHtml(effectiveDate(), selectedRoom) : `<div class="empty">마감할 방을 선택해 주세요.</div>`}</div>
         </div>
         <div class="card">
           <h2>방 마감 이력</h2>
@@ -229,13 +234,21 @@
       const statusWrap = document.getElementById("roomCloseStatus");
       const itemsWrap = document.getElementById("roomCloseItems");
       if (!dateInput || !statusWrap || !itemsWrap) return;
+      // 전체 렌더 직후에는 화면이 저장된 상태와 일치하므로 보호를 해제한다.
+      setRoomCloseDirty?.(false);
       const refresh = () => {
+        // 화면을 저장된 상태 기준으로 다시 그리므로 입력 중 보호를 해제한다.
+        setRoomCloseDirty?.(false);
         statusWrap.innerHTML = roomStatusHtml(selectedDate());
         itemsWrap.innerHTML = selectedRoom
           ? refillItemsHtml(selectedDate(), selectedRoom)
           : `<div class="empty">마감할 방을 선택해 주세요.</div>`;
         bindControls();
       };
+      // 스테퍼(+/−)로 수량을 만지는 순간부터 원격 onSnapshot 재렌더로부터 입력을 보호한다.
+      itemsWrap.addEventListener("input", (event) => {
+        if (event.target.matches?.("[data-room-close-qty]")) setRoomCloseDirty?.(true);
+      });
       const collectItems = () => Array.from(itemsWrap.querySelectorAll("[data-room-close-qty]"))
         .map((input) => {
           const productId = input.dataset.roomCloseQty;
@@ -277,6 +290,7 @@
           ...(state.roomRefills || []).filter((refill) => !sameId(refill.id, record.id)),
           record
         ];
+        setRoomCloseDirty?.(false);
         render();
         await saveState(`${selectedRoom}번방 마감 저장 완료`, {
           savingMessage: "방 마감 저장 중입니다...",
@@ -312,10 +326,13 @@
                 input.value = Math.min(keep.get(pid), num(input.max) || 99);
               }
             });
+            // 입력 중이던 수량을 복원했으므로 다시 보호 상태로 표시한다.
+            setRoomCloseDirty?.(true);
           });
         });
       };
       dateInput.addEventListener("change", () => {
+        closeDate = dateInput.value || "";
         remainIds = new Set();
         refresh();
       });

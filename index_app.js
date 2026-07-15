@@ -293,6 +293,7 @@ let productCategoryToKeepOpen = "";
 let useEntryDirty = false;
 let editEntryDirty = false;
 let productFormDirty = false;
+let roomCloseDirty = false;
 let deferredUseEntryRender = false;
 const useEntryAutosaveKey = "orInventoryUseEntryPatientDraft";
 const useEntryAutosaveMaxAgeMs = 12 * 60 * 60 * 1000;
@@ -367,9 +368,10 @@ const setStatus = (message, type = "ok") => {
 const isUseEntryProtected = () => currentView === "use" && useEntryDirty;
 const isEditEntryProtected = () => currentView === "edit" && editEntryDirty;
 const isProductFormProtected = () => currentView === "settings" && currentSettingsView === "products" && productFormDirty;
+const isRoomCloseProtected = () => currentView === "roomclose" && roomCloseDirty;
 
 const renderOrDeferForUseEntry = (message = "새 데이터가 들어왔습니다. 입력 중인 사용입력을 보호하고 있습니다.") => {
-  if (isUseEntryProtected() || isEditEntryProtected() || isProductFormProtected()) {
+  if (isUseEntryProtected() || isEditEntryProtected() || isProductFormProtected() || isRoomCloseProtected()) {
     deferredUseEntryRender = true;
     setStatus(message, "ok");
     return false;
@@ -1238,11 +1240,19 @@ const bindCommon = () => {
       const id = deleteProductBtn.dataset.deleteProduct;
       const productUsed = state.usages.some((usage) => usage.productIds.some((productId) => sameId(productId, id)));
       const productReceived = state.receipts.some((receipt) => sameId(receipt.productId, id));
-      if ((productUsed || productReceived) && !confirm("내역에 사용된 제품입니다. 그래도 삭제할까요?")) return;
+      // 비급여는 사용량이 방 마감(roomRefills)에만 기록되므로 삭제 확인에 함께 포함한다.
+      const productRefilled = (state.roomRefills || []).some((refill) =>
+        (refill.items || []).some((item) => sameId(item.productId, id)));
+      if ((productUsed || productReceived || productRefilled) && !confirm("내역에 사용된 제품입니다. 그래도 삭제할까요?")) return;
       const applyProductDelete = (s) => {
         s.products = s.products.filter((item) => !sameId(item.id, id));
         s.receipts = s.receipts.filter((item) => !sameId(item.productId, id));
         s.usages = s.usages.map((usage) => ({ ...usage, productIds: usage.productIds.filter((productId) => !sameId(productId, id)) }));
+        // 방 마감 기록의 해당 품목도 정리한다. items가 비어도 refill 자체는 남겨 마감 상태를 유지한다.
+        s.roomRefills = (s.roomRefills || []).map((refill) => ({
+          ...refill,
+          items: (refill.items || []).filter((item) => !sameId(item.productId, id))
+        }));
       };
       applyProductDelete(state);
       render();
@@ -2645,6 +2655,7 @@ const renderEditUsage = () => {
       <div class="card">
         <h3>수정될 사용내용</h3>
         <div id="editSelectedUseList" class="meta"><span>선택된 제품이 없습니다.</span></div>
+        <div id="editPreservedItemsNote" class="helper" hidden></div>
       </div>
       <div class="card">
         <h3>제품 검색</h3>
@@ -2750,6 +2761,22 @@ const bindEditUsage = () => {
   editImplantSection?.addEventListener("click", () => { editEntryDirty = true; });
   let editImplantRecordId = "";
   let editImplantRows = [];
+  // 제품 피커에 없는 항목(비급여 방마감 전환 이전 기록, 삭제된 제품)은 수정 UI로 다룰 수 없다.
+  // 그대로 보존해 두었다가 수정 저장 시 productIds에 합쳐, 기록·재고가 조용히 틀어지지 않게 한다.
+  let preservedEditItems = [];
+  const renderPreservedEditNote = () => {
+    const note = document.getElementById("editPreservedItemsNote");
+    if (!note) return;
+    if (!preservedEditItems.length) {
+      note.hidden = true;
+      note.innerHTML = "";
+      return;
+    }
+    const text = preservedEditItems.map((item) =>
+      `${escapeHtml(productById(item.productId)?.name || "삭제된 제품")} ${item.qty}개`).join(", ");
+    note.hidden = false;
+    note.innerHTML = `이 기록에는 수정 화면에서 다룰 수 없는 항목이 있어 그대로 보존됩니다: ${text}`;
+  };
   const editCommonImplantPhotos = [];
   let editImplantCanModify = true;
   let activeEditImplantPhotoPair = "";
@@ -2774,6 +2801,8 @@ const bindEditUsage = () => {
     select.value = "";
     form.style.display = "none";
     deleteButton.style.display = "none";
+    preservedEditItems = [];
+    renderPreservedEditNote();
     if (lockNote) lockNote.innerHTML = "";
     if (formTitle) formTitle.textContent = "사용내용 수정";
     if (editImplantSection) editImplantSection.hidden = true;
@@ -3250,7 +3279,15 @@ const bindEditUsage = () => {
       }
     }
     clearProducts();
-    usageProductItems(usage).forEach((item) => selectProduct(item.productId, item.qty, { syncImplants: false }));
+    preservedEditItems = [];
+    usageProductItems(usage).forEach((item) => {
+      if (!form.querySelector(`[data-use-product="${item.productId}"]`)) {
+        preservedEditItems.push({ productId: item.productId, qty: Math.max(1, num(item.qty)) });
+        return;
+      }
+      selectProduct(item.productId, item.qty, { syncImplants: false });
+    });
+    renderPreservedEditNote();
     loadEditImplantsForUsage(usage, canModify);
     renderSearch();
     renderSelected();
@@ -3494,6 +3531,8 @@ const bindEditUsage = () => {
     }
     const newItems = selectedItems();
     const newProductIds = newItems.flatMap((item) => Array.from({ length: item.qty }, () => item.productId));
+    // 피커에 없어 보존된 항목(레거시 비급여 등)은 원래 수량 그대로 기록에 합친다.
+    const preservedProductIds = preservedEditItems.flatMap((item) => Array.from({ length: item.qty }, () => item.productId));
     const editCaseRoom = document.getElementById("editCaseRoom").value.trim();
     const editCaseOrder = document.getElementById("editCaseOrder").value.trim();
     const editCaseMessage = caseNumberValidationMessage(editCaseRoom, editCaseOrder);
@@ -3514,7 +3553,7 @@ const bindEditUsage = () => {
     if (duplicateCase && !confirm(`${editDateValue}에 같은 케이스 번호(${editCaseKey}) 기록이 이미 있습니다.\n그래도 저장할까요?`)) {
       return;
     }
-    if (!newProductIds.length) {
+    if (!newProductIds.length && !preservedProductIds.length) {
       alert("제품을 하나 이상 선택해 주세요.");
       return;
     }
@@ -3555,7 +3594,8 @@ const bindEditUsage = () => {
       setButtonBusy(submitButton, false);
       return;
     }
-    newItems.forEach((item) => {
+    // 보존 항목도 함께 차감한다 — 위 복원 루프(usage.productIds 전체 +1)와 짝을 이뤄 순변화 0.
+    [...newItems, ...preservedEditItems].forEach((item) => {
       const product = productById(item.productId);
       if (product && !isVendorManagedProduct(product)) product.stock = Math.max(0, num(product.stock) - item.qty);
     });
@@ -3565,7 +3605,7 @@ const bindEditUsage = () => {
       caseOrder: editCaseOrder,
       doctorId: doctorSelect.value,
       surgeryId: surgerySelect.value,
-      productIds: newProductIds,
+      productIds: [...newProductIds, ...preservedProductIds],
       date: document.getElementById("editUsageDate").value,
       updatedAt: new Date().toISOString()
     };
@@ -5542,14 +5582,32 @@ const deleteUsageRecord = async (usageId, { onSuccess } = {}) => {
     alert(usagePastLockMessage(usage) || "사용내역 삭제는 관리자와 책임사용자만 가능합니다.");
     return false;
   }
-  if (!confirm("사용내역을 삭제하고 재고를 복구할까요?")) return false;
+  // 이 사용내역으로 확인된 랜딩 입고가 있으면 함께 취소해야 재고가 사용 전 상태로 돌아간다.
+  // (사용 −1과 랜딩 입고 +1은 상쇄 관계라, 사용만 지우면 재고가 실물보다 부풀어진다.)
+  const linkedLandingReceipts = state.receipts.filter((receipt) =>
+    receipt.type === "landing" && sameId(receipt.usageId, usageId));
+  const confirmMessage = linkedLandingReceipts.length
+    ? "이미 랜딩 입고 확인된 사용내역입니다.\n삭제하면 연결된 랜딩 입고도 '랜딩 취소'로 전환되어 재고가 사용 전 상태로 복구됩니다. 계속할까요?"
+    : "사용내역을 삭제하고 재고를 복구할까요?";
+  if (!confirm(confirmMessage)) return false;
   usage.productIds.forEach((id) => {
     const product = productById(id);
     if (product && !isVendorManagedProduct(product)) product.stock = num(product.stock) + 1;
   });
+  linkedLandingReceipts.forEach((receipt) => {
+    const product = productById(receipt.productId);
+    if (product && !isVendorManagedProduct(product)) {
+      product.stock = Math.max(0, num(product.stock) - Math.max(0, num(receipt.qty)));
+    }
+  });
   const deletedUsageId = usage.id;
   const applyUsageDelete = (s) => {
     s.usages = s.usages.filter((item) => String(item.id) !== String(deletedUsageId));
+    // 연결된 랜딩 입고를 취소 처리(receiptStockDelta가 0으로 계산)해 재고 수식과 정합을 맞춘다.
+    s.receipts = (s.receipts || []).map((receipt) =>
+      receipt.type === "landing" && sameId(receipt.usageId, deletedUsageId)
+        ? { ...receipt, type: "landingCancelled" }
+        : receipt);
   };
   applyUsageDelete(state);
   await saveState("사용내역 삭제 완료 · 재고 복구", { apply: applyUsageDelete });
@@ -5612,6 +5670,7 @@ const getRoomCloseModule = () => {
     roomCloseModule = window.createRoomCloseModule({
       getState: () => state,
       getApp: () => app,
+      setRoomCloseDirty: (dirty) => { roomCloseDirty = dirty; },
       escapeHtml,
       num,
       today,
