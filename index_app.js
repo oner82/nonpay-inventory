@@ -1034,10 +1034,12 @@ const mergeStates = (remoteData, localData) => {
   return reconciled;
 };
 
+// 성공 시 true, 실패 시 false를 반환한다. 최종저장처럼 저장 성패에 따라
+// 후속 파괴 동작(pendingUsages 삭제 등)을 결정해야 하는 호출부가 이 값을 쓴다.
 const saveState = async (message = "저장 완료", options = {}) => {
   if (!ref) {
     setStatus("Firebase 연결 전입니다", "error");
-    return;
+    return false;
   }
   savingCount += 1;
   saving = true;
@@ -1071,6 +1073,7 @@ const saveState = async (message = "저장 완료", options = {}) => {
     lastLocalSaveAt = Date.now();
     setStatus(`${message} · 동시저장 보호`, "ok");
     saveDoneToast(options.doneMessage || "저장 완료");
+    return true;
   } catch (error) {
     console.error(error);
     setStatus(`저장 실패: ${error.message}`, "error");
@@ -1090,6 +1093,7 @@ const saveState = async (message = "저장 완료", options = {}) => {
         console.error(rollbackError);
       }
     }
+    return false;
   } finally {
     savingCount = Math.max(0, savingCount - 1);
     saving = savingCount > 0;
@@ -1644,6 +1648,7 @@ const getProductsModule = () => {
       nextNonpaySortOrder,
       productMovementCounts,
       reconcileProductStocks,
+      isVendorManagedProduct,
       today,
       receiptDateValue,
       receiptStockDelta,
@@ -5357,14 +5362,21 @@ const bindUse = () => {
       auditFields: auditCreateFields()
     });
     state.usages.push(usageRecord);
-    resetUseEntryProtection();
-    currentView = "edit";
-    pendingEditUsageId = state.usages[state.usages.length - 1]?.id || "";
-    render();
-    await saveState("사용내역 저장 완료", {
+    const saved = await saveState("사용내역 저장 완료", {
       savingMessage: "사용내역 저장 중입니다...",
       doneMessage: implantDraftPayload.length ? "사용내역 저장 완료 · 사진 업로드 준비" : "사용내역 저장 완료"
     });
+    if (!saved) {
+      // 저장 실패: saveState가 서버 상태로 원복(재고·usages 포함)했다.
+      // 임시저장 대기 문서와 자동저장을 그대로 남겨 스크럽이 재시도할 수 있게 한다.
+      alert("사용내역 저장에 실패했습니다. 기록은 임시저장(스크럽 확인 대기)에 남아 있으니 잠시 후 다시 최종저장해 주세요.");
+      setButtonBusy(submitButton, false);
+      return;
+    }
+    resetUseEntryProtection();
+    currentView = "edit";
+    pendingEditUsageId = usageRecord.id || "";
+    render();
     if (implantDraftPayload.length) {
       try {
         await createImplantRecordFromUsage(usageRecord, implantDraftPayload, {

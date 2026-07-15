@@ -15,6 +15,7 @@
       nextNonpaySortOrder,
       productMovementCounts,
       reconcileProductStocks,
+      isVendorManagedProduct,
       today,
       receiptDateValue,
       receiptStockDelta,
@@ -147,16 +148,25 @@ const bindProducts = () => {
     syncProductFields();
   });
   const productMovementBeforeDate = (productId, date) => {
-    const used = state.usages.reduce((sum, usage) => {
-      if (!usage.date || usage.date >= date) return sum;
-      return sum + (usage.productIds || []).filter((id) => String(id) === String(productId)).length;
-    }, 0);
     const received = state.receipts.reduce((sum, receipt) => {
       const receiptDate = receiptDateValue(receipt);
       if (!receiptDate || receiptDate >= date || String(receipt.productId) !== String(productId)) return sum;
       return sum + receiptStockDelta(receipt);
     }, 0);
-    return { used, received };
+    // 업체관리품은 재고 수식 전체(productMovementCounts)에서 사용량을 세지 않으므로 여기서도 제외
+    if (isVendorManagedProduct?.(productById(productId))) return { used: 0, received };
+    const fromUsages = state.usages.reduce((sum, usage) => {
+      if (!usage.date || usage.date >= date) return sum;
+      return sum + (usage.productIds || []).filter((id) => String(id) === String(productId)).length;
+    }, 0);
+    // 방 마감 보충 기록(비급여)도 사용량으로 계산 — productMovementCounts와 동일 기준
+    const fromRefills = (state.roomRefills || []).reduce((sum, refill) => {
+      if (!refill?.date || refill.date >= date) return sum;
+      return sum + (refill.items || [])
+        .filter((item) => String(item.productId) === String(productId))
+        .reduce((qty, item) => qty + Math.max(0, num(item.qty)), 0);
+    }, 0);
+    return { used: fromUsages + fromRefills, received };
   };
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
