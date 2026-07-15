@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "public": "maintenance",
+    "public": ".",
     "ignore": [
       "firebase.json",
       ".firebaserc",
@@ -11,7 +11,8 @@
       "**/.*",
       "**/node_modules/**",
       "*firebase-adminsdk*.json",
-      "tore index_new.html",
+      "output/**",
+      "tmp/**",
       "start_local_site.bat",
       "*.log"
     ],
