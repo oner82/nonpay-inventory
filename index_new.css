@@ -2529,9 +2529,13 @@
     }
     .check-card.use-card { grid-template-columns: 28px minmax(0, 1fr) 112px !important; }
     .check-card.use-card > span { min-width: 0; }
+    /* 방 마감 카드: 체크박스가 없어 28px 첫 컬럼에 텍스트가 끼므로 2컬럼(내용 + 스테퍼)로 배치 */
+    .check-card.use-card.room-close-item { grid-template-columns: minmax(0, 1fr) 112px !important; }
     @media (max-width: 520px) {
       .check-card.use-card { grid-template-columns: 28px minmax(0, 1fr) !important; }
       .qty-stepper { grid-column: 2; justify-content: flex-start; margin-top: 4px; }
+      .check-card.use-card.room-close-item { grid-template-columns: minmax(0, 1fr) !important; }
+      .room-close-item .qty-stepper { grid-column: 1; }
     }
 
 
