@@ -4936,7 +4936,7 @@ const bindUse = () => {
     renderUseRecommendation();
     markUseEntryDirty();
   });
-  useRestrictNonpay.addEventListener("click", () => {
+  useRestrictNonpay?.addEventListener("click", () => {
     setRestrictButton(!isRestrictOn());
     markUseEntryDirty();
     renderUseRecommendation();
