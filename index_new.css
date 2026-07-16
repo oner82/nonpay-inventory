@@ -2531,11 +2531,22 @@
     .check-card.use-card > span { min-width: 0; }
     /* 방 마감 카드: 체크박스가 없어 28px 첫 컬럼에 텍스트가 끼므로 2컬럼(내용 + 스테퍼)로 배치 */
     .check-card.use-card.room-close-item { grid-template-columns: minmax(0, 1fr) 112px !important; }
+    /* 스테퍼 위 모드 라벨(채운 수량/남은 개수) — 지금 무엇을 입력 중인지 항상 표시 */
+    .room-close-qty-cell { display: grid; gap: 2px; justify-items: center; }
+    .room-close-mode { font-size: 11px; font-weight: 900; color: var(--muted); letter-spacing: .02em; }
+    .room-close-mode.remain { color: #c2410c; }
+    /* 방 마감 입력 안내 박스 — 핵심 문장을 크게, 예외 상황은 아랫줄로 분리 */
+    .room-close-guide { display: grid; gap: 4px; margin-top: 10px; padding: 10px 12px; border: 1px solid #bfdbfe; border-radius: 10px; background: #eff6ff; }
+    .room-close-guide-main { font-size: 15px; font-weight: 900; color: #1e3a8a; }
+    .room-close-guide-main strong { color: #1d4ed8; }
+    .room-close-guide-sub { font-size: 12.5px; font-weight: 700; color: #475569; line-height: 1.5; }
+    .room-close-guide-sub strong { color: #c2410c; }
     @media (max-width: 520px) {
       .check-card.use-card { grid-template-columns: 28px minmax(0, 1fr) !important; }
       .qty-stepper { grid-column: 2; justify-content: flex-start; margin-top: 4px; }
       .check-card.use-card.room-close-item { grid-template-columns: minmax(0, 1fr) !important; }
-      .room-close-item .qty-stepper { grid-column: 1; }
+      .room-close-item .qty-stepper { grid-column: 1; margin-top: 0; }
+      .room-close-qty-cell { justify-items: start; margin-top: 4px; }
     }
 
 

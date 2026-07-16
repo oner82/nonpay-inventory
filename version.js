@@ -6,8 +6,8 @@
 //     data-app-version="date"  → "v1.9.0 · 2026-07-07" (로그인 화면용)
 //     data-app-version="short" → "v1.9.0"              (앱 헤더용)
 (function () {
-  const VERSION = "2.5.5";
-  const RELEASE_DATE = "2026-07-15";
+  const VERSION = "2.5.6";
+  const RELEASE_DATE = "2026-07-16";
 
   window.OR_APP_VERSION = VERSION;
   window.OR_APP_VERSION_DATE = RELEASE_DATE;

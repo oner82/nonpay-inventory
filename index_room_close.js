@@ -119,16 +119,23 @@
         return `
           <label class="check-card use-card room-close-item">
             <span>${escapeHtml(product.name)}<br><span class="muted">${escapeHtml(product.company || "")}${product.subcategory ? ` · ${escapeHtml(product.subcategory)}` : ""}${num(product.roomParQty) ? ` · 기본 ${num(product.roomParQty)}개` : ""} · 총재고 ${num(product.stock)}</span>
-            ${isRemain ? `<br><span style="color:#c2410c;font-weight:700;">남은 개수 입력 중 · 사용량 = 기본수량 − 남은 개수</span>` : ""}
-            <br><button type="button" class="secondary" data-room-close-remain="${product.id}" style="margin-top:4px;padding:2px 10px;font-size:12px;">${isRemain ? "채운 수량으로 되돌리기" : "남은 개수로 입력"}</button></span>
-            ${zeroStepper(`data-room-close-qty="${product.id}" aria-label="${escapeHtml(product.name)} ${isRemain ? "남은 수량" : "보충 수량"}"`, stepperValue(product), stepperMax(product))}
+            ${isRemain ? `<br><span style="color:#c2410c;font-weight:700;">지금은 상자에 남은 개수를 입력하세요 · 사용량 = 기본수량 − 남은 개수</span>` : ""}
+            <br><button type="button" class="secondary" data-room-close-remain="${product.id}" style="margin-top:4px;padding:2px 10px;font-size:12px;">${isRemain ? "채운 수량 입력으로 되돌리기" : "다 못 채웠어요"}</button></span>
+            <span class="room-close-qty-cell">
+              <span class="room-close-mode${isRemain ? " remain" : ""}">${isRemain ? "남은 개수" : "채운 수량"}</span>
+              ${zeroStepper(`data-room-close-qty="${product.id}" aria-label="${escapeHtml(product.name)} ${isRemain ? "남은 개수" : "채운 수량"}"`, stepperValue(product), stepperMax(product))}
+            </span>
           </label>
         `;
       };
       return `
         ${dateWarning}
         ${existing ? `<div class="helper">이미 마감된 방입니다 (${escapeHtml(auditUserText(existing) || "-")} · ${escapeHtml(formatDateTime(existing.updatedAt || existing.createdAt || ""))}). 수량을 고쳐 저장하면 덮어씁니다.</div>` : ""}
-        <div class="helper">방 상자를 채운 수량만 입력하세요. 채운 수량이 그날 이 방의 사용량으로 기록되고 재고에서 차감됩니다. 보관소가 부족해 못 채운 제품만 <strong>남은 개수로 입력</strong>을 눌러 상자에 남은 개수를 적으면 사용량이 자동 계산됩니다.</div>
+        <div class="room-close-guide">
+          <div class="room-close-guide-main">오늘 <strong>채워 넣은 수량</strong>을 입력하세요</div>
+          <div class="room-close-guide-sub">채운 수량이 그날 이 방의 사용량으로 기록되고 재고에서 차감됩니다.</div>
+          <div class="room-close-guide-sub">보관소가 부족해 <strong>다 못 채운 제품만</strong> <strong>‘다 못 채웠어요’</strong> 버튼을 누른 뒤 상자에 남은 개수를 입력하세요. 사용량은 자동 계산됩니다.</div>
+        </div>
         ${scopeNote}
         <div class="room-close-items">
           ${listProducts.map(itemRow).join("")}
