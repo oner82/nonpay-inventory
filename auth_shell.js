@@ -20,7 +20,7 @@ const roleAllowedViews = {
   admin: ["dashboard", "use", "roomclose", "edit", "history", "receipts", "implants", "settings"],
   manager: ["dashboard", "use", "roomclose", "edit", "history", "receipts", "implants", "settings"],
   receiver: ["receipts", "implants"],
-  staff: ["dashboard", "use", "roomclose", "edit", "history", "implants"]
+  staff: ["dashboard", "use", "edit", "history", "implants"]
 };
 let accounts = [];
 let setupMode = false;

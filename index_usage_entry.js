@@ -231,8 +231,6 @@
       const normalizedQuery = context.normalizedName(query);
       if (!normalizedQuery) return [];
       return products
-        // 비급여는 방 마감(방 단위 보충)에서 집계하므로 사용입력 검색에서 제외한다.
-        .filter((item) => context.productCategory(item.category) !== "비급여")
         .filter((item) => context.normalizedName(`${item.name} ${item.company || ""} ${item.subcategory || ""} ${context.productCategoryLabel(item.category)}`).includes(normalizedQuery))
         .sort((a, b) => context.alphaFirstCompare(a.name, b.name))
         .slice(0, 12);
@@ -244,9 +242,7 @@
 
     const useRecommendedItemsWithProducts = (items = []) => items
       .map((item) => ({ ...item, product: context.productById(item.productId) }))
-      .filter((item) => item.product)
-      // 비급여는 방 마감에서 집계 — 사용입력 추천에서 제외한다.
-      .filter((item) => context.productCategory(item.product.category) !== "비급여");
+      .filter((item) => item.product);
 
     const shouldHideUseProductForRestriction = (product, productId, recommendedItems = [], restrictActive = false) =>
       Boolean(product) &&
@@ -298,8 +294,7 @@
 
     const finalSaveRecommendationCheck = ({ ruleItems = [], productIds = [], uniqueProductIds = [], useItems = [], restrictActive = false } = {}) => {
       const expectedRecommendations = productIds.length
-        // 비급여는 방 마감에서 집계 — 추천 누락 검사 대상에서 제외한다.
-        ? ruleItems.filter((item) => context.productCategory(context.productById(item.productId)?.category) !== "비급여")
+        ? ruleItems.filter((item) => !(restrictActive && context.productCategory(context.productById(item.productId)?.category) === "비급여"))
         : [];
       const missingRecommended = expectedRecommendations
         .map((item) => item.productId)
@@ -377,7 +372,7 @@
 
     const useRecommendationHtml = (recommended, restrictActive, selectedItems = []) => {
       const selectedQtyById = new Map(selectedItems.map((item) => [item.productId, Math.max(1, context.num(item.qty))]));
-      const visibleItems = recommended.filter((item) => context.productCategory(item.product.category) !== "비급여");
+      const visibleItems = recommended.filter((item) => !(restrictActive && context.productCategory(item.product.category) === "비급여"));
       return `
         <div class="item ${restrictActive ? "landing-line pending" : ""}">
           <div class="item-title">

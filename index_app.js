@@ -64,7 +64,7 @@ const firebaseConfig = {
 const menus = [
   ["dashboard", "대시보드"],
   ["use", "케이스 입력"],
-  ["roomclose", "방 마감"],
+  ["roomclose", "방 마감 이력"],
   ["edit", "케이스 수정"],
   ["history", "사용내역"],
   ["receipts", "입고관리"],
@@ -76,7 +76,7 @@ const roleAllowedViews = {
   admin: ["dashboard", "use", "roomclose", "edit", "history", "receipts", "implants", "settings"],
   manager: ["dashboard", "use", "roomclose", "edit", "history", "receipts", "implants", "settings"],
   receiver: ["receipts", "implants"],
-  staff: ["dashboard", "use", "roomclose", "edit", "history", "implants"]
+  staff: ["dashboard", "use", "edit", "history", "implants"]
 };
 
 const roleLabels = {
@@ -1544,8 +1544,6 @@ const renderGroupedProducts = (withActions) => {
   if (!state.products.length) return `<div class="empty">제품을 추가해 주세요.</div>`;
   const categories = PRODUCT_CATEGORIES;
   return categories.map((category) => {
-    // 사용입력(withActions=false)에서는 비급여를 숨긴다 — 비급여는 방 마감에서 집계.
-    if (!withActions && category === "비급여") return "";
     const categoryItems = state.products.filter((item) => productCategory(item.category) === category).sort(productDisplaySort(category));
     if (!categoryItems.length) return "";
     if (category === "비급여") {
@@ -2425,7 +2423,7 @@ const renderUse = () => `
         <h2>사용입력</h2>
         <button class="secondary" type="button" id="resetUseEntryForm">새 케이스 입력</button>
       </div>
-      <div class="row three">
+      <div class="row four">
         <div>
           <label for="useDate">사용일</label>
           <input id="useDate" type="date" value="${today()}" required>
@@ -2441,6 +2439,10 @@ const renderUse = () => `
           <label for="caseOrder">오늘 순서</label>
           <input id="caseOrder" type="number" min="1" max="99" inputmode="numeric" required placeholder="1">
           <div class="helper">케이스 번호(수술실-순서)로 저장됩니다. 환자명·등록번호는 입력하지 마세요.</div>
+        </div>
+        <div>
+          <label>비급여 제한</label>
+          <button class="secondary" type="button" id="useRestrictNonpay" data-restrict="false">비급여 제한 꺼짐</button>
         </div>
       </div>
       <div class="row two">
