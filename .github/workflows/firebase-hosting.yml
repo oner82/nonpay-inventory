@@ -26,6 +26,12 @@ jobs:
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_NONPAY_INVENTORY }}' > "$RUNNER_TEMP/firebase-service-account.json"
 
+      - name: Verify deployment identity
+        run: |
+          node -e 'const fs = require("fs"); const account = JSON.parse(fs.readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, "utf8")); if (!account.client_email || account.project_id !== "nonpay-inventory") throw new Error("Unexpected deployment account project"); console.log("Deployment service account:", account.client_email);'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
+
       - name: Deploy to Firebase Hosting
         run: firebase deploy --only hosting --project nonpay-inventory
         env:
