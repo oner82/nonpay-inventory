@@ -379,6 +379,19 @@ const normalizedPrescriptionCatalogName = (value) => String(value || "")
   .toLowerCase()
   .replace(/[^a-z0-9가-힣]+/g, "");
 const prescriptionBaseSettingId = (name) => `prescription-base:${normalizedPrescriptionCatalogName(name)}`;
+// 패턴에는 있으나 표시 마스터에 없는 항목을 조용히 누락하지 않는다.
+// 경고 전용이며 자동 처방·재고 연결·수량 변환은 수행하지 않는다.
+const prescriptionUnrepresentedItems = (pattern, materials) => {
+  const names = new Set((materials || []).flatMap(m => [m.name, ...(m.aliases || [])])
+    .filter(Boolean).map(normalizedPrescriptionCatalogName));
+  return (pattern?.items || []).filter(item => ![item.name, item.canonicalName].filter(Boolean)
+    .some(name => names.has(normalizedPrescriptionCatalogName(name))));
+};
+const prescriptionCoverageWarningHtml = (pattern, materials) => {
+  const missing = prescriptionUnrepresentedItems(pattern, materials);
+  if (!missing.length) return '';
+  return `<section class="card" id="prescriptionCoverageWarning" role="status"><strong>표시 연결 확인 필요 · ${missing.length}항목</strong><p>아래 항목은 등록된 수술 패턴에 있지만 사용 중인 처방 재료 목록과 연결되지 않아 입력 행에 표시되지 않습니다. 현재 목록을 완성된 약속 처방으로 간주하지 마세요. 관리자에게 비활성화 여부와 명칭·규격 확인을 요청해 주세요.</p><ul>${missing.map(item => `<li>${escapeHtml(item.name || item.canonicalName || '명칭 확인 필요')}</li>`).join('')}</ul><p class="helper">이 안내만으로 처방이 선택되거나 재고가 차감되지 않습니다.</p></section>`;
+};
 const prescriptionBaseCatalog = () => Array.isArray(window.ORPrescriptionPatterns?.materialCatalog)
   ? window.ORPrescriptionPatterns.materialCatalog
   : [];
@@ -5247,6 +5260,8 @@ const bindUse = () => {
           </div>
         </details>`;
     }).join("") || `<div class="empty">처방전 재료 마스터를 불러오지 못했습니다.</div>`;
+    // 사용자가 이번 케이스에서 의도적으로 삭제한 행은 마스터 누락과 구분한다.
+    prescriptionChecklist.insertAdjacentHTML('afterbegin', prescriptionCoverageWarningHtml(pattern, [...prescriptionNameCatalog, ...customMaterials]));
     filterPrescriptionRows();
     refreshUnlinkedWarning();
     if (applyProducts) {
