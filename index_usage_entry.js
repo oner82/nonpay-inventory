@@ -4,7 +4,8 @@
       const productCount = (item.productItems || []).reduce((sum, product) => sum + Math.max(1, context.num(product.qty)), 0);
       const implantCount = (item.implantDrafts || []).length;
       const photoCount = (item.implantDrafts || []).reduce((sum, implant) => sum + (implant.photos || []).length, 0);
-      return { productCount, implantCount, photoCount };
+      const prescriptionCount = (item.prescriptionChecks || []).filter((entry) => entry.checked !== false).length;
+      return { productCount, implantCount, photoCount, prescriptionCount };
     };
 
     const useDraftSummaryHtml = (snapshot) => {
@@ -12,14 +13,17 @@
       const implantDrafts = snapshot.implantDraftPayload || [];
       const productLines = useItems.map((item) => {
         const product = context.productById(item.productId);
-        return `${product?.name || "삭제된 제품"} ${context.num(item.qty)}개`;
+        return `${product?.orderCode ? product.orderCode + ' · ' : ''}${product?.name || "삭제된 제품"} ${context.num(item.qty)} ${product?.stockUnit || '개'}${context.isUnconfirmedStock?.(product) ? ' (재고 미확정)' : ''}`;
       });
       const implantPhotoCount = implantDrafts.reduce((sum, draft) => sum + (draft.photos || []).length, 0);
+      const prescriptionCount = (snapshot.prescriptionChecks || []).filter((item) => item.checked !== false).length;
       return `
         <div><span>케이스</span> ${context.escapeHtml(snapshot.caseRoom && snapshot.caseOrder ? `${snapshot.caseRoom}-${snapshot.caseOrder}` : "-")}</div>
         <div><span>사용일</span> ${context.escapeHtml(snapshot.date || context.today())}</div>
-        <div><span>수술</span> ${context.escapeHtml(snapshot.doctorText)} · ${context.escapeHtml(snapshot.surgeryText)}</div>
+        <div><span>수술</span> ${context.escapeHtml(snapshot.doctorText)} · ${context.escapeHtml(snapshot.surgeryDetail || snapshot.surgeryText)}</div>
         <div><span>사용제품</span> ${context.escapeHtml(productLines.join(", ") || "-")}</div>
+        <div><span>처방확인</span> ${prescriptionCount ? `${prescriptionCount}종` : "패턴 없음"}</div>
+        ${(snapshot.prescriptionChecks || []).some(item => item.checked && !item.matchedProductId) ? `<div><span>재고 연결 없음</span> ${context.escapeHtml((snapshot.prescriptionChecks || []).filter(item => item.checked && !item.matchedProductId).map(item => item.name).join(', '))} · 확인 기록만 저장됩니다.</div>` : ''}
         <div><span>임플란트</span> ${implantDrafts.length ? `${implantDrafts.length}개 업체 · 사진 ${implantPhotoCount}장` : "기록 없음"}</div>
         <div><span>임시저장</span> ${context.escapeHtml(snapshot.enteredBy)} · ${context.escapeHtml(context.formatDateTime(snapshot.enteredAt))}</div>
       `;
@@ -50,8 +54,9 @@
                   </div>
                   <div class="pending-usage-meta">
                     <span>${context.escapeHtml(doctor?.name || "-")}</span>
-                    <span>${context.escapeHtml(surgery?.name || "-")}</span>
+                    <span>${context.escapeHtml(item.surgeryDetail || surgery?.name || "-")}</span>
                     <span>제품 ${summary.productCount}개</span>
+                    <span>처방 ${summary.prescriptionCount}종 확인</span>
                     <span>임플란트 ${summary.implantCount}업체 · 사진 ${summary.photoCount}장</span>
                     <span>입력 ${context.escapeHtml(item.enteredBy?.name || item.enteredBy?.loginId || item.draftSavedBy || "-")}</span>
                     <span>${context.escapeHtml(context.formatDateTime(item.updatedAt || item.createdAt || ""))}</span>
@@ -91,10 +96,10 @@
         <div class="selected-use-buttons">
           ${safeItems.map((item) => {
             const product = item.product;
-            const vendorManaged = context.isVendorManagedProduct?.(product);
+            const vendorManaged = context.isVendorManagedProduct?.(product) || context.isUnconfirmedStock?.(product);
             const linkedQty = context.getApp().querySelector(`[data-use-qty="${item.productId}"]`);
             const maxQty = vendorManaged ? 999 : Math.max(1, context.num(linkedQty?.max || product.stock || 999));
-            const meta = [context.productCategoryLabel(product.category), product.company, product.subcategory, vendorManaged ? "업체관리 · 재고차감 제외" : ""].filter(Boolean).join(" · ");
+            const meta = [context.productCategoryLabel(product.category), product.company, product.subcategory, context.isUnconfirmedStock?.(product) ? "재고 미확정" : context.isVendorManagedProduct?.(product) ? "업체관리 · 재고차감 제외" : ""].filter(Boolean).join(" · ");
             return `
               <div class="selected-use-chip ${chipClass(product.category)}">
                 <div class="selected-use-name" title="${context.escapeHtml(product.name)}">
@@ -169,7 +174,7 @@
         status.classList.toggle("dirty", Boolean(dirty));
       }
       if (finalSaveButton) finalSaveButton.disabled = Boolean(dirty);
-      if (saveButton) saveButton.textContent = hasSnapshot ? "임시저장 갱신" : "임시저장";
+      if (saveButton) saveButton.textContent = hasSnapshot ? "확인 대기 내용 갱신" : "확인 대기로 저장";
     };
 
     const draftUserText = () => context.currentAuditUser()?.name || context.currentAuditUser()?.loginId || "현재 사용자";
@@ -188,8 +193,8 @@
           ${items.map((item) => {
             const product = context.productById(item.productId);
             if (!product) return "";
-            const vendorManaged = context.isVendorManagedProduct?.(product);
-            const meta = [context.productCategoryLabel(product.category), product.company, product.subcategory, vendorManaged ? "업체관리 · 재고차감 제외" : ""].filter(Boolean).join(" · ");
+            const vendorManaged = context.isVendorManagedProduct?.(product) || context.isUnconfirmedStock?.(product);
+            const meta = [context.productCategoryLabel(product.category), product.company, product.subcategory, context.isUnconfirmedStock?.(product) ? "재고 미확정" : context.isVendorManagedProduct?.(product) ? "업체관리 · 재고차감 제외" : ""].filter(Boolean).join(" · ");
             return `
               <div class="selected-use-chip ${chipClass(product.category)}">
                 <div class="selected-use-name" title="${context.escapeHtml(product.name)}">
@@ -213,27 +218,28 @@
       const selectedQtyById = new Map(selectedItems.map((item) => [item.productId, Math.max(1, context.num(item.qty))]));
       return results.map((item) => {
         const selectedQty = selectedQtyById.get(item.id);
-        const vendorManaged = context.isVendorManagedProduct?.(item);
-        const stockText = vendorManaged ? "업체관리 · 재고차감 제외" : `현재고 ${context.num(item.stock)}`;
+        const vendorManaged = context.isVendorManagedProduct?.(item) || context.isUnconfirmedStock?.(item);
+        const stockText = context.isVendorManagedProduct?.(item) ? "업체관리 · 재고차감 제외" : context.stockDisplay(item);
         return `
           <label class="check-card use-card">
             <input type="checkbox" value="${item.id}" data-search-product="${item.id}" ${selectedQty ? "checked" : ""}>
-            <span>${context.escapeHtml(item.name)}<br><span class="muted">${context.escapeHtml(context.productCategoryLabel(item.category))}${item.company ? ` · ${context.escapeHtml(item.company)}` : ""}${item.subcategory ? ` · ${context.escapeHtml(item.subcategory)}` : ""} · ${context.escapeHtml(stockText)}</span></span>
+            <span>${context.escapeHtml(item.name)}<br><span class="muted">${context.escapeHtml(item.orderCode || '구매코드 미등록')} · ${context.escapeHtml(context.productCategoryLabel(item.category))}${item.company ? ` · ${context.escapeHtml(item.company)}` : ""}${item.subcategory ? ` · ${context.escapeHtml(item.subcategory)}` : ""} · ${context.escapeHtml(stockText)}</span></span>
             ${context.qtyStepper(`data-search-qty="${item.id}" aria-label="${context.escapeHtml(item.name)} 검색 사용 수량"`, selectedQty || 1, vendorManaged ? 999 : Math.max(1, context.num(item.stock)))}
           </label>
         `;
       }).join("");
     };
 
-    const productSearchEmptyQueryHtml = () => `<div class="empty">제품명을 입력해 주세요.</div>`;
+    const productSearchEmptyQueryHtml = () => `<div class="empty">구매코드·제품명·규격을 입력해 주세요.</div>`;
 
     const useProductSearchResults = (products = [], query = "") => {
-      const normalizedQuery = context.normalizedName(query);
+      const searchText = value => context.normalizedName(String(value || '').normalize('NFKC'));
+      const normalizedQuery = searchText(query);
       if (!normalizedQuery) return [];
       return products
-        .filter((item) => context.normalizedName(`${item.name} ${item.company || ""} ${item.subcategory || ""} ${context.productCategoryLabel(item.category)}`).includes(normalizedQuery))
-        .sort((a, b) => context.alphaFirstCompare(a.name, b.name))
-        .slice(0, 12);
+        .filter(item => item.active !== false)
+        .filter((item) => searchText(`${item.orderCode || ''} ${item.name} ${item.purchaseName || ''} ${item.purchaseSpec || ''} ${item.company || ""} ${item.subcategory || ""} ${context.productCategoryLabel(item.category)}`).includes(normalizedQuery))
+        .sort((a, b) => context.alphaFirstCompare(a.name, b.name));
     };
 
     const noRecommendationHtml = (hasSurgerySelection) => hasSurgerySelection
@@ -242,7 +248,7 @@
 
     const useRecommendedItemsWithProducts = (items = []) => items
       .map((item) => ({ ...item, product: context.productById(item.productId) }))
-      .filter((item) => item.product);
+      .filter((item) => item.product && item.product.active !== false);
 
     const shouldHideUseProductForRestriction = (product, productId, recommendedItems = [], restrictActive = false) =>
       Boolean(product) &&
@@ -325,7 +331,7 @@
       if (!matches.length) return "";
       const lines = matches.slice(0, 3).map((usage, index) => {
         const doctor = context.departmentById(usage.doctorId)?.name || "-";
-        const surgery = context.surgeryById(usage.surgeryId)?.name || "-";
+        const surgery = usage.surgeryDetail || context.surgeryById(usage.surgeryId)?.name || "-";
         const productCount = (usage.productIds || []).length;
         return `${index + 1}. ${doctor} · ${surgery} · 제품 ${productCount}개`;
       });
@@ -349,6 +355,9 @@
       finalSavedAt = "",
       draftSnapshot = {},
       finalSavedBy = "",
+      prescriptionPatternId = "",
+      prescriptionChecks = [],
+      surgeryDetail = "",
       auditFields = {}
     } = {}) => ({
       id: context.uid(),
@@ -359,6 +368,10 @@
       productIds,
       date: usageDate || context.today(),
       createdAt: finalSavedAt,
+      prescriptionPatternId,
+      prescriptionChecks,
+      surgeryDetail,
+      surgerySelection: draftSnapshot.surgerySelection || null,
       doubleCheck: {
         mode: "circulatorDraftScrubFinal",
         status: "finalSaved",
@@ -383,8 +396,8 @@
           ${visibleItems.map((item) => {
             const selectedQty = selectedQtyById.get(item.productId);
             const qty = selectedQty || Math.max(1, context.num(item.qty));
-            const vendorManaged = context.isVendorManagedProduct?.(item.product);
-            const stockText = vendorManaged ? "업체관리 · 재고차감 제외" : `현재고 ${context.num(item.product.stock)}`;
+            const vendorManaged = context.isVendorManagedProduct?.(item.product) || context.isUnconfirmedStock?.(item.product);
+            const stockText = context.isVendorManagedProduct?.(item.product) ? "업체관리 · 재고차감 제외" : context.stockDisplay(item.product);
             return `
               <label class="check-card use-card">
                 <input type="checkbox" value="${item.productId}" data-recommend-product="${item.productId}" ${selectedQty ? "checked" : ""}>
@@ -531,11 +544,11 @@
       !String(implantDraftVendorText(draft) || "").trim() || (!draft.description && !(draft.photos || []).length)
     );
 
-    const useDraftValidationMessage = (useItems = [], implantDraftPayload = []) => {
-      if (!useItems.length && !implantDraftPayload.length) return "제품을 선택하거나 임플란트 장부를 작성해 주세요.";
+    const useDraftValidationMessage = (useItems = [], implantDraftPayload = [], prescriptionChecks = []) => {
+      if (!useItems.length && !implantDraftPayload.length && !prescriptionChecks.some((item) => item.checked)) return "처방재료를 확인하거나 제품 또는 임플란트 장부를 작성해 주세요.";
       const unavailable = useItems.find((item) => {
         const product = context.productById(item.productId);
-        return !context.isVendorManagedProduct?.(product) && context.num(product?.stock) < item.qty;
+        return !product || product.active === false || (!context.isVendorManagedProduct?.(product) && !context.isUnconfirmedStock?.(product) && context.num(product?.stock) < item.qty);
       });
       if (unavailable) {
         const product = context.productById(unavailable.productId);
@@ -553,9 +566,13 @@
       surgeryId = "",
       doctorText = "-",
       surgeryText = "-",
+      surgeryDetail = "",
       enteredBy = "",
       useItems = [],
-      implantDraftPayload = []
+      implantDraftPayload = [],
+      prescriptionPatternId = "",
+      prescriptionChecks = [],
+      surgerySelection = null
     } = {}) => ({
       date,
       caseRoom,
@@ -564,10 +581,14 @@
       surgeryId,
       doctorText,
       surgeryText,
+      surgeryDetail,
       enteredBy,
       enteredAt: new Date().toISOString(),
       useItems,
-      implantDraftPayload
+      implantDraftPayload,
+      prescriptionPatternId,
+      prescriptionChecks,
+      surgerySelection
     });
 
     const pendingUsagePhotoCount = (implantDraftPayload = []) =>
@@ -674,7 +695,7 @@
           </div>
           <div class="edit-patient-card-meta">
             <span>원장: ${context.escapeHtml(doctor?.name || "-")}</span>
-            <span>수술: ${context.escapeHtml(surgeryDepartment)} - ${context.escapeHtml(surgery?.name || "-")}</span>
+            <span>수술: ${context.escapeHtml(surgeryDepartment)} - ${context.escapeHtml(usage.surgeryDetail || surgery?.name || "-")}</span>
             <span>제품: ${productItems.reduce((sum, item) => sum + item.qty, 0)}개${productSummary ? ` · ${context.escapeHtml(productSummary)}${extraCount ? ` 외 ${extraCount}종` : ""}` : ""}</span>
           </div>
         </button>
@@ -699,8 +720,8 @@
             <button class="search-modal-close" type="button" id="closeUseProductSearch" aria-label="제품 검색 닫기">×</button>
           </div>
           <div>
-            <label for="useProductSearch">제품명 검색</label>
-            <input id="useProductSearch" autocomplete="off" placeholder="제품명, 업체, 종류를 입력하세요">
+            <label for="useProductSearch">코드·제품명 검색</label>
+            <input id="useProductSearch" autocomplete="off" placeholder="구매코드, 제품명, 규격, 업체를 입력하세요">
           </div>
           <div id="useProductSearchResults" class="product-picker search-modal-results"></div>
         </div>

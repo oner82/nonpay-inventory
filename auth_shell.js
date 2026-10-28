@@ -17,10 +17,10 @@ const roleLabels = {
 };
 
 const roleAllowedViews = {
-  admin: ["dashboard", "use", "roomclose", "edit", "history", "receipts", "implants", "settings"],
-  manager: ["dashboard", "use", "roomclose", "edit", "history", "receipts", "implants", "settings"],
-  receiver: ["receipts", "implants"],
-  staff: ["dashboard", "use", "edit", "history", "implants"]
+  admin: ["dashboard", "morningcount", "use", "edit", "history", "purchase", "receipts", "implants", "settings"],
+  manager: ["dashboard", "morningcount", "use", "edit", "history", "purchase", "receipts", "implants", "settings"],
+  receiver: ["purchase", "receipts", "implants"],
+  staff: ["dashboard", "morningcount", "use", "edit", "history", "purchase", "implants"]
 };
 let accounts = [];
 let setupMode = false;

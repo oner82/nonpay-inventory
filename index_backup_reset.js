@@ -50,7 +50,7 @@
       <section class="grid two">
         <div class="card">
           <h2>서버 백업 저장</h2>
-          <p class="muted">현재 데이터를 Firestore 서버에 날짜별 버전으로 저장합니다. 입력/수정 데이터는 평소에도 자동 저장되며, 이 기능은 특정 시점으로 되돌리기 위한 별도 백업입니다.</p>
+          <p class="muted">제품·사용·대기·임플란트 기록을 백업합니다. 모든 기기의 입력을 멈춘 유지보수 시간에 저장·복원하세요. 사진 URL은 포함하지만 Storage 사진 원본 파일과 계정은 별도 백업 대상입니다. 구형 불완전 백업은 복원을 차단합니다.</p>
           <label for="backupLabel">백업 이름</label>
           <input id="backupLabel" autocomplete="off" placeholder="예: 월말 점검 전, 5월 정기 백업">
           <div class="actions">
@@ -70,7 +70,7 @@
           <div class="actions">
             <button type="button" id="saveSettingsBackup">설정 보존 백업 저장</button>
             <button class="secondary" type="button" id="downloadResetPlan">초기화 미리보기 JSON</button>
-            <button class="danger" type="button" id="runOperationalReset">운영기록 초기화 실행</button>
+            <button class="danger" type="button" id="runOperationalReset" disabled title="별도 안전 검증 전 사용 중지">운영기록 초기화 · 안전 검증 대기</button>
           </div>
         </div>
         <div class="card">
@@ -102,11 +102,100 @@
       return date.toLocaleString("ko-KR", { hour12: false });
     };
 
-    const stateSnapshotForBackup = () => {
-      const snapshot = JSON.parse(JSON.stringify(state));
+    const stateSnapshotForBackup = (source = ctx.getState()) => {
+      const snapshot = JSON.parse(JSON.stringify(source));
       delete snapshot.backupVersions;
       snapshot.backedUpAt = new Date().toISOString();
       return snapshot;
+    };
+
+    const validateBackup = (backup) => {
+      for (const key of ['products', 'doctors', 'surgeries', 'usages', 'receipts', 'usageRules']) {
+        if (!Array.isArray(backup?.data?.[key])) throw new Error(`불완전한 백업입니다: ${key} 누락. 복원할 수 없습니다.`);
+        const ids = backup.data[key].map(x => x?.id);
+        if (ids.some(id => typeof id !== 'string' || !id || id.includes('/')) || new Set(ids).size !== ids.length) throw new Error(`백업 ${key}의 ID가 잘못되었거나 중복됩니다.`);
+      }
+      if (backup.externalCollections) {
+        for (const name of ['pendingUsages', 'implantRecords']) {
+          const rows = backup.externalCollections[name];
+          if (!Array.isArray(rows)) throw new Error(`외부 백업 ${name} 누락`);
+          const ids = rows.map(x => x?.id);
+          if (ids.some(id => typeof id !== 'string' || !id || id.includes('/')) || new Set(ids).size !== ids.length) throw new Error(`외부 백업 ${name} ID 오류`);
+          if (backup.externalCollectionsSummary && backup.externalCollectionsSummary[name] !== rows.length) throw new Error(`외부 백업 ${name} 개수가 맞지 않습니다.`);
+        }
+      }
+      return backup;
+    };
+
+    const readCompleteBackup = async (id) => {
+      const snap = await getDoc(doc(db, 'backups', id));
+      if (!snap.exists()) throw new Error('백업 데이터를 찾을 수 없습니다.');
+      const backup = { ...snap.data(), id };
+      validateBackup(backup);
+      if (!backup.externalCollections && backup.externalCollectionsSummary) {
+        const count = backup.externalChunkCount;
+        if (!Number.isSafeInteger(count) || count < 0 || count > 10000) throw new Error('백업 조각 개수가 잘못되었습니다.');
+        const external = { pendingUsages: [], implantRecords: [] };
+        for (let i = 0; i < count; i++) {
+          const chunk = await getDoc(doc(db, 'backups', id, 'externalChunks', `chunk-${String(i).padStart(4, '0')}`));
+          if (!chunk.exists() || !Array.isArray(chunk.data().records)) throw new Error('백업 조각이 누락되었습니다.');
+          for (const record of chunk.data().records) {
+            if (!Object.hasOwn(external, record.collectionName)) throw new Error('알 수 없는 백업 컬렉션입니다.');
+            external[record.collectionName].push(record.item);
+          }
+        }
+        backup.externalCollections = external;
+      }
+      return validateBackup(backup);
+    };
+
+    // 유지보수 시간에만 실행한다. 부분 실패를 피하기 위해 작은 복원만 단일 거래로 처리한다.
+    const restoreCompleteBackup = async (backup) => {
+      if (!canManageSettings()) throw new Error('복원 권한이 없습니다.');
+      validateBackup(backup);
+      if (!['full','beforeOperationalResetFull','beforeRestoreFull'].includes(backup.kind)) throw new Error('설정 전용 백업은 전체 기록 복원에 사용할 수 없습니다.');
+      if (!backup.externalCollections) throw new Error('외부 기록이 없는 설정/구형 백업은 전체 복원할 수 없습니다.');
+      const transactionRunner = ctx.getRunTransaction?.();
+      const mainRef = ctx.getMainRef?.();
+      if (!transactionRunner || !mainRef || !getDocs || !collection) throw new Error('안전한 복원 연결이 준비되지 않았습니다.');
+      const beforeSnap = await getDoc(mainRef);
+      if (!beforeSnap.exists()) throw new Error('현재 원본을 확인할 수 없습니다.');
+      const before = beforeSnap.data();
+      const currentExternal = await backupExternalCollections();
+      const canonical = value => JSON.stringify(value, (_key, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
+      const operations = [];
+      for (const name of ['pendingUsages', 'implantRecords']) {
+        const existing = new Map(currentExternal[name].map(row => [row.id, row]));
+        const target = new Map(backup.externalCollections[name].map(row => [row.id, row]));
+        for (const id of new Set([...existing.keys(), ...target.keys()])) operations.push({ref:doc(db,name,id),before:existing.get(id),after:target.get(id)});
+      }
+      const recoveryId = `pre-restore-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+      const recovery = {id:recoveryId,kind:'beforeRestoreFull',label:'복원 직전 자동 백업',createdAt:new Date().toISOString(),data:before,externalCollections:currentExternal,externalCollectionsSummary:externalCollectionsSummary(currentExternal),externalChunkCount:0};
+      if (operations.length > 400 || new Blob([JSON.stringify(recovery)]).size > 700000 || new Blob([JSON.stringify(backup.data)]).size > 700000) throw new Error('대량 복원은 앱에서 안전하게 처리할 수 없습니다. 관리자 전용 복구 절차가 필요합니다. 변경하지 않았습니다.');
+      const restored = normalizeState(backup.data);
+      delete restored.backedUpAt;
+      restored.backupVersions = [{id:recoveryId,label:recovery.label,createdAt:recovery.createdAt,kind:recovery.kind},...(before.backupVersions || [])].slice(0,50);
+      restored.updatedAt = new Date().toISOString();
+      await transactionRunner(db, async transaction => {
+        const latest = await transaction.get(mainRef);
+        if (!latest.exists() || canonical(latest.data()) !== canonical(before)) throw new Error('복원 준비 중 데이터가 변경되었습니다. 모든 입력을 중지하고 다시 확인해 주세요.');
+        for (const op of operations) {
+          const snap = await transaction.get(op.ref);
+          const actual = snap.exists() ? { ...snap.data(), id:op.before?.id || op.after.id } : undefined;
+          if (canonical(actual) !== canonical(op.before)) throw new Error('대기/장부 기록이 변경되었습니다. 복원을 중단했습니다.');
+        }
+        transaction.set(doc(db,'backups',recoveryId), recovery);
+        for (const op of operations) {
+          if (op.after) transaction.set(op.ref, op.after);
+          else transaction.delete(op.ref);
+        }
+        transaction.set(mainRef, restored);
+      });
+      ctx.setState(restored);
+      ctx.setPendingUsages(backup.externalCollections.pendingUsages);
+      ctx.setImplantRecords(backup.externalCollections.implantRecords);
+      render();
+      return recoveryId;
     };
 
     const operationalResetPlan = () => ({
@@ -145,6 +234,17 @@
       pendingUsages: await readCollectionForBackup("pendingUsages", pendingUsages),
       implantRecords: await readCollectionForBackup("implantRecords", implantRecords)
     });
+
+    const captureFullBackup = async () => {
+      const mainRef = ctx.getMainRef?.();
+      if (!mainRef) throw new Error('서버 원본 연결이 준비되지 않았습니다.');
+      const first = await getDoc(mainRef);
+      if (!first.exists()) throw new Error('서버 원본이 없습니다.');
+      const externalCollections = await backupExternalCollections();
+      const last = await getDoc(mainRef);
+      if (!last.exists() || JSON.stringify(first.data()) !== JSON.stringify(last.data())) throw new Error('백업 중 데이터가 변경되었습니다. 입력을 중지한 뒤 다시 백업해 주세요.');
+      return {data:stateSnapshotForBackup(first.data()),externalCollections};
+    };
 
     const downloadJson = (filename, payload) => {
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -187,7 +287,8 @@
         chunkIndex += 1;
       };
       for (const record of records) {
-        const recordBytes = JSON.stringify(record).length;
+        const recordBytes = new Blob([JSON.stringify(record)]).size;
+        if (recordBytes > maxChunkBytes) throw new Error('한 기록이 백업 조각 안전 크기를 넘습니다. 백업을 중단했습니다.');
         if (chunk.length && chunkBytes + recordBytes > maxChunkBytes) await flush();
         chunk.push(record);
         chunkBytes += recordBytes;
@@ -197,6 +298,7 @@
     };
 
     const saveBackupDocument = async ({ id, label, kind, data, externalCollections, message }) => {
+      validateBackup({data,externalCollections});
       const createdAt = new Date().toISOString();
       const summary = externalCollections ? externalCollectionsSummary(externalCollections) : null;
       const externalChunkCount = externalCollections ? await saveExternalBackupChunks(id, externalCollections) : 0;
@@ -211,12 +313,13 @@
         externalCollectionsSummary: summary,
         externalChunkCount
       });
+      await readCompleteBackup(id);
       state.backupVersions = [
         { id, label, date: today(), createdAt, kind },
         ...(state.backupVersions || []).filter((item) => item.id !== id)
       ].slice(0, 50);
       render();
-      await saveState(message);
+      if (!await saveState(message)) throw new Error('백업 목록 저장에 실패했습니다. 완료로 처리하지 않습니다.');
     };
 
     const deleteCollectionDocs = async (collectionName, fallbackItems = []) => {
@@ -251,60 +354,8 @@
     };
 
     const runOperationalReset = async () => {
-      if (!canManageSettings()) {
-        alert("관리자와 책임사용자만 운영기록 초기화를 실행할 수 있습니다.");
-        return;
-      }
-      if (!db) {
-        alert("Firebase 연결 후 초기화할 수 있습니다.");
-        return;
-      }
-      const plan = operationalResetPlan();
-      const totalClear = plan.clear.usages + plan.clear.receipts + plan.clear.pendingUsages + plan.clear.implantRecords;
-      if (!totalClear) {
-        alert("초기화할 운영기록이 없습니다.");
-        return;
-      }
-      if (!confirm("운영기록을 초기화합니다. 실행 전 전체 백업과 설정 보존 백업을 저장한 뒤, 사용입력/입고이력/임시저장/임플란트 장부를 삭제합니다. 계속할까요?")) return;
-      const typed = prompt("정말 초기화하려면 초기화 라고 입력해 주세요.");
-      if (typed !== "초기화") {
-        alert("초기화가 취소되었습니다.");
-        return;
-      }
-
-      const startedAt = new Date().toISOString();
-      const externalCollections = await backupExternalCollections();
-      savingToast("초기화 전 백업 저장 중입니다...", { hold: true });
-      await saveBackupDocument({
-        id: `pre-reset-full-${startedAt.replace(/[:.]/g, "-")}`,
-        label: `${today()} 운영기록 초기화 전 전체 백업`,
-        kind: "beforeOperationalResetFull",
-        data: stateSnapshotForBackup(),
-        externalCollections,
-        message: "운영기록 초기화 전 전체 백업 저장 완료"
-      });
-      await saveBackupDocument({
-        id: `pre-reset-settings-${startedAt.replace(/[:.]/g, "-")}`,
-        label: `${today()} 운영기록 초기화 전 설정 보존 백업`,
-        kind: "beforeOperationalResetSettings",
-        data: settingsOnlyStateSnapshot(),
-        externalCollections,
-        message: "운영기록 초기화 전 설정 보존 백업 저장 완료"
-      });
-
-      savingToast("운영기록 초기화 중입니다...", { hold: true });
-      const deletedPending = await deleteCollectionDocs("pendingUsages", externalCollections.pendingUsages);
-      const deletedImplants = await deleteCollectionDocs("implantRecords", externalCollections.implantRecords);
-      ctx.setPendingUsages([]);
-      ctx.setImplantRecords([]);
-      prepareStateForOperationalReset();
-      render();
-      await saveState("운영기록 초기화 완료", {
-        authoritative: true,
-        savingMessage: "운영기록 초기화 저장 중입니다...",
-        doneMessage: `운영기록 초기화 완료 · 임시저장 ${deletedPending}건 · 임플란트 ${deletedImplants}건 삭제`
-      });
-      alert("운영기록 초기화가 완료되었습니다. 현재고는 새 기준재고로 보존되었습니다.");
+      // 다중 컬렉션 삭제는 백업 수정과 분리하여 별도 검증 전까지 잠근다.
+      throw new Error('운영기록 초기화는 안전 검증 전까지 중지되어 있습니다.');
     };
 
     const bindBackup = () => {
@@ -321,8 +372,7 @@
             id,
             label,
             kind: "full",
-            data: stateSnapshotForBackup(),
-            externalCollections: await backupExternalCollections(),
+            ...await captureFullBackup(),
             message: "서버 백업 저장 완료"
           });
         } catch (error) {
@@ -374,12 +424,7 @@
       app.querySelectorAll("[data-download-server-backup]").forEach((button) => {
         button.addEventListener("click", async () => {
           try {
-            const snap = await getDoc(doc(db, "backups", button.dataset.downloadServerBackup));
-            if (!snap.exists()) {
-              alert("백업 데이터를 찾을 수 없습니다.");
-              return;
-            }
-            const backup = snap.data();
+            const backup = await readCompleteBackup(button.dataset.downloadServerBackup);
             downloadJson(`${backup.id || "nonpay-backup"}.json`, backup);
           } catch (error) {
             console.error(error);
@@ -390,25 +435,17 @@
 
       app.querySelectorAll("[data-restore-server-backup]").forEach((button) => {
         button.addEventListener("click", async () => {
-          if (!confirm("현재 데이터를 선택한 백업 버전으로 교체할까요?")) return;
+          if (!canManageSettings()) return;
+          if (!confirm("모든 기기에서 입력을 중지했습니까? 제품·사용·대기·임플란트 기록을 선택한 백업으로 교체합니다. 사진 원본 파일은 복구하지 않습니다. 복원 직전 사본을 자동 보존합니다.")) return;
+          button.disabled = true;
           try {
-            const snap = await getDoc(doc(db, "backups", button.dataset.restoreServerBackup));
-            if (!snap.exists()) {
-              alert("백업 데이터를 찾을 수 없습니다.");
-              return;
-            }
-            const backup = snap.data();
-            const currentVersions = state.backupVersions || [];
-            ctx.setState(normalizeState(backup.data || {}));
-            state.backupVersions = currentVersions;
-            addSeedMasters();
-            reconcileProductStocks();
-            render();
-            await saveState("백업 버전 복원 완료");
+            const backup = await readCompleteBackup(button.dataset.restoreServerBackup);
+            await restoreCompleteBackup(backup);
+            alert('백업 복원 완료. 사진 원본과 모든 기기의 재접속 상태를 확인해 주세요.');
           } catch (error) {
             console.error(error);
             alert(`백업 복원 실패: ${error.message}`);
-          }
+          } finally { button.disabled = false; }
         });
       });
     };

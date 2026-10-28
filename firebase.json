@@ -13,6 +13,7 @@
       "*firebase-adminsdk*.json",
       "output/**",
       "tmp/**",
+      "환자처방전/**",
       "start_local_site.bat",
       "*.log"
     ],

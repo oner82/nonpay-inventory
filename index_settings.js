@@ -4,6 +4,8 @@
       if (!context.canManageSettings()) return `<div class="empty">관리자와 책임사용자만 설정을 사용할 수 있습니다.</div>`;
       const views = {
         products: context.renderProducts,
+        prescriptions: context.renderPrescriptionSettings,
+        patterns: context.renderPrescriptionPatterns,
         doctors: context.renderDoctors,
         surgeries: context.renderSurgeries,
         usageRules: context.renderUsageRules,
@@ -25,12 +27,15 @@
       const app = context.getApp();
       app.querySelectorAll("[data-settings-view]").forEach((button) => {
         button.addEventListener("click", () => {
+          if (button.dataset.settingsView !== context.getCurrentSettingsView() && context.hasUnsavedSettings?.() && !confirm('저장하지 않은 입력이 있습니다. 이동할까요?')) return;
           context.setCurrentSettingsView(button.dataset.settingsView);
           context.render();
         });
       });
       const handlers = {
         products: context.bindProducts,
+        prescriptions: context.bindPrescriptionSettings,
+        patterns: context.bindPrescriptionPatterns,
         doctors: context.bindDoctors,
         surgeries: context.bindSurgeries,
         usageRules: context.bindUsageRules,

@@ -71,7 +71,7 @@
         <section class="grid">
           <div class="card">
             <h2>사용내역 검색</h2>
-            <p class="helper">비급여는 사용입력(케이스 단위)에서 기록됩니다. 방 마감 방식으로 운영했던 기간(2026-07-14~)의 방 마감 수량도 아래 제품별 집계에 포함되어 있습니다.</p>
+            <p class="helper">케이스 기록을 고치려면 아래 목록에서 해당 케이스의 <strong>"사용내용 수정"</strong> 버튼을 누르세요. 방 마감 방식으로 운영했던 기간(2026-07-14~07-27)의 수량도 제품별 집계에 포함되어 있습니다.</p>
             <div class="row history-filter-grid">
               <div>
                 <label for="historyStart">시작일</label>
@@ -138,7 +138,7 @@
           const product = context.productById(id);
           return `${product?.name || ""} ${product?.company || ""} ${product?.subcategory || ""}`;
         }).join(" ");
-        return context.normalizedName(`${doctor?.name || ""} ${surgery?.name || ""} ${productText}`).includes(normalizedQuery);
+        return context.normalizedName(`${doctor?.name || ""} ${usage.surgeryDetail || surgery?.name || ""} ${productText}`).includes(normalizedQuery);
       });
     };
 
@@ -234,7 +234,7 @@
     };
 
     const productInitialStock = (product, totalReceived, totalUsed) => {
-      if (Number.isFinite(Number(product.baseStock))) return context.num(product.baseStock);
+      if (Number.isFinite(Number(product.baseStock))) return Number(product.baseStock);
       const seed = productSeedFor(product);
       if (seed) return context.num(seed.baseStock);
       return context.num(product.stock) - totalReceived + totalUsed;
@@ -285,14 +285,14 @@
         const systemCurrentStock = Math.max(0, initialStock + totalReceived - totalUsed);
         return {
           product,
-          initialStock,
+          initialStock: window.ORPurchase.unconfirmed(product) ? '미확정' : initialStock,
           totalReceived,
           totalUsed,
-          basisStock,
+          basisStock: window.ORPurchase.unconfirmed(product) ? '미확정' : basisStock,
           periodReceived,
           periodUsed,
-          currentStock,
-          systemCurrentStock,
+          currentStock: window.ORPurchase.unconfirmed(product) ? '미확정' : currentStock,
+          systemCurrentStock: window.ORPurchase.unconfirmed(product) ? '미확정' : systemCurrentStock,
           latestReceiptDate: latestReceiptDateForProduct(product.id)
         };
       });
@@ -321,7 +321,7 @@
                 <div class="summary-metrics">
                   <div class="metric"><span>기간입고</span> <strong>${received}</strong></div>
                   <div class="metric"><span>기간사용</span> <strong>${used}</strong></div>
-                  <div class="metric ${context.stockStatusClass(product)}"><strong>${vendorManaged ? "업체관리" : context.num(product.stock)}</strong><span>재고</span></div>
+                  <div class="metric ${context.stockStatusClass(product)}"><strong>${window.ORPurchase.unconfirmed(product) ? '미확정' : vendorManaged ? "업체관리" : context.num(product.stock)}</strong><span>재고</span></div>
                 </div>
               </summary>
               <div class="details-body">
@@ -331,7 +331,7 @@
                     <div class="meta">
                       <span>사용일: ${context.escapeHtml(usage.date)}</span>
                       ${context.auditMetaHtml(usage, "입력")}
-                      <span>과/원장 코드: ${context.escapeHtml(doctor?.name || "-")} · 수술: ${context.escapeHtml(surgery?.department || context.inferSurgeryDepartment(surgery?.name || ""))} - ${context.escapeHtml(surgery?.name || "-")}</span>
+                      <span>과/원장 코드: ${context.escapeHtml(doctor?.name || "-")} · 수술: ${context.escapeHtml(surgery?.department || context.inferSurgeryDepartment(surgery?.name || ""))} - ${context.escapeHtml(usage.surgeryDetail || surgery?.name || "-")}</span>
                     </div>
                   </div>
                 `).join("") : `<div class="empty">해당 기간 사용 케이스가 없습니다.</div>`}
@@ -482,7 +482,7 @@
           <div class="meta">
             ${context.auditMetaHtml(usage, "입력")}
             ${doubleCheckText ? `<span>${context.escapeHtml(doubleCheckText)}</span>` : ""}
-            <span>과/원장 코드: ${context.escapeHtml(doctor?.name || "-")} · 수술: ${context.escapeHtml(surgeryDepartment)} - ${context.escapeHtml(surgery?.name || "-")}</span>
+            <span>과/원장 코드: ${context.escapeHtml(doctor?.name || "-")} · 수술: ${context.escapeHtml(surgeryDepartment)} - ${context.escapeHtml(usage.surgeryDetail || surgery?.name || "-")}</span>
             <div class="usage-check-badges">
               <span class="usage-check-badge ${nonpayTotal ? "warn" : "muted"}">비급여 ${nonpayTotal}개</span>
               <span class="usage-check-badge ${tissueTotal ? "info" : "muted"}">인체조직 ${tissueTotal}개</span>
@@ -582,7 +582,7 @@
           context.auditTimeText(usage),
           doctor?.name || "",
           surgery?.department || context.inferSurgeryDepartment(surgery?.name || ""),
-          surgery?.name || "",
+          usage.surgeryDetail || surgery?.name || "",
           productText
         ];
       });

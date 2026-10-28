@@ -63,20 +63,20 @@ const firebaseConfig = {
 
 const menus = [
   ["dashboard", "대시보드"],
+  ["morningcount", "실사·재고"],
   ["use", "케이스 입력"],
-  ["roomclose", "방 마감 이력"],
-  ["edit", "케이스 수정"],
   ["history", "사용내역"],
+  ["purchase", "구매주문"],
   ["receipts", "입고관리"],
   ["implants", "임플란트"],
   ["settings", "설정"]
 ];
 
 const roleAllowedViews = {
-  admin: ["dashboard", "use", "roomclose", "edit", "history", "receipts", "implants", "settings"],
-  manager: ["dashboard", "use", "roomclose", "edit", "history", "receipts", "implants", "settings"],
-  receiver: ["receipts", "implants"],
-  staff: ["dashboard", "use", "edit", "history", "implants"]
+  admin: ["dashboard", "morningcount", "use", "edit", "history", "purchase", "receipts", "implants", "settings"],
+  manager: ["dashboard", "morningcount", "use", "edit", "history", "purchase", "receipts", "implants", "settings"],
+  receiver: ["purchase", "receipts", "implants"],
+  staff: ["dashboard", "morningcount", "use", "edit", "history", "purchase", "implants"]
 };
 
 const roleLabels = {
@@ -87,8 +87,10 @@ const roleLabels = {
 };
 
 const settingsMenus = [
-  ["products", "제품관리"],
-  ["doctors", "과관리"],
+  ["prescriptions", "재료·코드 관리"],
+  ["products", "재고제품 상세"],
+  ["patterns", "원장별 처방"],
+  ["doctors", "원장관리"],
   ["surgeries", "수술관리"],
   ["usageRules", "수술별 사용관리"],
   ["implantVendors", "임플란트 업체"],
@@ -102,7 +104,11 @@ const blankState = () => ({
   receipts: [],
   usages: [],
   roomRefills: [],
+  morningCounts: [],
   usageRules: [],
+  prescriptionMaterialSettings: [],
+  prescriptionPatternSettings: [],
+  purchaseRequests: [],
   hiddenLowProductIds: [],
   backupVersions: [],
   updatedAt: ""
@@ -133,7 +139,10 @@ const seedDoctors = [
   "OS25",
   "NS39",
   "NS51",
-  "URO1"
+  "URO1",
+  "NS23",
+  "OS26",
+  "URO2"
 ];
 const defaultDepartmentOnlyNames = ["NS", "OS", "CS", "GS", "URO"];
 
@@ -293,7 +302,8 @@ let productCategoryToKeepOpen = "";
 let useEntryDirty = false;
 let editEntryDirty = false;
 let productFormDirty = false;
-let roomCloseDirty = false;
+let prescriptionSettingsDirty = false;
+let morningCountDirty = false;
 let deferredUseEntryRender = false;
 const useEntryAutosaveKey = "orInventoryUseEntryPatientDraft";
 const useEntryAutosaveMaxAgeMs = 12 * 60 * 60 * 1000;
@@ -348,6 +358,9 @@ const nextNonpaySortOrder = (excludeId = "") => {
 const productById = (id) => state.products.find((item) => item.id === id);
 const isVendorManagedProduct = (product) =>
   productCategory(product?.category) === "인체조직" && Boolean(product?.vendorManaged);
+const isUnconfirmedStock = (product) => window.ORPurchase.unconfirmed(product);
+const isPurchaseProduct = (product) => window.ORPurchase.isPurchase(product);
+const stockDisplay = (product) => window.ORPurchase.stockText(product);
 const departmentById = (id) => state.doctors.find((item) => item.id === id);
 const surgeryById = (id) => state.surgeries.find((item) => item.id === id);
 const usageRuleById = (id) => state.usageRules.find((item) => sameId(item.id, id));
@@ -355,10 +368,147 @@ const surgeryDoctorIds = (surgery) => Array.isArray(surgery?.doctorIds) ? surger
 const isCommonSurgery = (surgery) => surgeryDoctorIds(surgery).length === 0;
 const surgeryVisibleForDoctor = (surgery, doctorId) => isCommonSurgery(surgery) || surgeryDoctorIds(surgery).some((id) => sameId(id, doctorId));
 const visibleSurgeriesFor = (department, doctorId) => state.surgeries
-  .slice()
+  .filter(item => item.active !== false)
   .sort((a, b) => alphaFirstCompare(a.name, b.name))
   .filter((item) => (item.department || inferSurgeryDepartment(item.name)) === department)
   .filter((item) => doctorId && surgeryVisibleForDoctor(item, doctorId));
+
+const PRESCRIPTION_MATERIAL_GROUPS = ["수술팩", "Suture material", "비급여", "GS", "URO", "약물", "일반재료"];
+const normalizedPrescriptionCatalogName = (value) => String(value || "")
+  .normalize("NFKC")
+  .toLowerCase()
+  .replace(/[^a-z0-9가-힣]+/g, "");
+const prescriptionBaseSettingId = (name) => `prescription-base:${normalizedPrescriptionCatalogName(name)}`;
+const prescriptionBaseCatalog = () => Array.isArray(window.ORPrescriptionPatterns?.materialCatalog)
+  ? window.ORPrescriptionPatterns.materialCatalog
+  : [];
+const prescriptionSettingRecords = (targetState = state) => Array.isArray(targetState?.prescriptionMaterialSettings)
+  ? targetState.prescriptionMaterialSettings
+  : [];
+const prescriptionProductMatchByName = (name) => {
+  const needle = normalizedPrescriptionCatalogName(name);
+  if (!needle || needle.length < 3) return null;
+  const setting = prescriptionSettingRecords().find(item => [item.name, ...(item.aliases || [])].some(n => normalizedPrescriptionCatalogName(n) === needle));
+  if (setting?.inventoryMode === 'excluded') return null;
+  if (setting?.linkedProductId) { const p = productById(setting.linkedProductId); return p?.active !== false ? p || null : null; }
+  const matches = state.products.filter((product) => {
+    const candidate = normalizedPrescriptionCatalogName(product.name);
+    return product.active !== false && candidate === needle;
+  });
+  return matches.length === 1 ? matches[0] : null;
+};
+const inferredPrescriptionMaterialGroup = (material) => {
+  const section = material?.section || "공통재료";
+  if (section === "수술팩·행위료") return "수술팩";
+  const materialNames = [material?.name, ...(Array.isArray(material?.aliases) ? material.aliases : [])].filter(Boolean);
+  const matchedProduct = materialNames.map(prescriptionProductMatchByName).find(Boolean);
+  const knownNonpayName = /FLOSEAL|플로실|M-?CLOT|MEDICLORE|TENDOREGEN|HISTOACRYL|KLOTPAD|EXOFIN|타우로린|TAUROL|HYDROCOOL|VISCOSEAL|HYAZEN|HYAGEN|HEMOSTOP|WOUND CLOT|INTERGUARD|이노그램|INOGRAM|SURGI CURE/i.test(materialNames.join(" "));
+  if ((matchedProduct && productCategory(matchedProduct.category) === "비급여") || knownNonpayName) return "비급여";
+  if (section === "봉합사") return "Suture material";
+  if (section === "GS") return "GS";
+  if (section === "URO") return "URO";
+  if (section === "약물") return "약물";
+  return "일반재료";
+};
+const inferredPrescriptionSizeFamily = (material) => {
+  const upper = String(material?.name || "").normalize("NFKC").toUpperCase();
+  const hint = String(material?.group || "").normalize("NFKC").toUpperCase();
+  if (hint === "일반팩") return "세종 수술팩";
+  if (hint === "OS8 HIP PACK") return "YK 수술팩";
+  if (hint === "MIS, GS PACK") return "앤티아이 수술팩";
+  const familyRules = [
+    [/VICRYL PLUS/, "VICRYL PLUS"], [/NOVOSYN/, "NOVOSYN"], [/REXLON BLUE NYLON/, "REXLON BLUE NYLON"],
+    [/^NYLON /, "NYLON"], [/BLACK SILK/, "BLACK SILK"], [/SOF-?SILK|SOFSILK/, "SOF SILK"],
+    [/MERSILK/, "MERSILK"], [/^V-LOC 90/, "V-LOC 90"], [/ETHIBOND/, "ETHIBOND"],
+    [/^PDS (?:1|II VIO)/, "PDS"], [/ZIP SONIC/, "ZIP SONIC"], [/SKIN STAPLER/, "SKIN STAPLER"],
+    [/THREADED K-WIRE/, "THREADED K-WIRE"], [/K-WIRE/, "K-WIRE"], [/STEINMANN PIN/, "STEINMANN PIN"],
+    [/ROLL WIRE/, "ROLL WIRE"], [/^OS SPLINT/, "OS SPLINT"], [/QPLINT-SHORT ARM/, "QPLINT SHORT ARM"],
+    [/QPLINT-LONG ARM/, "QPLINT LONG ARM"], [/QPLINT-SHORT LEG/, "QPLINT SHORT LEG"],
+    [/QPLINT-LONG LEG/, "QPLINT LONG LEG"], [/ALUMINUM SPLINT/, "ALUMINUM SPLINT"], [/BAROVAC/, "BAROVAC"],
+    [/CROWN TROCAR/, "CROWN TROCAR"], [/LAPORT-E/, "LAPORT-E"], [/ENDOGARD/, "ENDOGARD"],
+    [/LAP BAG/, "LAP BAG"], [/LAPLOOP/, "LAPLOOP"], [/VASOCLIP/, "VASOCLIP"],
+    [/SOUND REACH/, "SOUND REACH"], [/SONICURE/, "SONICURE"], [/GLOVE PORT/, "GLOVE PORT"],
+    [/ANASTOCLIP CLOSURE SYSTEM/, "ANASTOCLIP"], [/^OP SITE /, "OP SITE"], [/OPSITE POST-OP/, "OPSITE POST-OP"],
+    [/COBAN /, "COBAN"], [/TEGADERM/, "TEGADERM"], [/슈퍼포아/, "슈퍼포아"],
+    [/DUAL PATTY/, "DUAL PATTY"], [/SURGI CHITO/, "SURGI CHITO"], [/COLTRIX TENDOREGEN/, "COLTRIX TENDOREGEN"],
+    [/HYAGEN/, "HYAGEN"], [/토니밴드/, "토니밴드"], [/SCORPION NEEDLE/, "SCORPION NEEDLE"],
+    [/CEMEX/, "CEMEX"], [/SIMPLEX/, "SIMPLEX"], [/DOUJET/, "DOUJET"],
+    [/대한리도카인/, "리도카인"], [/티씰/, "티씰"], [/타코실/, "타코실"],
+    [/대한멸균생리식염수/, "멸균생리식염수"], [/노보시스/, "노보시스"]
+  ];
+  return familyRules.find(([pattern]) => pattern.test(upper))?.[1] || "";
+};
+const prescriptionSectionForGroup = (group) => ({
+  "수술팩": "수술팩·행위료",
+  "Suture material": "봉합사",
+  "GS": "GS",
+  "URO": "URO",
+  "약물": "약물"
+}[group] || "공통재료");
+const prescriptionMaterialSortValue = (item) => {
+  const managed = Number(item?.sortOrder);
+  if (Number.isFinite(managed)) return managed;
+  const paper = Number(item?.paperOrder);
+  return Number.isFinite(paper) ? (paper + 1) * 10 : Number.MAX_SAFE_INTEGER;
+};
+const effectivePrescriptionMaterials = ({ includeInactive = false } = {}) => {
+  const records = prescriptionSettingRecords();
+  const byId = new Map(records.map((record) => [String(record.id || ""), record]));
+  const base = prescriptionBaseCatalog().map((material) => {
+    const settingsId = prescriptionBaseSettingId(material.name);
+    const override = byId.get(settingsId) || {};
+    const managedGroup = PRESCRIPTION_MATERIAL_GROUPS.includes(override.group)
+      ? override.group
+      : inferredPrescriptionMaterialGroup(material);
+    const managedFamily = Object.prototype.hasOwnProperty.call(override, "family")
+      ? String(override.family || "").trim()
+      : inferredPrescriptionSizeFamily(material);
+    return {
+      ...material,
+      name: override.name || material.name,
+      code: override.code || '',
+      aliases: [...new Set([material.name, ...(material.aliases || []), ...(override.aliases || [])])],
+      linkedProductId: override.linkedProductId || '',
+      inventoryMode: override.inventoryMode || '',
+      settingsId,
+      custom: false,
+      active: override.active !== false,
+      managedGroup,
+      managedFamily,
+      sortOrder: Number.isFinite(Number(override.sortOrder)) ? Number(override.sortOrder) : prescriptionMaterialSortValue(material)
+    };
+  });
+  const custom = records.filter((record) => record?.custom && record?.name).map((record) => ({
+    name: String(record.name).trim(),
+    linkedProductId: record.linkedProductId || '',
+    inventoryMode: record.inventoryMode || '',
+    section: record.section || prescriptionSectionForGroup(record.group),
+    aliases: record.aliases || [],
+    code: record.code || '',
+    settingsId: record.id,
+    custom: true,
+    active: record.active !== false,
+    managedGroup: PRESCRIPTION_MATERIAL_GROUPS.includes(record.group) ? record.group : "일반재료",
+    managedFamily: String(record.family || "").trim(),
+    sortOrder: prescriptionMaterialSortValue(record)
+  }));
+  return [...base, ...custom]
+    .filter((item) => includeInactive || item.active)
+    .sort((left, right) => {
+      const groupDelta = PRESCRIPTION_MATERIAL_GROUPS.indexOf(left.managedGroup) - PRESCRIPTION_MATERIAL_GROUPS.indexOf(right.managedGroup);
+      if (groupDelta) return groupDelta;
+      return prescriptionMaterialSortValue(left) - prescriptionMaterialSortValue(right) || alphaFirstCompare(left.name, right.name);
+    });
+};
+const applyPrescriptionSettingChanges = (targetState, changes) => {
+  const byId = new Map(prescriptionSettingRecords(targetState).map((record) => [String(record.id || ""), { ...record }]));
+  changes.forEach((change) => {
+    if (!change?.id) return;
+    const current = byId.get(String(change.id)) || { id: change.id };
+    byId.set(String(change.id), { ...current, ...change });
+  });
+  targetState.prescriptionMaterialSettings = Array.from(byId.values());
+};
 
 const setStatus = (message, type = "ok") => {
   status.textContent = message;
@@ -367,11 +517,12 @@ const setStatus = (message, type = "ok") => {
 
 const isUseEntryProtected = () => currentView === "use" && useEntryDirty;
 const isEditEntryProtected = () => currentView === "edit" && editEntryDirty;
-const isProductFormProtected = () => currentView === "settings" && currentSettingsView === "products" && productFormDirty;
-const isRoomCloseProtected = () => currentView === "roomclose" && roomCloseDirty;
+const isProductFormProtected = () => currentView === "settings" && ((currentSettingsView === "products" && productFormDirty) || (["doctors", "surgeries"].includes(currentSettingsView) && departmentsModule?.isDirty()));
+const isPrescriptionSettingsProtected = () => currentView === "settings" && ((currentSettingsView === "prescriptions" && prescriptionSettingsDirty) || (currentSettingsView === "patterns" && prescriptionAdminModule?.isDirty()));
+const isMorningCountProtected = () => currentView === "morningcount" && morningCountDirty;
 
 const renderOrDeferForUseEntry = (message = "새 데이터가 들어왔습니다. 입력 중인 사용입력을 보호하고 있습니다.") => {
-  if (isUseEntryProtected() || isEditEntryProtected() || isProductFormProtected() || isRoomCloseProtected()) {
+  if (isUseEntryProtected() || isEditEntryProtected() || isProductFormProtected() || isPrescriptionSettingsProtected() || isMorningCountProtected() || (['purchase','morningcount'].includes(currentView) && purchaseModule?.isDirty())) {
     deferredUseEntryRender = true;
     setStatus(message, "ok");
     return false;
@@ -603,6 +754,34 @@ const dedupeRoomRefills = (refills = []) => {
   return Array.from(byKey.values());
 };
 
+// 같은 날짜의 아침 실사 기록이 중복되면(동시 저장 등) 품목 단위로 병합한다 — 나중 입력(at)이 이긴다.
+const dedupeMorningCounts = (counts = []) => {
+  const byDate = new Map();
+  counts.forEach((record) => {
+    if (!record) return;
+    const key = record.date || "";
+    const current = byDate.get(key);
+    if (!current) {
+      byDate.set(key, { ...record, items: [...(record.items || [])] });
+      return;
+    }
+    const nextTime = String(record.updatedAt || record.createdAt || "");
+    const currentTime = String(current.updatedAt || current.createdAt || "");
+    const base = nextTime >= currentTime ? { ...record } : { ...current };
+    const byProduct = new Map();
+    [...(current.items || []), ...(record.items || [])].forEach((item) => {
+      if (!item) return;
+      const productKey = String(item.productId || "");
+      const existing = byProduct.get(productKey);
+      if (!existing || String(item.at || "") >= String(existing.at || "")) byProduct.set(productKey, item);
+    });
+    base.items = Array.from(byProduct.values());
+    base.createdAt = [current.createdAt, record.createdAt].filter(Boolean).sort()[0] || base.createdAt;
+    byDate.set(key, base);
+  });
+  return Array.from(byDate.values());
+};
+
 const normalizeState = (data) => ({
   ...blankState(),
   ...data,
@@ -612,12 +791,16 @@ const normalizeState = (data) => ({
   receipts: Array.isArray(data?.receipts) ? data.receipts : [],
   usages: Array.isArray(data?.usages) ? data.usages : [],
   roomRefills: dedupeRoomRefills(Array.isArray(data?.roomRefills) ? data.roomRefills : []),
+  morningCounts: dedupeMorningCounts(Array.isArray(data?.morningCounts) ? data.morningCounts : []),
   usageRules: Array.isArray(data?.usageRules) ? data.usageRules : [],
+  purchaseRequests: Array.isArray(data?.purchaseRequests) ? data.purchaseRequests : [],
+  prescriptionPatternSettings: Array.isArray(data?.prescriptionPatternSettings) ? data.prescriptionPatternSettings : [],
+  prescriptionMaterialSettings: Array.isArray(data?.prescriptionMaterialSettings) ? data.prescriptionMaterialSettings : [],
   hiddenLowProductIds: Array.isArray(data?.hiddenLowProductIds) ? data.hiddenLowProductIds : [],
   backupVersions: Array.isArray(data?.backupVersions) ? data.backupVersions : []
 });
 
-const PRODUCT_CATEGORIES = ["비급여", "인체조직", "ANCHOR", "URO_LANDING", "GS_LANDING", "IMPLANT"];
+const PRODUCT_CATEGORIES = ["비급여", "PURCHASE", "인체조직", "ANCHOR", "URO_LANDING", "GS_LANDING", "IMPLANT"];
 // 환자정보 대신 비식별 케이스 번호(수술실-순서, 예: "1-1")를 쓴다.
 const CASE_ROOM_COUNT = 10;
 const caseRoomText = (item) => String(item?.caseRoom || "").trim();
@@ -773,6 +956,7 @@ const receiptProductMeta = (receipt) => {
   ].filter(Boolean).join(" · ");
 };
 const receiptTypeLabel = (receipt) => {
+  if (receipt?.type === "purchase") return "구매재료";
   if (receipt?.type === "landing") return "랜딩";
   if (receipt?.type === "landingCarryover") return "이월 랜딩";
   if (receipt?.type === "landingCancelled") return "랜딩 취소";
@@ -785,6 +969,7 @@ const receiptSortValue = (receipt) => {
   return Number.isNaN(time) ? 0 : time;
 };
 const receiptHistoryTypeMatches = (receipt, type = "") => {
+  if (type === "purchase") return receipt?.type === "purchase";
   if (type === "landing") return ["landing", "landingCarryover", "landingCancelled"].includes(receipt?.type);
   if (type === "loan") return receipt?.type === "loan";
   if (type === "nonpay") return !receipt?.type || receipt?.type === "nonpay";
@@ -925,7 +1110,7 @@ const addSeedMasters = () => {
         company: seed.company,
         subcategory: seed.subcategory,
         stock: target.stock,
-        baseStock: Number.isFinite(Number(target.baseStock)) ? num(target.baseStock) : seed.baseStock,
+        baseStock: Number.isFinite(Number(target.baseStock)) ? Number(target.baseStock) : seed.baseStock,
         landingQty: num(target.landingQty) || seed.landingQty,
         warningStock: num(target.warningStock) || seed.warningStock
       };
@@ -973,7 +1158,7 @@ const reconcileProductStocks = () => {
     const productUsed = used.get(product.id) || 0;
     const productReceived = received.get(product.id) || 0;
     const baseStock = Number.isFinite(Number(product.baseStock))
-      ? num(product.baseStock)
+      ? Number(product.baseStock)
       : seed
         ? num(seed.baseStock)
         : num(product.stock) - productReceived + productUsed;
@@ -1024,7 +1209,13 @@ const mergeStates = (remoteData, localData) => {
     receipts: mergeArrayById(remote.receipts, local.receipts, remote.updatedAt, local.updatedAt),
     usages: mergeArrayById(remote.usages, local.usages, remote.updatedAt, local.updatedAt),
     roomRefills: mergeArrayById(remote.roomRefills || [], local.roomRefills || [], remote.updatedAt, local.updatedAt),
+    morningCounts: dedupeMorningCounts([
+      ...mergeArrayById(remote.morningCounts || [], local.morningCounts || [], remote.updatedAt, local.updatedAt)
+    ]),
     usageRules: mergeArrayById(remote.usageRules, local.usageRules, remote.updatedAt, local.updatedAt),
+    purchaseRequests: mergeArrayById(remote.purchaseRequests, local.purchaseRequests, remote.updatedAt, local.updatedAt),
+    prescriptionPatternSettings: mergeArrayById(remote.prescriptionPatternSettings, local.prescriptionPatternSettings, remote.updatedAt, local.updatedAt),
+    prescriptionMaterialSettings: mergeArrayById(remote.prescriptionMaterialSettings, local.prescriptionMaterialSettings, remote.updatedAt, local.updatedAt),
     backupVersions: mergeArrayById(remote.backupVersions || [], local.backupVersions || [], remote.updatedAt, local.updatedAt),
     hiddenLowProductIds: [...new Set([...(remote.hiddenLowProductIds || []), ...(local.hiddenLowProductIds || [])])]
   });
@@ -1048,6 +1239,7 @@ const saveState = async (message = "저장 완료", options = {}) => {
   savingToast(options.savingMessage || "저장 중입니다...");
   state.updatedAt = new Date().toISOString();
   try {
+    if (options.requireTransaction && !(runTransaction && db)) throw new Error('안전한 동시 저장 연결이 준비되지 않았습니다. 다시 시도해 주세요.');
     if (runTransaction && db) {
       const merged = await runTransaction(db, async (transaction) => {
         const serverSnap = await transaction.get(ref);
@@ -1058,17 +1250,19 @@ const saveState = async (message = "저장 완료", options = {}) => {
         // 항목을 되살린다)은 apply 변환을 최신 서버 상태 위에 덧입힌다.
         if (typeof options.apply === "function") {
           const before = state;
-          state = nextState;
-          options.apply(state);
-          reconcileProductStocks();
-          nextState = normalizeState(state);
-          state = before;
+          try {
+            state = nextState;
+            options.apply(state, remoteData);
+            reconcileProductStocks();
+            nextState = normalizeState(state);
+          } finally { state = before; }
         }
         transaction.set(ref, nextState);
         return nextState;
       });
       state = normalizeState(merged);
     } else {
+      if (typeof options.apply === "function") options.apply(state);
       reconcileProductStocks();
       await setDoc(ref, state);
     }
@@ -1089,7 +1283,7 @@ const saveState = async (message = "저장 완료", options = {}) => {
         if (snap.exists()) {
           state = normalizeState(snap.data());
           reconcileProductStocks();
-          render();
+          if (!options.preserveFormOnFailure) render();
         }
       } catch (rollbackError) {
         console.error(rollbackError);
@@ -1110,11 +1304,20 @@ const renderNav = () => {
   nav.querySelectorAll("button").forEach((button) => {
     button.addEventListener("click", () => {
       if (!canOpenView(button.dataset.view)) return;
+      if (button.dataset.view !== currentView && (isUseEntryProtected() || isEditEntryProtected() || isProductFormProtected() || isPrescriptionSettingsProtected() || isMorningCountProtected() || (['purchase','morningcount'].includes(currentView) && purchaseModule?.isDirty())) && !confirm('저장하지 않은 입력이 있습니다. 화면을 이동할까요?')) return;
       currentView = button.dataset.view;
       render();
     });
   });
 };
+
+let purchaseModule;
+const getPurchaseModule = () => purchaseModule ||= window.createPurchaseModule({
+  getState: () => state, escapeHtml, today, canManageSettings, canMarkRequested: canRegisterNonpayReceipts, uid, auditUpdateFields, saveState, render, saveDoneToast,
+  openCount: () => {currentView = "morningcount";render();}
+});
+const renderPurchaseOrders = () => getPurchaseModule().render();
+const bindPurchaseOrders = () => getPurchaseModule().bind();
 
 const implantRecordViews = new Set(["implants", "edit", "history", "receipts"]);
 const currentViewNeedsImplantRecords = () => implantRecordViews.has(currentView);
@@ -1153,6 +1356,7 @@ const ensureImplantRecordsSubscription = () => {
 
 const render = () => {
   if (!ensureLocalSession() || !ensureCurrentViewAllowed()) return;
+  document.body.classList.toggle("use-view-active", currentView === "use");
   // 랜딩보드의 펼침/접힘 상태를 렌더 직전에 캡처해, 원격 갱신 재렌더에도 유지한다.
   if (currentView === "receipts") captureLandingBoardOpenState();
   // 연결 오류로 끊긴 임플란트 업체·임시저장 대기 구독을 재시도한다(구독 중이면 no-op).
@@ -1177,11 +1381,13 @@ const render = () => {
   }
   const views = {
     dashboard: renderDashboard,
+    purchase: renderPurchaseOrders,
     receipts: renderReceipts,
     implants: renderImplants,
     use: renderUse,
-    roomclose: renderRoomClose,
-    history: renderHistory,
+    morningcount: renderMorningCount,
+    // 방 마감 이력은 별도 뷰 대신 사용내역 하단의 접힌 카드로 제공한다(관리자·책임사용자만).
+    history: () => renderHistory() + (canManageSettings() ? renderRoomCloseHistoryCard() : ""),
     edit: renderEditUsage,
     settings: renderSettings
   };
@@ -1216,6 +1422,12 @@ const bindCommon = () => {
       document.getElementById("productId").value = item.id;
       document.getElementById("productCategory").value = item.category;
       document.getElementById("productName").value = item.name;
+      document.getElementById("productOrderCode").value = item.orderCode || "";
+      document.getElementById("productStockUnit").value = item.stockUnit || "EA";
+      document.getElementById("productStockUnit").readOnly = Boolean(item.stockUnit);
+      document.getElementById("productOrderUnit").value = item.orderUnit || "EA";
+      document.getElementById("productUnitsPerOrder").value = item.unitsPerOrder || 1;
+      document.getElementById("productUnconfirmed").checked = item.stockConfirmed === false;
       document.getElementById("productCompany").innerHTML = productCompanyOptions(item.company || "", item.companyVendorId || "");
       document.getElementById("productCompany").value = productCompanySelectValue(item.company || "", item.companyVendorId || "");
       document.getElementById("productSubcategory").value = item.subcategory || "";
@@ -1238,25 +1450,14 @@ const bindCommon = () => {
         return;
       }
       const id = deleteProductBtn.dataset.deleteProduct;
-      const productUsed = state.usages.some((usage) => usage.productIds.some((productId) => sameId(productId, id)));
-      const productReceived = state.receipts.some((receipt) => sameId(receipt.productId, id));
-      // 비급여는 사용량이 방 마감(roomRefills)에만 기록되므로 삭제 확인에 함께 포함한다.
-      const productRefilled = (state.roomRefills || []).some((refill) =>
-        (refill.items || []).some((item) => sameId(item.productId, id)));
-      if ((productUsed || productReceived || productRefilled) && !confirm("내역에 사용된 제품입니다. 그래도 삭제할까요?")) return;
-      const applyProductDelete = (s) => {
-        s.products = s.products.filter((item) => !sameId(item.id, id));
-        s.receipts = s.receipts.filter((item) => !sameId(item.productId, id));
-        s.usages = s.usages.map((usage) => ({ ...usage, productIds: usage.productIds.filter((productId) => !sameId(productId, id)) }));
-        // 방 마감 기록의 해당 품목도 정리한다. items가 비어도 refill 자체는 남겨 마감 상태를 유지한다.
-        s.roomRefills = (s.roomRefills || []).map((refill) => ({
-          ...refill,
-          items: (refill.items || []).filter((item) => !sameId(item.productId, id))
-        }));
+      const current = productById(id);
+      const active = current?.active === false;
+      if (!confirm(active ? "제품을 복원할까요?" : "제품을 선택 목록에서 삭제할까요? 입고·사용·실사 기록은 보존됩니다.")) return;
+      const applyProductDelete = s => {
+        const p = s.products.find(x => sameId(x.id, id));
+        if (p) Object.assign(p, {active, ...auditUpdateFields(), updatedAt: new Date().toISOString()});
       };
-      applyProductDelete(state);
-      render();
-      await saveState("제품 삭제 완료", { apply: applyProductDelete });
+      if (await saveState(active ? "제품 복원 완료" : "제품 삭제 완료", {apply: applyProductDelete})) render();
       return;
     }
 
@@ -1311,16 +1512,12 @@ const bindCommon = () => {
         return;
       }
       const id = deleteDoctorBtn.dataset.deleteDoctor;
-      const doctorToDelete = state.doctors.find((item) => sameId(item.id, id));
-      if (!confirm("과를 삭제할까요?")) return;
-      const doctorName = doctorToDelete?.name;
-      const applyDoctorDelete = (s) => {
-        s.doctors = s.doctors.filter((item) => !sameId(item.id, id));
-        s.surgeries = s.surgeries.filter((item) => item.department !== doctorName);
-      };
-      applyDoctorDelete(state);
-      render();
-      await saveState("과 삭제 완료", { apply: applyDoctorDelete });
+      const active = departmentById(id)?.active === false;
+      if (!confirm(active ? "원장을 복원할까요?" : "원장을 선택 목록에서 삭제할까요? 수술과 과거 기록은 보존됩니다.")) return;
+      if (await saveState("원장 목록 변경 완료", {apply: s => {
+        const d = s.doctors.find(x => sameId(x.id,id));
+        if (d) Object.assign(d,{active, ...auditUpdateFields(), updatedAt:new Date().toISOString()});
+      }})) render();
       return;
     }
 
@@ -1351,13 +1548,12 @@ const bindCommon = () => {
         return;
       }
       const id = deleteSurgeryBtn.dataset.deleteSurgery;
-      if (!confirm("수술을 삭제할까요?")) return;
-      const applySurgeryDelete = (s) => {
-        s.surgeries = s.surgeries.filter((item) => !sameId(item.id, id));
-      };
-      applySurgeryDelete(state);
-      render();
-      await saveState("수술 삭제 완료", { apply: applySurgeryDelete });
+      const active = surgeryById(id)?.active === false;
+      if (!confirm(active ? "수술을 복원할까요?" : "수술을 선택 목록에서 삭제할까요? 과거 기록은 보존됩니다.")) return;
+      if (await saveState("수술 목록 변경 완료", {apply: s => {
+        const surgery = s.surgeries.find(x => sameId(x.id,id));
+        if (surgery) Object.assign(surgery,{active, ...auditUpdateFields(), updatedAt:new Date().toISOString()});
+      }})) render();
       return;
     }
 
@@ -1409,17 +1605,337 @@ const bindCommon = () => {
 const bindView = () => {
   const handlers = {
     dashboard: bindDashboard,
+    purchase: bindPurchaseOrders,
     receipts: bindReceipts,
     implants: bindImplants,
     use: bindUse,
-    roomclose: bindRoomClose,
-    history: bindHistory,
+    morningcount: bindMorningCount,
+    history: () => { bindHistory(); if (canManageSettings()) bindRoomCloseHistory(); },
     edit: bindEditUsage,
     settings: bindSettings
   };
   handlers[currentView]?.();
 };
 
+const prescriptionSettingsGroupOptions = (selected = "") => PRESCRIPTION_MATERIAL_GROUPS
+  .map((group) => `<option value="${escapeHtml(group)}" ${group === selected ? "selected" : ""}>${escapeHtml(group)}</option>`)
+  .join("");
+
+const renderPrescriptionSettings = () => {
+  const materials = effectivePrescriptionMaterials({ includeInactive: true });
+  const activeCount = materials.filter((item) => item.active).length;
+  const customCount = materials.filter((item) => item.custom).length;
+  const grouped = new Map(PRESCRIPTION_MATERIAL_GROUPS.map((group) => [group, []]));
+  materials.forEach((material) => grouped.get(material.managedGroup)?.push(material));
+  const groupHtml = PRESCRIPTION_MATERIAL_GROUPS.map((group) => {
+    const rows = grouped.get(group) || [];
+    return `<details class="item prescription-admin-group" data-prescription-admin-group="${escapeHtml(group)}" open>
+      <summary><span>${escapeHtml(group)}</span><span class="pill">${rows.length}항목</span></summary>
+      <div class="prescription-admin-dropzone" data-prescription-drop-group="${escapeHtml(group)}">
+        ${rows.map((material) => `<div class="prescription-admin-row ${material.active ? "" : "inactive"}" data-prescription-setting-row="${escapeHtml(material.settingsId)}" data-prescription-search="${escapeHtml(normalizedPrescriptionCatalogName(`${material.code || ''} ${material.name} ${material.managedFamily}`))}">
+          <span class="prescription-drag-handle" draggable="true" data-prescription-drag-handle="${escapeHtml(material.settingsId)}" title="마우스로 끌어서 순서 이동" aria-label="${escapeHtml(material.name)} 순서 이동">⋮⋮</span>
+          <span class="prescription-admin-name" title="${escapeHtml(material.name)}"><strong>${escapeHtml(material.name)}</strong><small>${escapeHtml(material.code || "코드 미등록")} · ${material.custom ? "추가 제품" : "처방종류 원본"}</small></span>
+          <label class="prescription-stock-link">재고 연결<select data-prescription-stock-link="${escapeHtml(material.settingsId)}"><option value="">정확히 같은 이름만 연결</option><option value="__excluded__" ${material.inventoryMode === 'excluded' ? 'selected' : ''}>재고 제외 (행위료·확인 항목)</option>${state.products.map(p => `<option value="${escapeHtml(p.id)}" ${material.linkedProductId === p.id ? 'selected' : ''}>${escapeHtml(p.orderCode || '')} ${escapeHtml(p.name)} / ${escapeHtml(p.stockUnit || '개')}</option>`).join('')}</select></label>
+          <select data-prescription-setting-group="${escapeHtml(material.settingsId)}" aria-label="${escapeHtml(material.name)} 묶음">${prescriptionSettingsGroupOptions(material.managedGroup)}</select>
+          <input type="text" value="${escapeHtml(material.managedFamily)}" data-prescription-setting-family="${escapeHtml(material.settingsId)}" placeholder="같은 제품 규격 묶음" aria-label="${escapeHtml(material.name)} 하위 묶음">
+          <button type="button" class="secondary" data-edit-prescription-material="${escapeHtml(material.settingsId)}">코드·명칭 수정</button><button class="secondary prescription-active-toggle" type="button" data-toggle-prescription-setting="${escapeHtml(material.settingsId)}">${material.active ? "목록에서 삭제" : "복원"}</button>
+        </div>`).join("") || `<div class="prescription-admin-empty" data-prescription-group-empty>이 묶음에는 제품이 없습니다. 다른 묶음의 제품을 끌어 놓을 수 있습니다.</div>`}
+      </div>
+    </details>`;
+  }).join("");
+  return `<section class="prescription-settings-layout">
+    <form class="card prescription-add-form" id="prescriptionSettingForm">
+      <div class="item-title"><span>처방 제품 추가·수정</span><span class="pill">코드 + 제품명</span></div>
+      <p class="helper">제품명·처방코드를 수동으로 관리합니다. 구매코드는 제품관리에서 별도로 관리합니다. 삭제 시 과거 기록은 남습니다.</p>
+      <input id="prescriptionSettingId" type="hidden"><label>처방코드 (선택)<input id="prescriptionSettingCode" maxlength="80" autocomplete="off"></label><label for="prescriptionSettingName">제품 명칭</label>
+      <input id="prescriptionSettingName" required autocomplete="off" placeholder="처방전에 표시할 정식 명칭">
+      <div class="prescription-add-fields">
+        <label>큰 묶음<select id="prescriptionSettingGroup" required>${prescriptionSettingsGroupOptions("일반재료")}</select></label>
+        <label>같은 제품 규격 묶음<input id="prescriptionSettingFamily" placeholder="예: VICRYL PLUS (선택)"></label>
+      </div>
+      <details><summary>구매코드·재고 연결 함께 설정</summary>
+        <label>실제 재고 제품<select id="materialInventoryProduct"><option value="__auto__">기존 연결 유지 / 정확한 이름 연결</option><option value="__excluded__">행위료 등 재고 제외</option><option value="__new__">새 재고 제품 등록 (기존 제품이 없을 때만)</option>${state.products.filter(p=>p.active!==false).map(p=>`<option value="${escapeHtml(p.id)}">${escapeHtml(p.orderCode||'')} · ${escapeHtml(p.name)}</option>`).join('')}</select></label>
+        <div id="materialInventoryFields" hidden><label>실제 재고 제품명<input id="materialInventoryName"></label><label>구매팀 품목코드<input id="materialPurchaseCode"></label><p id="materialCodeCheck" class="helper" role="status"></p>
+        <div class="row three"><label>사용 단위<input id="materialStockUnit" value="EA"></label><label>구매 단위<input id="materialOrderUnit" value="EA"></label><label>구매 1단위당 수량<input id="materialFactor" type="number" min="1" step="1" value="1"></label></div><p id="materialUnitPreview" class="helper"></p>
+        <p class="helper">기존 비급여는 기존 제품을 연결하세요. 새 재고 제품은 미확정으로 시작합니다. 재고·입고 이력은 유지됩니다.</p></div>
+      </details>
+      <button type="submit">재료·코드 함께 저장</button><button class="secondary" type="button" id="prescriptionSettingReset">새로 입력</button>
+    </form>
+    <div class="card prescription-admin-card">
+      <div class="prescription-admin-head">
+        <div><h2>처방 목록 관리</h2><p class="helper">⋮⋮를 끌어 순서를 바꾸거나 다른 큰 묶음으로 옮길 수 있습니다.</p></div>
+        <div class="prescription-admin-count"><strong>${activeCount}</strong>사용 중 · <strong>${customCount}</strong>추가</div>
+      </div>
+      <div class="prescription-admin-tools">
+        <input id="prescriptionSettingSearch" type="search" placeholder="처방코드·제품명·규격 검색" aria-label="처방 제품 찾기">
+        <select id="prescriptionSettingGroupFilter" aria-label="큰 묶음 필터"><option value="">전체 묶음</option>${prescriptionSettingsGroupOptions()}</select>
+      </div>
+      <div class="prescription-admin-column-head"><span></span><span>제품 명칭</span><span>큰 묶음</span><span>같은 제품 규격 묶음</span><span>표시</span></div>
+      <div class="prescription-admin-groups">${groupHtml}</div>
+    </div>
+  </section>`;
+};
+
+const prescriptionSettingChange = (material, patch = {}) => ({
+  id: material.settingsId,
+  name: material.name,
+  custom: material.custom === true,
+  ...(material.custom ? { section: material.section || prescriptionSectionForGroup(material.managedGroup) } : {}),
+  ...patch,
+  ...auditUpdateFields(),
+  updatedAt: new Date().toISOString()
+});
+
+const savePrescriptionSettingChanges = async (changes, message, applyInventory = null) => {
+  if (!changes.length) return;
+  const applyChanges = (targetState) => { if(applyInventory) applyInventory(targetState); applyPrescriptionSettingChanges(targetState, changes); };
+  if (await saveState(message, { apply: applyChanges })) {
+    prescriptionSettingsDirty = false;
+    render();
+  }
+};
+
+const bindPrescriptionSettings = () => {
+  document.querySelectorAll('[data-prescription-stock-link]').forEach(select => select.addEventListener('change', async () => {
+    if (!canManageSettings()) return;
+    const material = effectivePrescriptionMaterials({includeInactive:true}).find(m => m.settingsId === select.dataset.prescriptionStockLink);
+    if (!material) return;
+    await savePrescriptionSettingChanges([prescriptionSettingChange(material, {linkedProductId: select.value === '__excluded__' ? '' : select.value, inventoryMode: select.value === '__excluded__' ? 'excluded' : ''})], '처방 재고 연결 저장 완료');
+  }));
+  const form = document.getElementById("prescriptionSettingForm");
+  document.getElementById("prescriptionSettingReset")?.addEventListener("click", () => {
+    if (prescriptionSettingsDirty && !confirm("저장하지 않은 내용을 비울까요?")) return;
+    form.reset(); document.getElementById("prescriptionSettingId").value = ""; syncMaterialInventory(); prescriptionSettingsDirty = false;
+  });
+  document.querySelectorAll("[data-edit-prescription-material]").forEach(b => b.addEventListener("click", () => {
+    if (prescriptionSettingsDirty && !confirm("저장하지 않은 내용을 비우고 수정할까요?")) return;
+    const m = effectivePrescriptionMaterials({includeInactive:true}).find(x => x.settingsId === b.dataset.editPrescriptionMaterial);
+    if (!m) return;
+    document.getElementById("prescriptionSettingId").value = m.settingsId;
+    document.getElementById("prescriptionSettingName").value = m.name;
+    document.getElementById("prescriptionSettingCode").value = m.code || "";
+    document.getElementById("prescriptionSettingGroup").value = m.managedGroup;
+    document.getElementById("prescriptionSettingFamily").value = m.managedFamily;
+    document.getElementById("materialInventoryProduct").value = m.inventoryMode === 'excluded' ? '__excluded__' : m.linkedProductId || '__auto__';
+    syncMaterialInventory();
+    prescriptionSettingsDirty = false; form.scrollIntoView({block:"start",behavior:"smooth"});
+  }));
+  const syncMaterialInventory = () => {
+    const choice = document.getElementById("materialInventoryProduct").value;
+    const p = productById(choice);
+    document.getElementById("materialInventoryFields").hidden = !p && choice !== '__new__';
+    document.getElementById("materialInventoryName").value = p?.name || document.getElementById("prescriptionSettingName").value;
+    document.getElementById("materialPurchaseCode").value = p?.orderCode || '';
+    document.getElementById("materialStockUnit").value = p?.stockUnit || 'EA';
+    document.getElementById("materialStockUnit").readOnly = Boolean(p?.stockUnit);
+    document.getElementById("materialOrderUnit").value = p?.orderUnit || 'EA';
+    document.getElementById("materialFactor").value = p?.unitsPerOrder || 1;
+    previewMaterialUnit();
+  };
+  const previewMaterialUnit = () => {
+    const factor = Number(document.getElementById("materialFactor").value);
+    document.getElementById("materialUnitPreview").textContent = factor > 0 ? `1 ${document.getElementById("materialOrderUnit").value} = ${factor} ${document.getElementById("materialStockUnit").value}` : '단위를 확인해 주세요.';
+    const code=document.getElementById('materialPurchaseCode').value.trim().toUpperCase();
+    const reference=(window.ORPurchaseCatalog||[]).find(x=>String(x.code).toUpperCase()===code);
+    document.getElementById('materialCodeCheck').textContent=!code?'구매팀에서 사용하는 코드를 입력하세요.':reference?`제공 물류목록: ${reference.name} · ${reference.spec} · ${reference.orderUnit}. 선택 제품과 같은지 확인하세요.`:'제공 물류목록에서 찾지 못한 코드입니다. 새 품목이라면 구매팀에 확인한 코드만 입력하세요.';
+  };
+  document.getElementById("materialInventoryProduct").addEventListener('change',syncMaterialInventory);
+  ['materialFactor','materialOrderUnit','materialStockUnit','materialPurchaseCode'].forEach(id=>document.getElementById(id).addEventListener('input',previewMaterialUnit));
+  const search = document.getElementById("prescriptionSettingSearch");
+  const groupFilter = document.getElementById("prescriptionSettingGroupFilter");
+  const materialById = () => new Map(effectivePrescriptionMaterials({ includeInactive: true }).map((item) => [String(item.settingsId), item]));
+  const filterRows = () => {
+    const needle = normalizedPrescriptionCatalogName(search?.value);
+    const selectedGroup = groupFilter?.value || "";
+    document.querySelectorAll("[data-prescription-admin-group]").forEach((groupElement) => {
+      const group = groupElement.dataset.prescriptionAdminGroup || "";
+      let visibleCount = 0;
+      groupElement.querySelectorAll("[data-prescription-setting-row]").forEach((row) => {
+        const visible = (!selectedGroup || selectedGroup === group) && (!needle || String(row.dataset.prescriptionSearch || "").includes(needle));
+        row.hidden = !visible;
+        if (visible) visibleCount += 1;
+      });
+      groupElement.hidden = Boolean(selectedGroup && selectedGroup !== group) || (Boolean(needle) && visibleCount === 0);
+      if (visibleCount && (needle || selectedGroup)) groupElement.open = true;
+    });
+  };
+  [search, groupFilter].forEach((input) => input?.addEventListener("input", filterRows));
+  form?.querySelectorAll("input, select").forEach((input) => input.addEventListener("input", () => { prescriptionSettingsDirty = true; }));
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const name = document.getElementById("prescriptionSettingName")?.value?.trim() || "";
+    const group = document.getElementById("prescriptionSettingGroup")?.value || "일반재료";
+    const family = document.getElementById("prescriptionSettingFamily")?.value?.trim() || "";
+    if (!name) return;
+    const editingId = document.getElementById("prescriptionSettingId").value;
+    const code = document.getElementById("prescriptionSettingCode").value.trim();
+    const existing = materialById().get(editingId);
+    const duplicate = effectivePrescriptionMaterials({ includeInactive: true }).filter(item => item.settingsId !== editingId)
+      .find((item) => normalizedPrescriptionCatalogName(item.name) === normalizedPrescriptionCatalogName(name));
+    if (duplicate) {
+      alert(`이미 등록된 제품입니다: ${duplicate.name}`);
+      document.getElementById("prescriptionSettingName")?.focus();
+      return;
+    }
+    const choice = document.getElementById("materialInventoryProduct").value;
+    const inventoryPatch = choice === '__excluded__' ? {inventoryMode:'excluded',linkedProductId:''} : {};
+    let applyInventory = null;
+    if (!choice.startsWith('__') || choice === '__new__') {
+      const productId = choice === '__new__' ? uid() : choice;
+      const productName = document.getElementById("materialInventoryName").value.trim() || name;
+      const orderCode = document.getElementById("materialPurchaseCode").value.trim();
+      const stockUnit = document.getElementById("materialStockUnit").value.trim(), orderUnit = document.getElementById("materialOrderUnit").value.trim(), unitsPerOrder = Number(document.getElementById("materialFactor").value);
+      if (!stockUnit || !orderUnit || !Number.isSafeInteger(unitsPerOrder) || unitsPerOrder < 1) return alert('단위와 포장당 수량을 확인해 주세요.');
+      if(choice === '__new__' && (!orderCode || !confirm('기존 제품이 없는지 확인하셨습니까? 새 구매재료를 등록합니다.'))) return;
+      Object.assign(inventoryPatch,{inventoryMode:'',linkedProductId:productId});
+      applyInventory = target => {
+        if(orderCode && target.products.some(p=>p.id!==productId&&String(p.orderCode||'').toLowerCase()===orderCode.toLowerCase()))throw new Error('이미 다른 제품에 등록된 구매코드입니다.');
+        let p=target.products.find(p=>p.id===productId);
+        if(!p && choice!=='__new__')throw new Error('재고 제품을 찾을 수 없습니다.');
+        if(p?.active===false)throw new Error('삭제된 제품입니다. 먼저 복원해 주세요.');
+        if(p?.stockUnit&&p.stockUnit!==stockUnit)throw new Error('기록 중인 사용 단위는 변경할 수 없습니다.');
+        if(!p){p={id:productId,category:'PURCHASE',stock:0,baseStock:0,stockConfirmed:false,warningStock:0};target.products.push(p);}
+        Object.assign(p,{name:productName,orderCode,purchaseName:productName,stockUnit,orderUnit,unitsPerOrder,...auditUpdateFields(),updatedAt:new Date().toISOString()});
+      };
+    }
+    if (existing) {
+      await savePrescriptionSettingChanges([prescriptionSettingChange(existing, { name, code, group, family, ...inventoryPatch, aliases: [...new Set([existing.name, ...(existing.aliases || [])])] })], "처방 제품 수정 완료", applyInventory);
+      return;
+    }
+    const groupItems = effectivePrescriptionMaterials({ includeInactive: true }).filter((item) => item.managedGroup === group);
+    const maxOrder = groupItems.reduce((max, item) => Math.max(max, prescriptionMaterialSortValue(item)), 0);
+    const id = `prescription-custom:${uid()}`;
+    await savePrescriptionSettingChanges([{
+      id, name, code, custom: true, active: true, group, family, ...inventoryPatch,
+      section: prescriptionSectionForGroup(group), sortOrder: maxOrder + 10,
+      ...auditCreateFields(), ...auditUpdateFields(),
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+    }], "처방 제품 추가 완료", applyInventory);
+  });
+  document.querySelectorAll("[data-prescription-setting-group]").forEach((select) => {
+    select.addEventListener("change", async () => {
+      const material = materialById().get(String(select.dataset.prescriptionSettingGroup));
+      const group = select.value;
+      if (!material || group === material.managedGroup) return;
+      const targetItems = effectivePrescriptionMaterials({ includeInactive: true }).filter((item) => item.managedGroup === group);
+      const maxOrder = targetItems.reduce((max, item) => Math.max(max, prescriptionMaterialSortValue(item)), 0);
+      await savePrescriptionSettingChanges([prescriptionSettingChange(material, {
+        group, sortOrder: maxOrder + 10,
+        ...(material.custom ? { section: prescriptionSectionForGroup(group) } : {})
+      })], "처방 묶음 변경 완료");
+    });
+  });
+  document.querySelectorAll("[data-prescription-setting-family]").forEach((input) => {
+    input.addEventListener("change", async () => {
+      const material = materialById().get(String(input.dataset.prescriptionSettingFamily));
+      if (!material) return;
+      const family = input.value.trim();
+      if (family === material.managedFamily) return;
+      await savePrescriptionSettingChanges([prescriptionSettingChange(material, { family })], "규격 묶음 변경 완료");
+    });
+  });
+  document.querySelectorAll("[data-toggle-prescription-setting]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const material = materialById().get(String(button.dataset.togglePrescriptionSetting));
+      if (!material) return;
+      if (material.active && !confirm('이 재료를 앞으로의 처방 목록에서 삭제할까요? 과거 케이스 기록은 보존됩니다.')) return;
+      await savePrescriptionSettingChanges([prescriptionSettingChange(material, { active: !material.active })], material.active ? "처방 제품 숨김 완료" : "처방 제품 다시 사용");
+    });
+  });
+
+  let draggedId = "";
+  let dropTargetRow = null;
+  let dropAfter = false;
+  const clearDragState = () => {
+    document.querySelectorAll(".prescription-admin-row.dragging, .prescription-admin-row.drop-before, .prescription-admin-row.drop-after, .prescription-admin-dropzone.drag-over")
+      .forEach((element) => element.classList.remove("dragging", "drop-before", "drop-after", "drag-over"));
+    draggedId = "";
+    dropTargetRow = null;
+    dropAfter = false;
+  };
+  const moveDraggedMaterial = async (targetGroup, targetId = "", after = false) => {
+    const materials = effectivePrescriptionMaterials({ includeInactive: true });
+    const dragged = materials.find((item) => String(item.settingsId) === String(draggedId));
+    if (!dragged || !PRESCRIPTION_MATERIAL_GROUPS.includes(targetGroup)) return;
+    const targetRows = materials.filter((item) => item.managedGroup === targetGroup && String(item.settingsId) !== String(draggedId));
+    let insertIndex = targetRows.length;
+    if (targetId) {
+      const found = targetRows.findIndex((item) => String(item.settingsId) === String(targetId));
+      if (found >= 0) insertIndex = found + (after ? 1 : 0);
+    }
+    targetRows.splice(insertIndex, 0, dragged);
+    const previous = targetRows[insertIndex - 1];
+    const next = targetRows[insertIndex + 1];
+    const previousOrder = previous ? prescriptionMaterialSortValue(previous) : null;
+    const nextOrder = next ? prescriptionMaterialSortValue(next) : null;
+    let sortOrder = previousOrder === null ? (nextOrder === null ? 10 : nextOrder - 10) : (nextOrder === null ? previousOrder + 10 : (previousOrder + nextOrder) / 2);
+    let changes;
+    if (!Number.isFinite(sortOrder) || (previousOrder !== null && nextOrder !== null && Math.abs(nextOrder - previousOrder) < 0.001)) {
+      changes = targetRows.map((item, index) => prescriptionSettingChange(item, {
+        group: targetGroup, sortOrder: (index + 1) * 10,
+        ...(item.custom ? { section: prescriptionSectionForGroup(targetGroup) } : {})
+      }));
+    } else {
+      changes = [prescriptionSettingChange(dragged, {
+        group: targetGroup, sortOrder,
+        ...(dragged.custom ? { section: prescriptionSectionForGroup(targetGroup) } : {})
+      })];
+    }
+    await savePrescriptionSettingChanges(changes, "처방 제품 순서 변경 완료");
+  };
+  document.querySelectorAll("[data-prescription-drag-handle]").forEach((handle) => {
+    handle.addEventListener("dragstart", (event) => {
+      draggedId = handle.dataset.prescriptionDragHandle || "";
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", draggedId);
+      handle.closest(".prescription-admin-row")?.classList.add("dragging");
+    });
+    handle.addEventListener("dragend", clearDragState);
+  });
+  document.querySelectorAll("[data-prescription-setting-row]").forEach((row) => {
+    row.addEventListener("dragover", (event) => {
+      if (!draggedId || String(row.dataset.prescriptionSettingRow) === String(draggedId)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const rect = row.getBoundingClientRect();
+      dropAfter = event.clientY > rect.top + rect.height / 2;
+      dropTargetRow?.classList.remove("drop-before", "drop-after");
+      dropTargetRow = row;
+      row.classList.add(dropAfter ? "drop-after" : "drop-before");
+    });
+    row.addEventListener("drop", async (event) => {
+      if (!draggedId) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const targetGroup = row.closest("[data-prescription-drop-group]")?.dataset.prescriptionDropGroup || "";
+      const targetId = row.dataset.prescriptionSettingRow || "";
+      const after = dropAfter;
+      await moveDraggedMaterial(targetGroup, targetId, after);
+      clearDragState();
+    });
+  });
+  document.querySelectorAll("[data-prescription-drop-group]").forEach((zone) => {
+    zone.addEventListener("dragover", (event) => {
+      if (!draggedId || event.target.closest("[data-prescription-setting-row]")) return;
+      event.preventDefault();
+      zone.classList.add("drag-over");
+    });
+    zone.addEventListener("dragleave", () => zone.classList.remove("drag-over"));
+    zone.addEventListener("drop", async (event) => {
+      if (!draggedId || event.target.closest("[data-prescription-setting-row]")) return;
+      event.preventDefault();
+      await moveDraggedMaterial(zone.dataset.prescriptionDropGroup || "");
+      clearDragState();
+    });
+  });
+};
+
+const effectivePrescriptionPatterns = () => window.ORPrescriptionAdmin.effective(window.ORPrescriptionPatterns?.patterns, state.prescriptionPatternSettings);
+let prescriptionAdminModule = null;
+const getPrescriptionAdminModule = () => prescriptionAdminModule || (prescriptionAdminModule = window.createPrescriptionAdminModule({
+  getState: () => state, materials: () => effectivePrescriptionMaterials(), escapeHtml, uid,
+  saveState, render, canManageSettings, auditUpdateFields
+}));
 let settingsModule = null;
 const getSettingsModule = () => {
   if (!window.createSettingsModule) throw new Error("설정 모듈을 불러오지 못했습니다.");
@@ -1432,12 +1948,17 @@ const getSettingsModule = () => {
       canManageSettings,
       render,
       renderProducts,
+      renderPrescriptionSettings,
+      renderPrescriptionPatterns: () => getPrescriptionAdminModule().render(),
+      bindPrescriptionPatterns: () => getPrescriptionAdminModule().bind(),
+      hasUnsavedSettings: () => isProductFormProtected() || isPrescriptionSettingsProtected(),
       renderDoctors,
       renderSurgeries,
       renderUsageRules,
       renderImplantVendors,
       renderBackup,
       bindProducts,
+      bindPrescriptionSettings,
       bindDoctors,
       bindSurgeries,
       bindUsageRules,
@@ -1487,9 +2008,10 @@ const bindDashboard = () => getDashboardModule().bindDashboard();
 
 const productItem = (item, options = {}) => {
   const vendorManaged = isVendorManagedProduct(item);
-  const low = !vendorManaged && num(item.stock) <= num(item.warningStock);
+  const low = !vendorManaged && !isUnconfirmedStock(item) && num(item.stock) <= num(item.warningStock);
   const detail = [
     `분류: ${escapeHtml(productCategoryLabel(item.category))}`,
+    item.orderCode ? `코드: ${escapeHtml(item.orderCode)}` : "",
     item.company ? `업체: ${escapeHtml(item.company)}` : "",
     item.subcategory ? `세부: ${escapeHtml(item.subcategory)}` : "",
     vendorManaged ? "업체관리 · 재고차감 제외" : "",
@@ -1503,7 +2025,7 @@ const productItem = (item, options = {}) => {
       </div>
       <div class="meta">
         <span>${detail}</span>
-        <span>${vendorManaged ? "업체관리품 · 업체 장부 기록" : `${item.roomStocked ? "총재고(보관실+방 합계)" : "현재고"}: ${num(item.stock)} · 경고수량: ${num(item.warningStock)}${item.category === "비급여" ? "" : ` · 랜딩수량: ${num(item.landingQty)}`}`}</span>
+        <span>${isUnconfirmedStock(item) ? "재고 미확정 · 사용량 기록 중" : vendorManaged ? "업체관리품 · 업체 장부 기록" : `${item.roomStocked ? "총재고(보관실+방 합계)" : "현재고"}: ${num(item.stock)} · 경고수량: ${num(item.warningStock)}${item.category === "비급여" ? "" : ` · 랜딩수량: ${num(item.landingQty)}`}`}</span>
       </div>
       ${canManageSettings() ? `<div class="actions">
         ${options.showSort ? `
@@ -1511,7 +2033,7 @@ const productItem = (item, options = {}) => {
           <button class="secondary" type="button" data-move-product-order="${item.id}::down" ${options.canMoveDown ? "" : "disabled"}>아래</button>
         ` : ""}
         <button class="secondary" type="button" data-edit-product="${item.id}">수정</button>
-        <button class="danger" type="button" data-delete-product="${item.id}">삭제</button>
+        <button class="danger" type="button" data-delete-product="${item.id}">${item.active === false ? "복원 (삭제됨)" : "삭제"}</button>
       </div>` : ""}
     </div>
   `;
@@ -1544,7 +2066,7 @@ const renderGroupedProducts = (withActions) => {
   if (!state.products.length) return `<div class="empty">제품을 추가해 주세요.</div>`;
   const categories = PRODUCT_CATEGORIES;
   return categories.map((category) => {
-    const categoryItems = state.products.filter((item) => productCategory(item.category) === category).sort(productDisplaySort(category));
+    const categoryItems = state.products.filter((item) => (withActions || item.active !== false) && productCategory(item.category) === category).sort(productDisplaySort(category));
     if (!categoryItems.length) return "";
     if (category === "비급여") {
       return `
@@ -1627,9 +2149,9 @@ window.adjustQtyButton = (button, delta) => {
 
 const productCheckItem = (item) => `
   <label class="check-card use-card">
-    <input type="checkbox" value="${item.id}" data-use-product="${item.id}" ${!isVendorManagedProduct(item) && num(item.stock) < 1 ? "disabled" : ""}>
-    <span>${escapeHtml(item.name)}<br><span class="muted">${escapeHtml(item.company || item.category)}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ""}${isVendorManagedProduct(item) ? " · 업체관리 · 재고차감 제외" : ""}</span></span>
-    ${qtyStepper(`data-use-qty="${item.id}" aria-label="${escapeHtml(item.name)} 사용 수량"`, 1, isVendorManagedProduct(item) ? 999 : Math.max(1, num(item.stock)))}
+    <input type="checkbox" value="${item.id}" data-use-product="${item.id}" ${!isVendorManagedProduct(item) && !isUnconfirmedStock(item) && num(item.stock) < 1 ? "disabled" : ""}>
+    <span>${escapeHtml(item.name)}<br><span class="muted">${escapeHtml(item.company || item.category)} · ${escapeHtml(stockDisplay(item))}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ""}${isVendorManagedProduct(item) ? " · 업체관리 · 재고차감 제외" : ""}</span></span>
+    ${qtyStepper(`data-use-qty="${item.id}" aria-label="${escapeHtml(item.name)} 사용 수량"`, 1, (isVendorManagedProduct(item) || isUnconfirmedStock(item)) ? 999 : Math.max(1, num(item.stock)))}
   </label>
 `;
 
@@ -1680,6 +2202,13 @@ const getDepartmentsModule = () => {
       getState: () => state,
       getApp: () => app,
       setSyncSurgeryDoctorScope: (handler) => { syncSurgeryDoctorScope = handler; },
+      auditUpdateFields,
+      renameDoctorPatterns: (target, oldName, name) => {
+        const records = new Map((target.prescriptionPatternSettings || []).map(p => [p.id, p]));
+        window.ORPrescriptionAdmin.effective(window.ORPrescriptionPatterns?.patterns, target.prescriptionPatternSettings, true)
+          .filter(p => p.doctorCode === oldName).forEach(p => records.set(p.id, {...records.get(p.id), id:p.id, doctorCode:name, ...auditUpdateFields(), updatedAt:new Date().toISOString()}));
+        target.prescriptionPatternSettings = [...records.values()];
+      },
       departmentOptions,
       departmentNames,
       departmentCode,
@@ -1739,7 +2268,7 @@ const landingUsageLines = (includeReceived = true) => {
     }, new Map());
     return Array.from(counts.entries()).map(([productId, qty]) => {
     const product = productById(productId);
-    if (!product || productCategory(product.category) === "비급여") return null;
+    if (!product || productCategory(product.category) === "비급여" || isPurchaseProduct(product)) return null;
     // 업체관리품은 업체가 장부를 관리하므로 랜딩 입고 확인 대상에서 제외한다.
     if (isVendorManagedProduct(product)) return null;
     const receipt = received.get(landingReceiptKey(usage.id, productId));
@@ -1869,7 +2398,7 @@ const receiptHistoryLineHtml = (receipt, manager) => {
           ${escapeHtml(receipt.type === "landing" ? landingReceiptLineSummary(receipt) : name)}
           <span>${escapeHtml([meta, receipt.memo ? `메모: ${receipt.memo}` : "", receipt.type === "loan" ? `대여: ${receipt.loanDepartment || "-"}` : ""].filter(Boolean).join(" · ") || "-")}</span>
         </div>
-        <strong class="receipt-qty">${num(receipt.qty).toLocaleString()}개</strong>
+        <strong class="receipt-qty">${num(receipt.qty).toLocaleString()} ${escapeHtml(receipt.stockUnit || product?.stockUnit || '개')}</strong>
         ${receiverBadge}
         ${manager ? `<div class="compact-actions receipt-row-actions">
           <button class="secondary" type="button" data-edit-receipt="${escapeHtml(receipt.id)}">수정</button>
@@ -1883,7 +2412,7 @@ const receiptHistoryLineHtml = (receipt, manager) => {
             <input id="receiptEditDate-${escapeHtml(receipt.id)}" type="date" value="${escapeHtml(date)}" data-receipt-edit-date required>
           </div>
           <div>
-            <label for="receiptEditQty-${escapeHtml(receipt.id)}">입고수량</label>
+            <label for="receiptEditQty-${escapeHtml(receipt.id)}">입고수량 (${escapeHtml(receipt.stockUnit || product?.stockUnit || '개')} 기준)</label>
             <input id="receiptEditQty-${escapeHtml(receipt.id)}" type="number" min="1" value="${num(receipt.qty) || 1}" data-receipt-edit-qty required>
           </div>
           <div>
@@ -2390,6 +2919,8 @@ const getUsageEntryModule = () => {
       productCategory,
       productById,
       isVendorManagedProduct,
+      isUnconfirmedStock,
+      stockDisplay,
       productCategoryLabel,
       qtyStepper,
       implantPhotoViewSrc,
@@ -2445,7 +2976,7 @@ const renderUse = () => `
           <button class="secondary" type="button" id="useRestrictNonpay" data-restrict="false">비급여 제한 꺼짐</button>
         </div>
       </div>
-      <div class="row two">
+      <div class="row two use-surgery-selector-row">
         <div>
           <label for="useDepartment">과</label>
           <select id="useDepartment" required>
@@ -2460,30 +2991,69 @@ const renderUse = () => `
             ${state.doctors.slice().sort(byName).map((item) => `<option value="${item.id}" data-department="${escapeHtml(departmentCode(item.name))}">${escapeHtml(item.name)}</option>`).join("")}
           </select>
         </div>
+
       </div>
-      <div class="row">
-        <div>
-          <label for="useSurgery">수술</label>
-          <select id="useSurgery" required>
-            <option value="">수술 선택</option>
+      <div class="prescription-assist-grid">
+        <section class="prescription-assist-panel">
+          <div class="prescription-assist-head">
+            <div>
+              <strong>수술실 처치 재료 처방전</strong>
+              <div class="helper">수술을 선택하면 예상 수량이 표시됩니다. 사용한 재료만 확인하고 수량을 고쳐 주세요.</div>
+            </div>
+            <div class="prescription-assist-head-actions">
+              <span class="pill" id="usePatternCaseCount">0건</span>
+              <button class="secondary prescription-edit-toggle" type="button" id="togglePrescriptionEdit" aria-expanded="false">재료 편집</button>
+            </div>
+          </div>
+          ${window.ORSurgerySelection.controlsHtml()}
+          <details id="useSurgeryAdvanced"><summary>처방 패턴 직접 선택 · 수술명 수정</summary>        <div>
+          <label for="useSurgery">기존 수술 분류 (선택)</label>
+          <select id="useSurgery">
+            <option value="">수술 분류 선택</option>
             ${state.surgeries.slice().sort((a, b) => alphaFirstCompare(a.department || inferSurgeryDepartment(a.name), b.department || inferSurgeryDepartment(b.name)) || alphaFirstCompare(a.name, b.name)).map((item) => `<option value="${item.id}" data-department="${escapeHtml(item.department || inferSurgeryDepartment(item.name))}">${escapeHtml(item.department || inferSurgeryDepartment(item.name))} - ${escapeHtml(item.name)}</option>`).join("")}
           </select>
-        </div>
+        </div><div class="prescription-surgery-fields">
+            <div>
+              <label for="usePrescriptionPattern">원장별 상세 수술</label>
+              <select id="usePrescriptionPattern" disabled>
+                <option value="">원장 코드를 먼저 선택하세요</option>
+              </select>
+            </div>
+            <div>
+              <label for="useSurgeryDetail">상세 수술명</label>
+              <input id="useSurgeryDetail" list="useSurgeryDetailOptions" autocomplete="off" required placeholder="선택하거나 직접 입력">
+            </div>
+          </div>
+          <datalist id="useSurgeryDetailOptions"></datalist></details>
+          <div class="prescription-material-editor" id="prescriptionMaterialEditor" hidden>
+            <select id="prescriptionMaterialSection" aria-label="추가할 재료 종류">
+              ${["공통재료", "수술특수재료", "배액관", "봉합사", "부목·고정", "GS", "URO", "약물", "인체조직", "수술팩·행위료"].map((section) => `<option value="${section}">${section}</option>`).join("")}
+            </select>
+            <input id="prescriptionMaterialName" list="prescriptionOrderOptions" autocomplete="off" placeholder="품명·규격">
+            <datalist id="prescriptionOrderOptions"></datalist>
+            <button type="button" id="addPrescriptionMaterial">처방전에 추가</button>
+            <span>추가·삭제는 이번 케이스에만 적용됩니다.</span>
+          </div>
+          <label for="usePrescriptionSearch">처방 재료 찾기 (처방코드·구매코드·제품명)</label><input id="usePrescriptionSearch" type="search" placeholder="예: 코드 또는 VICRYL"><p id="usePrescriptionSearchCount" class="helper" role="status"></p>
+          <div id="usePrescriptionChecklist" class="prescription-checklist">
+            <div class="empty">처방 패턴을 선택해 주세요.</div>
+          </div>
+        </section>
+        <div id="useRecommendation" hidden></div>
       </div>
-      <div id="useRecommendation" class="use-recommendation-gap"></div>
-      <div class="card use-content-card">
+      <div class="card use-content-card compact-use-content">
         <div class="use-content-head">
           <h3>사용내용</h3>
           <button class="icon-search-btn" type="button" id="openUseProductSearch" aria-haspopup="dialog" aria-controls="useProductSearchModal" title="제품 검색">🔍 제품 검색</button>
         </div>
-        <div id="selectedUseList" class="meta"><span>선택된 제품이 없습니다.</span></div>
+        <div id="selectedUseList" class="meta"><span>선택된 제품이 없습니다.</span></div><div id="useUnlinkedWarning" class="workflow-warning" hidden role="status"></div>
       </div>
       ${renderUseProductSearchModal()}
       ${renderImplantPhotoModal()}
-      <label>제품 여러 개 선택</label>
-      <div class="product-picker">
-        ${renderGroupedProducts(false)}
-      </div>
+      <details class="manual-product-picker">
+        <summary>전체 재고 제품에서 직접 선택</summary>
+        <div class="product-picker">${renderGroupedProducts(false)}</div>
+      </details>
       <label class="implant-toggle" for="useImplantEnabled">
         <input id="useImplantEnabled" type="checkbox">
         <span>임플란트 기록</span>
@@ -2509,7 +3079,7 @@ const renderUse = () => `
         </div>
       </div>
       <div class="actions">
-        <button type="button" id="saveUseDraft">임시저장</button>
+        <button type="button" id="saveUseDraft">확인 대기로 저장</button>
       </div>
       <div class="use-draft-panel" id="useDraftPanel" hidden>
         <div class="use-draft-head">
@@ -2522,7 +3092,7 @@ const renderUse = () => `
         <div class="use-draft-summary" id="useDraftSummary"></div>
         <div class="actions">
           <button class="secondary" type="button" id="editUseDraft">수정</button>
-          <button type="submit" id="finalSaveUseDraft">최종저장</button>
+          <button type="submit" id="finalSaveUseDraft">사용 확정·재고 반영</button>
           <button class="danger" type="button" id="cancelUseDraft">임시저장 취소</button>
         </div>
       </div>
@@ -2569,7 +3139,7 @@ const addImplantDraftPhotosFromFiles = (draft, files) => getUsageEntryModule().a
 const removeImplantDraftById = (drafts, id) => getUsageEntryModule().removeImplantDraftById(drafts, id);
 const mergeDuplicateImplantDraftsInList = (drafts) => getUsageEntryModule().mergeDuplicateImplantDrafts(drafts);
 const implantDraftPayloadFromList = (drafts, enabled) => getUsageEntryModule().implantDraftPayloadFromList(drafts, enabled);
-const useDraftValidationMessage = (useItems, implantDraftPayload) => getUsageEntryModule().useDraftValidationMessage(useItems, implantDraftPayload);
+const useDraftValidationMessage = (useItems, implantDraftPayload, prescriptionChecks) => getUsageEntryModule().useDraftValidationMessage(useItems, implantDraftPayload, prescriptionChecks);
 const buildUseDraftSnapshot = (options) => getUsageEntryModule().buildUseDraftSnapshot(options);
 const pendingUsagePhotoCount = (implantDraftPayload) => getUsageEntryModule().pendingUsagePhotoCount(implantDraftPayload);
 const pendingUsagePhotoProgressMessage = (done, total, failed) => getUsageEntryModule().pendingUsagePhotoProgressMessage(done, total, failed);
@@ -2590,7 +3160,10 @@ const renderEditUsage = () => {
   return `
   <section class="grid">
     <div class="card">
-      <h2>케이스 사용내역 선택</h2>
+      <div class="use-form-head">
+        <h2>케이스 사용내역 선택</h2>
+        <button class="secondary" type="button" id="editBackToHistory">← 사용내역으로</button>
+      </div>
       <div>
         <label for="editUsageSelectDate">사용일 선택</label>
         <input id="editUsageSelectDate" type="date" value="${escapeHtml(editSelectDate)}">
@@ -2649,11 +3222,16 @@ const renderEditUsage = () => {
           </select>
         </div>
       </div>
-      <label for="editSurgery">수술</label>
-      <select id="editSurgery" required>
+      <label for="editSurgery">수술 분류</label>
+      <select id="editSurgery">
         <option value="">수술 선택</option>
         ${state.surgeries.slice().sort((a, b) => alphaFirstCompare(a.department || inferSurgeryDepartment(a.name), b.department || inferSurgeryDepartment(b.name)) || alphaFirstCompare(a.name, b.name)).map((item) => `<option value="${item.id}" data-department="${escapeHtml(item.department || inferSurgeryDepartment(item.name))}">${escapeHtml(item.department || inferSurgeryDepartment(item.name))} - ${escapeHtml(item.name)}</option>`).join("")}
       </select>
+      <label for="editSurgeryDetail">상세 수술명</label>
+      <input id="editSurgeryDetail" list="editSurgeryDetailOptions" autocomplete="off" required placeholder="상세 수술명을 선택하거나 직접 입력">
+      <datalist id="editSurgeryDetailOptions">
+        ${(window.ORPrescriptionPatterns?.patterns || []).map((pattern) => `<option value="${escapeHtml(pattern.surgery)}">${escapeHtml(pattern.doctorCode)} · ${pattern.caseCount}건</option>`).join("")}
+      </datalist>
       <div class="card">
         <h3>수정될 사용내용</h3>
         <div id="editSelectedUseList" class="meta"><span>선택된 제품이 없습니다.</span></div>
@@ -2731,6 +3309,14 @@ const bindEditUsage = () => {
   if (!canEditUsage()) return;
   // 수정 화면이 새로 그려질 때 편집 보호 상태를 초기화한다.
   editEntryDirty = false;
+  // 수정은 사용내역·대시보드에서 진입하는 화면이라 전용 탭이 없다 — 돌아가기 버튼 제공.
+  document.getElementById("editBackToHistory")?.addEventListener("click", () => {
+    if (editEntryDirty && !confirm("수정 중인 내용이 저장되지 않았습니다. 사용내역으로 이동할까요?")) return;
+    pendingEditUsageId = "";
+    editEntryDirty = false;
+    currentView = "history";
+    render();
+  });
   const dateInput = document.getElementById("editUsageSelectDate");
   const select = document.getElementById("editUsageSelect");
   const caseSearch = document.getElementById("editUsageCaseSearch");
@@ -2743,6 +3329,7 @@ const bindEditUsage = () => {
   const useDepartment = document.getElementById("editDepartment");
   const doctorSelect = document.getElementById("editDoctor");
   const surgerySelect = document.getElementById("editSurgery");
+  const editSurgeryDetail = document.getElementById("editSurgeryDetail");
   const selectedList = document.getElementById("editSelectedUseList");
   const productSearch = document.getElementById("editProductSearch");
   const productSearchResults = document.getElementById("editProductSearchResults");
@@ -3169,7 +3756,7 @@ const bindEditUsage = () => {
     }, new Map());
     form.querySelectorAll("[data-use-product]").forEach((input) => {
       const product = productById(input.value);
-      const available = isVendorManagedProduct(product)
+      const available = isVendorManagedProduct(product) || isUnconfirmedStock(product)
         ? 999
         : num(product?.stock) + (originalCounts.get(input.value) || 0);
       const qtyInput = form.querySelector(`[data-use-qty="${input.value}"]`);
@@ -3185,7 +3772,7 @@ const bindEditUsage = () => {
     const currentDoctor = doctorSelect.value;
     const currentSurgery = surgerySelect.value;
     const doctors = department
-      ? state.doctors.slice().sort(byName).filter((item) => departmentCode(item.name) === department)
+      ? state.doctors.filter(item => item.active !== false).sort(byName).filter((item) => departmentCode(item.name) === department)
       : [];
     doctorSelect.innerHTML = `<option value="">${department ? "원장 코드 선택" : "과를 먼저 선택하세요"}</option>` + doctors
       .map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`)
@@ -3215,7 +3802,7 @@ const bindEditUsage = () => {
       <label class="check-card use-card">
         <input type="checkbox" value="${item.id}" data-edit-search-product="${item.id}" ${form.querySelector(`[data-use-product="${item.id}"]`)?.checked ? "checked" : ""}>
         <span>${escapeHtml(item.name)}<br><span class="muted">${escapeHtml(productCategoryLabel(item.category))}${item.company ? ` · ${escapeHtml(item.company)}` : ""}${item.subcategory ? ` · ${escapeHtml(item.subcategory)}` : ""} · ${isVendorManagedProduct(item) ? "업체관리 · 재고차감 제외" : `현재고 ${num(item.stock)}`}</span></span>
-        ${qtyStepper(`data-edit-search-qty="${item.id}" aria-label="${escapeHtml(item.name)} 수정 수량"`, Math.max(1, num(form.querySelector(`[data-use-qty="${item.id}"]`)?.value) || 1), isVendorManagedProduct(item) ? 999 : Math.max(1, num(item.stock) || 999))}
+        ${qtyStepper(`data-edit-search-qty="${item.id}" aria-label="${escapeHtml(item.name)} 수정 수량"`, Math.max(1, num(form.querySelector(`[data-use-qty="${item.id}"]`)?.value) || 1), (isVendorManagedProduct(item) || isUnconfirmedStock(item)) ? 999 : Math.max(1, num(item.stock) || 999))}
       </label>
     `).join("") : `<div class="empty">검색 결과가 없습니다.</div>`;
     productSearchResults.querySelectorAll("[data-edit-search-product]").forEach((input) => {
@@ -3234,9 +3821,11 @@ const bindEditUsage = () => {
       input.addEventListener("input", () => selectProduct(input.dataset.editSearchQty, input.value));
     });
   };
+  let loadedUsageSnapshot = null;
   const loadUsage = (id) => {
     pendingEditUsageId = id || "";
     const usage = state.usages.find((item) => item.id === id);
+    loadedUsageSnapshot = usage ? JSON.parse(JSON.stringify(usage)) : null;
     if (!usage) {
       form.style.display = "none";
       deleteButton.style.display = "none";
@@ -3270,6 +3859,7 @@ const bindEditUsage = () => {
     doctorSelect.value = usage.doctorId || "";
     filterOptions();
     surgerySelect.value = usage.surgeryId || "";
+    if (editSurgeryDetail) editSurgeryDetail.value = usage.surgeryDetail || surgery?.name || "";
     if (usage.surgeryId && !surgerySelect.value) {
       const surgeryOption = surgeryById(usage.surgeryId);
       if (surgeryOption) {
@@ -3525,7 +4115,7 @@ const bindEditUsage = () => {
     event.preventDefault();
     const submitButton = event.submitter || event.currentTarget.querySelector("button[type='submit']");
     const id = document.getElementById("editUsageId").value;
-    const usage = state.usages.find((item) => item.id === id);
+    const usage = loadedUsageSnapshot?.id === id ? loadedUsageSnapshot : null;
     if (!usage) return;
     if (!canModifyUsageRecord(usage)) {
       alert(usagePastLockMessage(usage) || "사용내역 수정 권한이 없습니다.");
@@ -3543,8 +4133,8 @@ const bindEditUsage = () => {
       document.getElementById(editCaseRoom ? "editCaseOrder" : "editCaseRoom").focus();
       return;
     }
-    if (!doctorSelect.value || !surgerySelect.value) {
-      alert("케이스 번호, 원장 코드, 수술을 모두 입력해 주세요.");
+    if (!doctorSelect.value || !(editSurgeryDetail?.value?.trim() || surgerySelect.value)) {
+      alert("케이스 번호, 원장 코드, 상세 수술명을 모두 입력해 주세요.");
       return;
     }
     // 생성 저장과 동일하게, 같은 날 같은 케이스 번호의 다른 기록이 있으면 확인을 받는다.
@@ -3570,55 +4160,52 @@ const bindEditUsage = () => {
       return;
     }
     setButtonBusy(submitButton, true, "저장 중...");
-    usage.productIds.forEach((productId) => {
-      const product = productById(productId);
-      if (product && !isVendorManagedProduct(product)) product.stock = num(product.stock) + 1;
-    });
-    const unavailable = newItems.find((item) => {
-      const product = productById(item.productId);
-      return !isVendorManagedProduct(product) && num(product?.stock) < item.qty;
-    });
-    if (unavailable) {
-      usage.productIds.forEach((productId) => {
-        const product = productById(productId);
-        if (product && !isVendorManagedProduct(product)) product.stock = Math.max(0, num(product.stock) - 1);
-      });
-      alert("재고가 부족한 제품이 있습니다.");
-      setButtonBusy(submitButton, false);
-      return;
-    }
-    const hasLandingReceipt = state.receipts.some((receipt) => receipt.type === "landing" && receipt.usageId === usage.id);
+    const hasLandingReceipt = state.receipts.some(receipt => receipt.type === "landing" && receipt.usageId === usage.id);
     if (hasLandingReceipt && !confirm("이미 랜딩 입고 확인된 사용내역입니다. 입고내역은 보존됩니다. 그래도 수정할까요?")) {
-      usage.productIds.forEach((productId) => {
-        const product = productById(productId);
-        if (product && !isVendorManagedProduct(product)) product.stock = Math.max(0, num(product.stock) - 1);
-      });
       setButtonBusy(submitButton, false);
       return;
     }
-    // 보존 항목도 함께 차감한다 — 위 복원 루프(usage.productIds 전체 +1)와 짝을 이뤄 순변화 0.
-    [...newItems, ...preservedEditItems].forEach((item) => {
-      const product = productById(item.productId);
-      if (product && !isVendorManagedProduct(product)) product.stock = Math.max(0, num(product.stock) - item.qty);
-    });
     const next = {
       ...usage,
       caseRoom: editCaseRoom,
       caseOrder: editCaseOrder,
       doctorId: doctorSelect.value,
       surgeryId: surgerySelect.value,
+      surgeryDetail: editSurgeryDetail?.value?.trim() || surgeryById(surgerySelect.value)?.name || "",
       productIds: [...newProductIds, ...preservedProductIds],
       date: document.getElementById("editUsageDate").value,
       updatedAt: new Date().toISOString()
     };
-    state.usages = state.usages.map((item) => item.id === usage.id ? next : item);
-    editEntryDirty = false;
-    currentView = "dashboard";
-    pendingEditUsageId = "";
-    await saveState("수정 완료", {
+    if (next.surgeryDetail !== usage.surgeryDetail || next.doctorId !== usage.doctorId) {
+      const matches = effectivePrescriptionPatterns().filter(p => p.doctorCode === departmentById(next.doctorId)?.name && normalizedPrescriptionCatalogName(p.surgery) === normalizedPrescriptionCatalogName(next.surgeryDetail));
+      next.surgerySelection = matches.length === 1 ? window.ORSurgerySelection.metadata(matches[0]) : null;
+      next.prescriptionPatternId = matches.length === 1 ? matches[0].id : '';
+    }
+    const editSaved = await saveState("수정 완료", {
+      requireTransaction: true,
+      preserveFormOnFailure: true,
+      apply: (target, remote) => {
+        const latest = (remote.usages || []).find(item => item.id === usage.id);
+        const canonical = value => JSON.stringify(value, (_key, item) => item && !Array.isArray(item) && typeof item === 'object' ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
+        if (!latest || canonical(latest) !== canonical(usage)) throw new Error('다른 사용자가 이 기록을 변경하거나 삭제했습니다. 입력은 화면에 보존했습니다. 최신 기록을 다시 불러와 비교해 주세요.');
+        const oldCounts = new Map(), newCounts = new Map();
+        (latest.productIds || []).forEach(id => oldCounts.set(id, (oldCounts.get(id) || 0) + 1));
+        next.productIds.forEach(id => newCounts.set(id, (newCounts.get(id) || 0) + 1));
+        for (const [id, qty] of newCounts) {
+          const product = target.products.find(p => p.id === id);
+          const increase = qty - (oldCounts.get(id) || 0);
+          if (increase > 0 && (!product || product.active === false)) throw new Error('추가한 제품이 삭제되었습니다. 제품 목록을 다시 확인해 주세요.');
+          if (increase > 0 && !isVendorManagedProduct(product) && !isUnconfirmedStock(product) && num(product.stock) < increase) throw new Error('최신 재고가 부족합니다. 입력은 보존했습니다. 재고를 다시 확인해 주세요.');
+        }
+        target.usages = target.usages.map(item => item.id === usage.id ? next : item);
+      },
       savingMessage: "수정 저장 중입니다...",
       doneMessage: editImplantCanModify && countEditImplantPhotosToUpload(nextImplants) ? "수정 저장 완료 · 사진 업로드 준비" : "수정 저장 완료"
     });
+    if (!editSaved) { editEntryDirty = true; setButtonBusy(submitButton, false); return; }
+    editEntryDirty = false;
+    currentView = "dashboard";
+    pendingEditUsageId = "";
     if (editImplantCanModify) {
       try {
         let photoUploadFailed = 0;
@@ -4299,6 +4886,17 @@ const bindUse = () => {
   const surgerySelect = document.getElementById("useSurgery");
   const useRestrictNonpay = document.getElementById("useRestrictNonpay");
   const recommendation = document.getElementById("useRecommendation");
+  const prescriptionPatternSelect = document.getElementById("usePrescriptionPattern");
+  const surgeryDetailInput = document.getElementById("useSurgeryDetail");
+  const surgeryDetailOptions = document.getElementById("useSurgeryDetailOptions");
+  const prescriptionChecklist = document.getElementById("usePrescriptionChecklist");
+  const patternCaseCount = document.getElementById("usePatternCaseCount");
+  const togglePrescriptionEdit = document.getElementById("togglePrescriptionEdit");
+  const prescriptionMaterialEditor = document.getElementById("prescriptionMaterialEditor");
+  const prescriptionMaterialSection = document.getElementById("prescriptionMaterialSection");
+  const prescriptionMaterialName = document.getElementById("prescriptionMaterialName");
+  const prescriptionOrderOptions = document.getElementById("prescriptionOrderOptions");
+  const addPrescriptionMaterial = document.getElementById("addPrescriptionMaterial");
   const selectedUseList = document.getElementById("selectedUseList");
   const productSearch = document.getElementById("useProductSearch");
   const productSearchResults = document.getElementById("useProductSearchResults");
@@ -4328,6 +4926,7 @@ const bindUse = () => {
   const caseOrderInput = document.getElementById("caseOrder");
   const implantDrafts = [];
   const commonImplantPhotos = [];
+  const autoPatternProductIds = new Set();
   let activeImplantEditPair = "";
   let manualRestrictNonpay = false;
   let useDraftSnapshot = null;
@@ -4335,8 +4934,355 @@ const bindUse = () => {
   let loadedPendingUsageId = "";
   let lastPendingPatientWarningKey = "";
   let lastSavedPatientWarningKey = "";
+  let prescriptionEditMode = false;
+  let prescriptionDeletedItems = new Map();
+  let prescriptionGroupOpenState = new Map();
   if (useDate && !useDate.value) useDate.value = today();
   const selectedUseDate = () => useDate?.value || today();
+  const prescriptionCatalog = { ...(window.ORPrescriptionPatterns || {}), patterns: effectivePrescriptionPatterns() };
+  const prescriptionNameCatalog = effectivePrescriptionMaterials();
+  const normalizedPrescriptionText = normalizedPrescriptionCatalogName;
+  const selectedDoctorCode = () => {
+    const doctor = departmentById(departmentSelect?.value);
+    const text = String(doctor?.name || departmentSelect?.selectedOptions?.[0]?.textContent || "").trim();
+    return text.match(/[A-Za-z]+\s*\d+/)?.[0]?.replace(/\s+/g, "").toUpperCase() || text.toUpperCase();
+  };
+  const patternsForSelectedDoctor = () => prescriptionCatalog.patterns.filter((pattern) => pattern.doctorCode === selectedDoctorCode());
+  const selectedPrescriptionPattern = () => prescriptionCatalog.patterns.find((pattern) => pattern.id === prescriptionPatternSelect?.value) || null;
+  const surgerySelection = window.ORSurgerySelection.bind({
+    patterns: patternsForSelectedDoctor, escapeHtml,
+    recent: () => state.usages.filter(u=>u.doctorId===departmentSelect.value).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))).map(u=>u.surgerySelection?.procedure || window.ORSurgerySelection.metadata(prescriptionCatalog.patterns.find(p=>p.id===u.prescriptionPatternId)).procedure).filter(Boolean).slice(0,5),
+    confirmChange: () => !Array.from(prescriptionChecklist?.querySelectorAll('[data-prescription-item]') || []).some(x => x.checked) || confirm("수술 조건을 바꾸면 처방 재료 확인을 다시 해야 합니다. 변경할까요?"),
+    onChange: (pattern, selection) => {
+      prescriptionPatternSelect.value = pattern?.id || "";
+      surgeryDetailInput.value = pattern?.surgery || window.ORSurgerySelection.label(selection);
+      const exact = visibleSurgeriesFor(useDepartment.value, departmentSelect.value).filter(x => normalizedPrescriptionText(x.name) === normalizedPrescriptionText(selection.procedure));
+      surgerySelect.value = exact.length === 1 ? exact[0].id : "";
+      renderPrescriptionPattern({applyProducts:true,resetGroupVisibility:true});
+      markUseEntryDirty(); markUseDraftDirty(); refreshUnlinkedWarning();
+    }
+  });
+  const refreshUnlinkedWarning = () => {
+    const warning = document.getElementById("useUnlinkedWarning");
+    if (!warning) return;
+    const checks = collectPrescriptionChecks().filter(x => x.checked && !x.matchedProductId);
+    warning.hidden = !checks.length;
+    warning.textContent = checks.length ? `재고 차감 없음: ${checks.map(x => x.name).join(", ")}. 이 항목은 확인 기록만 남습니다. 행위료가 아닌 재료는 관리자에게 재고 연결을 확인해 주세요.` : "";
+  };
+  const filterPrescriptionRows = () => {
+    const needle = normalizedPrescriptionCatalogName(document.getElementById("usePrescriptionSearch")?.value);
+    let matches=0;
+    prescriptionChecklist?.querySelectorAll('.prescription-sheet-row').forEach(row=>{
+      row.hidden=Boolean(needle&&!normalizedPrescriptionCatalogName(row.textContent).includes(needle));
+      if(!row.hidden)matches++;
+    });
+    prescriptionChecklist?.querySelectorAll('details').forEach(group=>{
+      if(needle){if(group.dataset.beforeSearch===undefined)group.dataset.beforeSearch=String(group.open);group.hidden=!Array.from(group.querySelectorAll('.prescription-sheet-row')).some(r=>!r.hidden);group.open=!group.hidden;}
+      else{group.hidden=false;if(group.dataset.beforeSearch!==undefined){group.open=group.dataset.beforeSearch==='true';delete group.dataset.beforeSearch;}}
+    });
+    const count=document.getElementById('usePrescriptionSearchCount');if(count)count.textContent=needle?`검색 결과 ${matches}항목 · 숨겨진 항목의 선택 상태는 유지됩니다.`:'';
+  };
+  document.getElementById('usePrescriptionSearch')?.addEventListener('input',filterPrescriptionRows);
+  const renderPrescriptionOrderOptions = () => {
+    if (!prescriptionOrderOptions) return;
+    const section = prescriptionMaterialSection?.value || "공통재료";
+    prescriptionOrderOptions.innerHTML = prescriptionNameCatalog
+      .filter((item) => item.section === section)
+      .map((item) => `<option value="${escapeHtml(item.name)}"></option>`)
+      .join("");
+  };
+  const prescriptionProductMatch = (name) => {
+    return prescriptionProductMatchByName(name);
+  };
+  const prescriptionMaterialGroupOrder = PRESCRIPTION_MATERIAL_GROUPS;
+  const prescriptionMaterialGroup = (material) => {
+    if (PRESCRIPTION_MATERIAL_GROUPS.includes(material?.managedGroup)) return material.managedGroup;
+    const section = material?.section || "공통재료";
+    if (section === "수술팩·행위료") return "수술팩";
+    const materialNames = [material?.name, ...(Array.isArray(material?.aliases) ? material.aliases : [])].filter(Boolean);
+    const matchedProduct = materialNames
+      .map((name) => prescriptionProductMatch(name))
+      .find(Boolean);
+    const knownNonpayName = /FLOSEAL|플로실|M-?CLOT|MEDICLORE|TENDOREGEN|HISTOACRYL|KLOTPAD|EXOFIN|타우로린|TAUROL|HYDROCOOL|VISCOSEAL|HYAZEN|HYAGEN|HEMOSTOP|WOUND CLOT|INTERGUARD|이노그램|INOGRAM|SURGI CURE/i.test(materialNames.join(" "));
+    if ((matchedProduct && productCategory(matchedProduct.category) === "비급여") || knownNonpayName) return "비급여";
+    if (section === "봉합사") return "Suture material";
+    if (section === "GS") return "GS";
+    if (section === "URO") return "URO";
+    if (section === "약물") return "약물";
+    return "일반재료";
+  };
+  const prescriptionSizeFamily = (material) => {
+    if (Object.prototype.hasOwnProperty.call(material || {}, "managedFamily")) return material.managedFamily || "";
+    const upper = String(material?.name || "").normalize("NFKC").toUpperCase();
+    const hint = String(material?.group || "").normalize("NFKC").toUpperCase();
+    if (hint === "일반팩") return "세종 수술팩";
+    if (hint === "OS8 HIP PACK") return "YK 수술팩";
+    if (hint === "MIS, GS PACK") return "앤티아이 수술팩";
+    const familyRules = [
+      [/VICRYL PLUS/, "VICRYL PLUS"],
+      [/NOVOSYN/, "NOVOSYN"],
+      [/REXLON BLUE NYLON/, "REXLON BLUE NYLON"],
+      [/^NYLON /, "NYLON"],
+      [/BLACK SILK/, "BLACK SILK"],
+      [/SOF-?SILK|SOFSILK/, "SOF SILK"],
+      [/MERSILK/, "MERSILK"],
+      [/^V-LOC 90/, "V-LOC 90"],
+      [/ETHIBOND/, "ETHIBOND"],
+      [/^PDS (?:1|II VIO)/, "PDS"],
+      [/ZIP SONIC/, "ZIP SONIC"],
+      [/SKIN STAPLER/, "SKIN STAPLER"],
+      [/THREADED K-WIRE/, "THREADED K-WIRE"],
+      [/K-WIRE/, "K-WIRE"],
+      [/STEINMANN PIN/, "STEINMANN PIN"],
+      [/ROLL WIRE/, "ROLL WIRE"],
+      [/^OS SPLINT/, "OS SPLINT"],
+      [/QPLINT-SHORT ARM/, "QPLINT SHORT ARM"],
+      [/QPLINT-LONG ARM/, "QPLINT LONG ARM"],
+      [/QPLINT-SHORT LEG/, "QPLINT SHORT LEG"],
+      [/QPLINT-LONG LEG/, "QPLINT LONG LEG"],
+      [/ALUMINUM SPLINT/, "ALUMINUM SPLINT"],
+      [/BAROVAC/, "BAROVAC"],
+      [/CROWN TROCAR/, "CROWN TROCAR"],
+      [/LAPORT-E/, "LAPORT-E"],
+      [/ENDOGARD/, "ENDOGARD"],
+      [/LAP BAG/, "LAP BAG"],
+      [/LAPLOOP/, "LAPLOOP"],
+      [/VASOCLIP/, "VASOCLIP"],
+      [/SOUND REACH/, "SOUND REACH"],
+      [/SONICURE/, "SONICURE"],
+      [/GLOVE PORT/, "GLOVE PORT"],
+      [/ANASTOCLIP CLOSURE SYSTEM/, "ANASTOCLIP"],
+      [/^OP SITE /, "OP SITE"],
+      [/OPSITE POST-OP/, "OPSITE POST-OP"],
+      [/COBAN /, "COBAN"],
+      [/TEGADERM/, "TEGADERM"],
+      [/슈퍼포아/, "슈퍼포아"],
+      [/DUAL PATTY/, "DUAL PATTY"],
+      [/SURGI CHITO/, "SURGI CHITO"],
+      [/COLTRIX TENDOREGEN/, "COLTRIX TENDOREGEN"],
+      [/HYAGEN/, "HYAGEN"],
+      [/토니밴드/, "토니밴드"],
+      [/SCORPION NEEDLE/, "SCORPION NEEDLE"],
+      [/CEMEX/, "CEMEX"],
+      [/SIMPLEX/, "SIMPLEX"],
+      [/DOUJET/, "DOUJET"],
+      [/대한리도카인/, "리도카인"],
+      [/티씰/, "티씰"],
+      [/타코실/, "타코실"],
+      [/대한멸균생리식염수/, "멸균생리식염수"],
+      [/노보시스/, "노보시스"],
+    ];
+    return familyRules.find(([pattern]) => pattern.test(upper))?.[1] || "";
+  };
+  const collectPrescriptionChecks = () => {
+    const visibleItems = Array.from(prescriptionChecklist?.querySelectorAll("[data-prescription-item]") || []).map((input) => ({
+      name: input.dataset.prescriptionName || "",
+      section: input.dataset.prescriptionSection || "공통재료",
+      qty: Math.max(0, num(input.closest(".prescription-sheet-row")?.querySelector("[data-prescription-actual-qty]")?.value ?? input.dataset.prescriptionQty ?? 0)),
+      defaultQty: Math.max(0, num(input.dataset.prescriptionDefaultQty ?? input.dataset.prescriptionQty ?? 0)),
+      checked: input.checked,
+      custom: input.dataset.prescriptionCustom === "true",
+      frequency: Number(input.dataset.prescriptionFrequency || 0),
+      matchedProductId: input.dataset.matchedProductId || ""
+    })).filter((item) => item.custom || item.checked || item.qty !== item.defaultQty);
+    const deletedItems = Array.from(prescriptionDeletedItems.values()).map((item) => ({
+      name: item.name,
+      section: item.section || "공통재료",
+      qty: 0,
+      defaultQty: Math.max(0, num(item.defaultQty || 0)),
+      checked: false,
+      custom: false,
+      deleted: true,
+      frequency: Number(item.frequency || 0),
+      matchedProductId: item.matchedProductId || ""
+    }));
+    return [...visibleItems, ...deletedItems];
+  };
+  const prescriptionSheetRowHtml = (item, index, saved = null) => {
+    const matchedProduct = item.inventoryMode === 'excluded' ? null : item.linkedProductId ? productById(item.linkedProductId) : [item.name, ...(Array.isArray(item.aliases) ? item.aliases : [])]
+      .map((name) => prescriptionProductMatch(name))
+      .find(Boolean) || null;
+    const product = matchedProduct?.active === false ? null : matchedProduct;
+    const predictedQty = Math.max(0, num(item.qty ?? 0));
+    const actualQty = Math.max(0, num(saved?.qty ?? predictedQty));
+    const checked = saved?.checked === true;
+    const custom = item.custom === true || saved?.custom === true;
+    const section = item.section || saved?.section || "공통재료";
+    const materialTitle = item.name;
+    return `<div class="prescription-sheet-row ${product ? "matched" : ""} ${predictedQty ? "predicted" : ""} ${custom ? "custom" : ""}">
+      <input type="checkbox" data-prescription-item="${index}" data-prescription-name="${escapeHtml(item.name)}" data-prescription-section="${escapeHtml(section)}" data-prescription-custom="${custom}" data-prescription-qty="${actualQty}" data-prescription-default-qty="${predictedQty}" data-prescription-frequency="${item.frequency || 0}" data-matched-product-id="${escapeHtml(product?.id || '')}" ${checked ? "checked" : ""} aria-label="${escapeHtml(materialTitle)} 확인">
+      <span class="prescription-material-name" title="${escapeHtml(materialTitle)}">${escapeHtml(item.name)}${item.code ? `<small>처방코드 ${escapeHtml(item.code)}</small>` : ''}${product?.orderCode ? `<small> ${escapeHtml(product.orderCode)} · ${escapeHtml(product.stockUnit || '개')}</small>` : ''}</span>
+      <input type="number" min="0" value="${actualQty}" data-prescription-actual-qty aria-label="${escapeHtml(item.name)} 사용 수량">
+      ${prescriptionEditMode
+        ? `<button class="prescription-row-delete" type="button" data-delete-prescription-material title="이번 처방전에서 삭제" aria-label="${escapeHtml(item.name)} 삭제">×</button>`
+        : `<span class="prescription-link-status ${product ? "linked" : ""}">${product ? '재고' : item.inventoryMode === 'excluded' ? '제외' : '미연결'}</span>`}
+    </div>`;
+  };
+  const renderPrescriptionPattern = ({ applyProducts = false, savedChecks = [], resetGroupVisibility = false } = {}) => {
+    // 새 수술/처방 패턴을 적용할 때는 이전 패턴에서 사용자가 여닫은 상태를 버린다.
+    // 아래 activeCount를 기준으로 자동 수량이 있는 묶음만 열리고 나머지는 닫힌다.
+    if (resetGroupVisibility) prescriptionGroupOpenState.clear();
+    const pattern = selectedPrescriptionPattern();
+    const effectiveSavedChecks = Array.isArray(savedChecks) ? savedChecks : [];
+    prescriptionDeletedItems = new Map(effectiveSavedChecks
+      .filter((item) => item?.deleted && item?.name)
+      .map((item) => [normalizedPrescriptionText(item.name), item]));
+    if (!pattern) {
+      if (patternCaseCount) patternCaseCount.textContent = "0건";
+      if (prescriptionChecklist) prescriptionChecklist.innerHTML = `<div class="empty">등록된 처방 수량이 없습니다. 아래 전체 재고 제품에서 실제 사용 재료를 직접 선택하거나 관리자에게 패턴 등록을 요청하세요.</div>`;
+      if (applyProducts) {
+        autoPatternProductIds.forEach(id => { const check = form.querySelector(`[data-use-product="${id}"]`); if(check) check.checked=false; });
+        autoPatternProductIds.clear(); renderSelectedUseList();
+      }
+      refreshUnlinkedWarning();
+      return;
+    }
+    if (patternCaseCount) patternCaseCount.textContent = pattern.caseCount ? `${pattern.caseCount}건 기반 추천` : "수동 등록 수량";
+    const savedByName = new Map(effectiveSavedChecks.filter((item) => !item.deleted).map((item) => [normalizedPrescriptionText(item.name), item]));
+    const patternByName = new Map();
+    pattern.items.forEach((item) => {
+      [item.canonicalName, item.name].filter(Boolean).forEach((name) => {
+        const key = normalizedPrescriptionText(name);
+        const current = patternByName.get(key);
+        if (!current || num(item.qty) > num(current.qty) || Number(item.frequency || 0) > Number(current.frequency || 0)) {
+          patternByName.set(key, item);
+        }
+      });
+    });
+    const baseMaterials = prescriptionNameCatalog
+      .filter((item) => !prescriptionDeletedItems.has(normalizedPrescriptionText(item.name)));
+    const customMaterials = effectiveSavedChecks
+      .filter((item) => item?.custom && !item.deleted && item.name)
+      .filter((item) => !baseMaterials.some((base) => normalizedPrescriptionText(base.name) === normalizedPrescriptionText(item.name)))
+      .map((item) => ({ ...item, custom: true }));
+    const groups = new Map(prescriptionMaterialGroupOrder.map((groupName) => [groupName, []]));
+    [...baseMaterials, ...customMaterials].forEach((material) => {
+      const predicted = patternByName.get(normalizedPrescriptionText(material.name)) || (material.aliases || []).map((alias) => patternByName.get(normalizedPrescriptionText(alias))).find(Boolean);
+      const saved = savedByName.get(normalizedPrescriptionText(material.name)) || (material.aliases || []).map((alias) => savedByName.get(normalizedPrescriptionText(alias))).find(Boolean);
+      groups.get(prescriptionMaterialGroup(material)).push({ material, predicted, saved });
+    });
+    prescriptionChecklist.innerHTML = prescriptionMaterialGroupOrder.map((groupName, groupIndex) => {
+        const rows = groups.get(groupName) || [];
+        if (!rows.length) return '';
+        const groupKey = groupName;
+        const indexedRows = rows.map((row, rowIndex) => ({ ...row, rowIndex }));
+        const rowIsActive = ({ predicted, saved }) => num(saved?.qty ?? predicted?.qty ?? 0) > 0 || saved?.checked === true;
+        const activeRows = indexedRows.filter(rowIsActive);
+        const activeCount = activeRows.length;
+        const isOpen = prescriptionGroupOpenState.has(groupKey) ? prescriptionGroupOpenState.get(groupKey) : activeCount > 0;
+        const rowsHtml = (items) => items.map(({ material, predicted, saved, rowIndex }) => prescriptionSheetRowHtml(
+          { ...material, qty: predicted?.qty || 0, frequency: predicted?.frequency || 0 },
+          `${groupIndex}-${rowIndex}`,
+          saved
+        )).join("");
+        const familyBuckets = new Map();
+        indexedRows.forEach((row) => {
+          const familyName = prescriptionSizeFamily(row.material);
+          if (!familyName) return;
+          if (!familyBuckets.has(familyName)) familyBuckets.set(familyName, []);
+          familyBuckets.get(familyName).push(row);
+        });
+        const sizeFamilies = Array.from(familyBuckets.entries()).filter(([, familyRows]) => familyRows.length >= 2);
+        const familyRowIndexes = new Set(sizeFamilies.flatMap(([, familyRows]) => familyRows.map((row) => row.rowIndex)));
+        const standaloneRows = indexedRows.filter((row) => !familyRowIndexes.has(row.rowIndex));
+        const renderSizeFamily = ([familyName, familyRows]) => {
+          const activeFamilyRows = familyRows.filter(rowIsActive);
+          const inactiveFamilyRows = familyRows.filter((row) => !rowIsActive(row));
+          let familyRowsHtml = "";
+          let inactiveSizeBuffer = [];
+          const flushInactiveSizes = () => {
+            if (!inactiveSizeBuffer.length) return;
+            familyRowsHtml += `<details class="prescription-unused-items prescription-family-unused">
+              <summary>다른 규격 ${inactiveSizeBuffer.length}항목 펼치기</summary>
+              <div>${rowsHtml(inactiveSizeBuffer)}</div>
+            </details>`;
+            inactiveSizeBuffer = [];
+          };
+          if (activeFamilyRows.length) {
+            familyRows.forEach((familyRow) => {
+              if (!rowIsActive(familyRow)) {
+                inactiveSizeBuffer.push(familyRow);
+                return;
+              }
+              flushInactiveSizes();
+              familyRowsHtml += rowsHtml([familyRow]);
+            });
+            flushInactiveSizes();
+          } else {
+            familyRowsHtml = rowsHtml(inactiveFamilyRows);
+          }
+          return `<details class="prescription-size-family ${activeFamilyRows.length ? "has-used" : ""}" ${activeFamilyRows.length ? "open" : ""}>
+            <summary><span>${escapeHtml(familyName)}</span><span><strong>${activeFamilyRows.length ? `${activeFamilyRows.length} 사용` : ""}</strong><em>${familyRows.length}규격</em></span></summary>
+            <div>${familyRowsHtml}</div>
+          </details>`;
+        };
+        const paperOrderBlocks = [
+          ...sizeFamilies.map((family) => ({ type: "family", order: Math.min(...family[1].map((row) => row.rowIndex)), family })),
+          ...standaloneRows.map((row) => ({ type: "row", order: row.rowIndex, row })),
+        ].sort((left, right) => left.order - right.order);
+        let paperOrderedRowsHtml = "";
+        let inactiveRowBuffer = [];
+        const flushInactiveRows = () => {
+          if (!inactiveRowBuffer.length) return;
+          paperOrderedRowsHtml += `<details class="prescription-unused-items">
+            <summary>나머지 재료 ${inactiveRowBuffer.length}항목 펼치기</summary>
+            <div>${rowsHtml(inactiveRowBuffer)}</div>
+          </details>`;
+          inactiveRowBuffer = [];
+        };
+        paperOrderBlocks.forEach((block) => {
+          if (block.type === "row" && !rowIsActive(block.row)) {
+            inactiveRowBuffer.push(block.row);
+            return;
+          }
+          flushInactiveRows();
+          paperOrderedRowsHtml += block.type === "family" ? renderSizeFamily(block.family) : rowsHtml([block.row]);
+        });
+        flushInactiveRows();
+        return `<details class="prescription-sheet-section prescription-material-group ${activeCount ? "has-used" : ""}" data-prescription-group="${escapeHtml(groupKey)}" ${isOpen ? "open" : ""}>
+          <summary><span>${escapeHtml(groupName)}</span><span class="prescription-group-meta"><strong data-prescription-group-used>${activeCount ? `${activeCount} 사용` : ""}</strong><em>${rows.length}항목</em></span></summary>
+          <div class="prescription-group-body">
+            <div class="prescription-sheet-head"><span>확인</span><span>품명·규격</span><span>수량</span><span></span></div>
+            ${paperOrderedRowsHtml}
+          </div>
+        </details>`;
+    }).join("") || `<div class="empty">처방전 재료 마스터를 불러오지 못했습니다.</div>`;
+    filterPrescriptionRows();
+    refreshUnlinkedWarning();
+    if (applyProducts) {
+      autoPatternProductIds.forEach((productId) => {
+        const previous = form.querySelector(`[data-use-product="${productId}"]`);
+        if (previous) previous.checked = false;
+      });
+      autoPatternProductIds.clear();
+      renderSelectedUseList();
+      syncImplantDraftsFromSelectedProducts();
+      renderImplantDrafts();
+    }
+  };
+  const filterPrescriptionPatterns = ({ preferSurgery = false } = {}) => {
+    if (!prescriptionPatternSelect) return;
+    const current = prescriptionPatternSelect.value;
+    const patterns = patternsForSelectedDoctor();
+    if (surgeryDetailOptions) surgeryDetailOptions.innerHTML = patterns.map((pattern) =>
+      `<option value="${escapeHtml(pattern.surgery)}">${pattern.caseCount}건 기준</option>`
+    ).join("");
+    prescriptionPatternSelect.disabled = !patterns.length;
+    prescriptionPatternSelect.innerHTML = `<option value="">${patterns.length ? "분석된 수술 선택" : "분석된 처방 패턴 없음"}</option>` + patterns.map((pattern) =>
+      `<option value="${escapeHtml(pattern.id)}">${escapeHtml(pattern.surgery)} · ${pattern.caseCount}건</option>`
+    ).join("");
+    if (patterns.some((pattern) => pattern.id === current)) prescriptionPatternSelect.value = current;
+    if (preferSurgery && surgerySelect.value) {
+      const surgeryName = normalizedPrescriptionText(surgeryById(surgerySelect.value)?.name);
+      const matches = patterns.filter(pattern => normalizedPrescriptionText(window.ORSurgerySelection.metadata(pattern).procedure) === surgeryName);
+      prescriptionPatternSelect.value = matches.length === 1 ? matches[0].id : "";
+    }
+    const selected = selectedPrescriptionPattern();
+    const patternChanged = (selected?.id || "") !== current;
+    if (selected && (!surgeryDetailInput?.value || preferSurgery)) surgeryDetailInput.value = selected.surgery;
+    surgerySelection.refresh(selected);
+    renderPrescriptionPattern({ resetGroupVisibility: patternChanged, applyProducts: patternChanged });
+  };
   const useEntryPatientFields = () => ({
     date: selectedUseDate(),
     caseRoom: caseRoomInput?.value?.trim() || "",
@@ -4344,11 +5290,13 @@ const bindUse = () => {
     department: useDepartment?.value || "",
     doctorId: departmentSelect?.value || "",
     surgeryId: surgerySelect?.value || "",
-    restrictNonpay: isRestrictOn()
+    surgeryDetail: surgeryDetailInput?.value?.trim() || "",
+    restrictNonpay: isRestrictOn(),
+    surgerySelection: surgerySelection.value()
   });
   const saveUseEntryPatientAutosave = () => {
     const payload = useEntryPatientFields();
-    const hasContent = payload.caseRoom || payload.caseOrder || payload.department || payload.doctorId || payload.surgeryId;
+    const hasContent = payload.caseRoom || payload.caseOrder || payload.department || payload.doctorId || payload.surgeryId || payload.surgeryDetail;
     if (hasContent) {
       writeUseEntryAutosave(payload);
     } else {
@@ -4406,7 +5354,7 @@ const bindUse = () => {
     if (key === lastSavedPatientWarningKey) return;
     lastSavedPatientWarningKey = key;
     const doctor = departmentById(usage.doctorId)?.name || "-";
-    const surgery = surgeryById(usage.surgeryId)?.name || "-";
+    const surgery = usage.surgeryDetail || surgeryById(usage.surgeryId)?.name || "-";
     const dateText = (usage.date || selectedUseDate()) === today() ? "오늘" : `${usage.date || selectedUseDate()}에`;
     const message = [
       `이미 ${dateText} 저장된 케이스 번호입니다.`,
@@ -4436,7 +5384,7 @@ const bindUse = () => {
       { label: "오늘 순서", field: caseOrderInput, missing: !String(caseOrderInput?.value || "").trim() },
       { label: "과", field: useDepartment, missing: !useDepartment.value },
       { label: "원장 코드", field: departmentSelect, missing: !departmentSelect.value },
-      { label: "수술명", field: surgerySelect, missing: !surgerySelect.value }
+      { label: "상세 수술명", field: surgeryDetailInput, missing: !String(surgeryDetailInput?.value || "").trim() }
     ].filter((item) => item.missing);
     if (!missing.length) return "";
     focusFirstMissingUseEntryField(missing);
@@ -4631,10 +5579,24 @@ const bindUse = () => {
     useDepartment.value = "";
     departmentSelect.value = "";
     surgerySelect.value = "";
+    if (surgeryDetailInput) surgeryDetailInput.value = "";
+    if (prescriptionPatternSelect) {
+      prescriptionPatternSelect.value = "";
+      prescriptionPatternSelect.disabled = true;
+    }
+    prescriptionEditMode = false;
+    prescriptionDeletedItems = new Map();
+    if (togglePrescriptionEdit) {
+      togglePrescriptionEdit.textContent = "재료 편집";
+      togglePrescriptionEdit.setAttribute("aria-expanded", "false");
+    }
+    if (prescriptionMaterialEditor) prescriptionMaterialEditor.hidden = true;
+    if (prescriptionMaterialName) prescriptionMaterialName.value = "";
     setRestrictButton(false);
     resetUseProductControls(form);
     implantDrafts.splice(0, implantDrafts.length);
     commonImplantPhotos.splice(0, commonImplantPhotos.length);
+    autoPatternProductIds.clear();
     activeImplantEditPair = "";
     loadedPendingUsageId = "";
     lastPendingPatientWarningKey = "";
@@ -4647,7 +5609,9 @@ const bindUse = () => {
     if (productSearch) productSearch.value = "";
     if (productSearchResults) productSearchResults.innerHTML = `<div class="empty">제품명을 입력해 주세요.</div>`;
     filterUseOptions();
+    surgerySelection.refresh();
     renderUseRecommendation();
+    renderPrescriptionPattern();
     renderSelectedUseList();
     renderCommonImplantPhotos();
     renderImplantDrafts();
@@ -4672,7 +5636,8 @@ const bindUse = () => {
     }
     const useItems = selectedUseItems();
     const implantDraftPayload = currentImplantDraftPayload();
-    const validationMessage = useDraftValidationMessage(useItems, implantDraftPayload);
+    const prescriptionChecks = collectPrescriptionChecks();
+    const validationMessage = useDraftValidationMessage(useItems, implantDraftPayload, prescriptionChecks);
     if (validationMessage) {
       alert(validationMessage);
       return null;
@@ -4685,9 +5650,13 @@ const bindUse = () => {
       surgeryId: surgerySelect.value,
       doctorText: departmentSelect.selectedOptions[0]?.textContent || "-",
       surgeryText: surgerySelect.selectedOptions[0]?.textContent || "-",
+      surgeryDetail: surgeryDetailInput?.value?.trim() || "",
       enteredBy: draftUserText(),
       useItems,
-      implantDraftPayload
+      implantDraftPayload,
+      prescriptionPatternId: prescriptionPatternSelect?.value || "",
+      prescriptionChecks,
+      surgerySelection: surgerySelection.value()
     });
   };
   const pendingUsagePhotoPayload = async (pendingId, draft, photo, date, index, onProgress, cache = null) => {
@@ -4742,8 +5711,12 @@ const bindUse = () => {
       caseOrder: snapshot.caseOrder,
       doctorId: departmentSelect.value,
       surgeryId: surgerySelect.value,
+      surgeryDetail: snapshot.surgeryDetail || "",
+      surgerySelection: snapshot.surgerySelection || null,
       date: snapshot.date || today(),
       productItems: snapshot.useItems.map((item) => ({ productId: item.productId, qty: Math.max(1, num(item.qty)) })),
+      prescriptionPatternId: snapshot.prescriptionPatternId || "",
+      prescriptionChecks: snapshot.prescriptionChecks || [],
       implantDrafts: implantDraftsPayload,
       draftSavedBy: snapshot.enteredBy,
       enteredBy: currentAuditUser(),
@@ -4804,8 +5777,14 @@ const bindUse = () => {
       filterUseOptions();
     }
     surgerySelect.value = pending.surgeryId || "";
+    filterPrescriptionPatterns();
+    if (prescriptionPatternSelect) prescriptionPatternSelect.value = pending.prescriptionPatternId || "";
+    if (surgeryDetailInput) surgeryDetailInput.value = pending.surgeryDetail || selectedPrescriptionPattern()?.surgery || "";
+    surgerySelection.refresh(selectedPrescriptionPattern(), pending.surgerySelection || null);
+    renderPrescriptionPattern({ savedChecks: pending.prescriptionChecks || [], resetGroupVisibility: true });
     renderUseRecommendation();
     applyPendingProductItemsToForm(form, pending.productItems || []);
+    autoPatternProductIds.clear();
     renderSelectedUseList();
     implantDrafts.splice(0, implantDrafts.length, ...pendingImplantDraftsFromRecord(pending));
     if (implantEnabled) implantEnabled.checked = implantDrafts.length > 0;
@@ -4873,7 +5852,8 @@ const bindUse = () => {
       return;
     }
     const results = useProductSearchResults(state.products, query);
-    productSearchResults.innerHTML = productSearchResultsHtml(results, selectedUseItems());
+    const resultHint = results.length > 12 ? `<p class="helper" role="status">검색 결과 ${results.length}개 중 12개 표시 · 코드나 규격을 더 입력하면 원하는 제품을 찾기 쉽습니다.</p>` : '';
+    productSearchResults.innerHTML = resultHint + productSearchResultsHtml(results.slice(0, 12), selectedUseItems());
     productSearchResults.querySelectorAll("[data-search-product]").forEach((input) => {
       input.addEventListener("change", () => {
         const qty = searchProductQtyValue(productSearchResults, input.value);
@@ -4891,41 +5871,9 @@ const bindUse = () => {
     });
   };
   const renderUseRecommendation = () => {
-    const rule = currentUseRule();
-    const restrictActive = isRestrictOn();
-    if (!rule) {
-      const hasSurgerySelection = useDepartment.value && departmentSelect.value && surgerySelect.value;
-      recommendation.innerHTML = noRecommendationHtml(hasSurgerySelection);
-      app.querySelectorAll("[data-use-product]").forEach((input) => input.closest(".check-card").style.display = "");
-      renderSelectedUseList();
-      return;
-    }
-    const recommendedItems = ruleItems(rule);
-    const recommended = useRecommendedItemsWithProducts(recommendedItems);
-    recommendation.innerHTML = useRecommendationHtml(recommended, restrictActive, selectedUseItems());
-    form.querySelectorAll("[data-use-product]").forEach((input) => {
-      const product = productById(input.value);
-      if (shouldHideUseProductForRestriction(product, input.value, recommendedItems, restrictActive)) {
-        input.checked = false;
-        input.closest(".check-card").style.display = "none";
-      } else {
-        input.closest(".check-card").style.display = "";
-      }
-    });
-    app.querySelectorAll("[data-recommend-product]").forEach((input) => {
-      input.addEventListener("change", () => {
-        syncRecommendProductToUseForm(input, form);
-        markUseEntryDirty();
-        renderSelectedUseList();
-      });
-    });
-    app.querySelectorAll("[data-recommend-qty]").forEach((input) => {
-      input.addEventListener("input", () => {
-        syncRecommendQtyToUseForm(input);
-        markUseEntryDirty();
-        renderSelectedUseList();
-      });
-    });
+    recommendation.innerHTML = "";
+    recommendation.hidden = true;
+    app.querySelectorAll("[data-use-product]").forEach((input) => { input.closest(".check-card").style.display = ""; });
     renderSelectedUseList();
   };
   const filterUseOptions = () => {
@@ -4933,7 +5881,7 @@ const bindUse = () => {
     const currentDoctor = departmentSelect.value;
     const currentSurgery = surgerySelect.value;
     const doctors = department
-      ? state.doctors.slice().sort(byName).filter((item) => departmentCode(item.name) === department)
+      ? state.doctors.filter(item => item.active !== false).sort(byName).filter((item) => departmentCode(item.name) === department)
       : [];
     departmentSelect.innerHTML = `<option value="">${department ? "원장 코드 선택" : "과를 먼저 선택하세요"}</option>` + doctors
       .map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`)
@@ -4965,6 +5913,14 @@ const bindUse = () => {
     departmentSelect.value = draft.doctorId || "";
     filterUseOptions();
     surgerySelect.value = draft.surgeryId || "";
+    filterPrescriptionPatterns();
+    if (surgeryDetailInput) surgeryDetailInput.value = draft.surgeryDetail || "";
+    if (draft.surgerySelection) {
+      const matches=window.ORSurgerySelection.match(patternsForSelectedDoctor(),draft.surgerySelection);
+      prescriptionPatternSelect.value=matches.length===1?matches[0].id:'';
+      surgerySelection.refresh(matches.length===1?matches[0]:null,draft.surgerySelection);
+      renderPrescriptionPattern({resetGroupVisibility:true});
+    }
     setRestrictButton(Boolean(draft.restrictNonpay));
     renderUseRecommendation();
     useEntryDirty = true;
@@ -4973,16 +5929,171 @@ const bindUse = () => {
   restoreUseEntryPatientAutosave();
   useDepartment.addEventListener("change", () => {
     filterUseOptions();
+    filterPrescriptionPatterns();
     markUseEntryDirty();
   });
   departmentSelect.addEventListener("change", () => {
     filterUseOptions();
+    filterPrescriptionPatterns();
     markUseEntryDirty();
   });
   surgerySelect.addEventListener("change", () => {
     renderUseRecommendation();
+    filterPrescriptionPatterns({ preferSurgery: true });
     markUseEntryDirty();
   });
+  prescriptionPatternSelect?.addEventListener("change", () => {
+    const pattern = selectedPrescriptionPattern();
+    if (surgeryDetailInput && pattern) surgeryDetailInput.value = pattern.surgery;
+    surgerySelection.refresh(pattern);
+    renderPrescriptionPattern({ applyProducts: true, resetGroupVisibility: true });
+    markUseEntryDirty();
+  });
+  surgeryDetailInput?.addEventListener("change", () => {
+    const exact = patternsForSelectedDoctor().find((pattern) => normalizedPrescriptionText(pattern.surgery) === normalizedPrescriptionText(surgeryDetailInput.value));
+    if (exact && prescriptionPatternSelect.value !== exact.id) {
+      prescriptionPatternSelect.value = exact.id;
+      surgerySelection.refresh(exact);
+      renderPrescriptionPattern({ applyProducts: true, resetGroupVisibility: true });
+    } else if (!exact) {
+      prescriptionPatternSelect.value = '';
+      surgerySelection.refresh(null, {procedure:surgeryDetailInput.value.trim(),regions:[],levelCount:0});
+      renderPrescriptionPattern({applyProducts:true,resetGroupVisibility:true});
+    }
+    markUseEntryDirty();
+  });
+  const syncPrescriptionRowToProduct = (input) => {
+    if (!input) return;
+    const productId = input.dataset.matchedProductId;
+    if (productId) {
+      const productCheckbox = form.querySelector(`[data-use-product="${productId}"]`);
+      const qtyInput = form.querySelector(`[data-use-qty="${productId}"]`);
+      const total = Array.from(prescriptionChecklist.querySelectorAll('[data-prescription-item]')).filter(row => row.checked && row.dataset.matchedProductId === productId).reduce((sum, row) => sum + num(row.closest('.prescription-sheet-row').querySelector('[data-prescription-actual-qty]').value), 0);
+      if (productCheckbox) productCheckbox.checked = total > 0;
+      if (qtyInput) qtyInput.value = Math.max(1, total);
+      if (total > 0) autoPatternProductIds.add(productId);
+      else autoPatternProductIds.delete(productId);
+      renderSelectedUseList();
+      syncImplantDraftsFromSelectedProducts();
+      renderImplantDrafts();
+    }
+    refreshUnlinkedWarning();
+    markUseEntryDirty();
+  };
+  togglePrescriptionEdit?.addEventListener("click", () => {
+    const savedChecks = collectPrescriptionChecks();
+    prescriptionEditMode = !prescriptionEditMode;
+    togglePrescriptionEdit.textContent = prescriptionEditMode ? "편집 완료" : "재료 편집";
+    togglePrescriptionEdit.setAttribute("aria-expanded", String(prescriptionEditMode));
+    if (prescriptionMaterialEditor) prescriptionMaterialEditor.hidden = !prescriptionEditMode;
+    renderPrescriptionPattern({ savedChecks });
+    if (prescriptionEditMode) prescriptionMaterialName?.focus();
+  });
+  addPrescriptionMaterial?.addEventListener("click", () => {
+    const pattern = selectedPrescriptionPattern();
+    if (!pattern) {
+      alert("원장별 상세 수술을 먼저 선택해 주세요.");
+      prescriptionPatternSelect?.focus();
+      return;
+    }
+    const enteredValue = prescriptionMaterialName?.value?.trim() || "";
+    const selectedOrder = prescriptionNameCatalog.find((item) => normalizedPrescriptionText(item.name) === normalizedPrescriptionText(enteredValue));
+    if (!enteredValue) {
+      alert("추가할 재료의 품명·규격을 입력해 주세요.");
+      prescriptionMaterialName?.focus();
+      return;
+    }
+    if (!selectedOrder) {
+      alert("처방종류 파일에 있는 정식 명칭을 선택해 주세요.");
+      prescriptionMaterialName?.focus();
+      return;
+    }
+    const name = selectedOrder.name;
+    const section = selectedOrder.section || prescriptionMaterialSection?.value || "공통재료";
+    const duplicate = Array.from(prescriptionChecklist?.querySelectorAll("[data-prescription-name]") || [])
+      .some((input) => normalizedPrescriptionText(input.dataset.prescriptionName) === normalizedPrescriptionText(name));
+    if (duplicate) {
+      alert("이미 처방전에 있는 재료입니다. 해당 행의 수량을 입력해 주세요.");
+      prescriptionMaterialName?.focus();
+      return;
+    }
+    const savedChecks = collectPrescriptionChecks();
+    savedChecks.push({ name, section, qty: 1, defaultQty: 0, checked: true, custom: true, frequency: 0, matchedProductId: "" });
+    renderPrescriptionPattern({ savedChecks });
+    const addedInput = Array.from(prescriptionChecklist?.querySelectorAll("[data-prescription-name]") || [])
+      .find((input) => normalizedPrescriptionText(input.dataset.prescriptionName) === normalizedPrescriptionText(name));
+    syncPrescriptionRowToProduct(addedInput);
+    if (prescriptionMaterialName) {
+      prescriptionMaterialName.value = "";
+      prescriptionMaterialName.focus();
+    }
+  });
+  prescriptionMaterialSection?.addEventListener("change", () => {
+    renderPrescriptionOrderOptions();
+    if (prescriptionMaterialName) prescriptionMaterialName.value = "";
+  });
+  prescriptionMaterialName?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    addPrescriptionMaterial?.click();
+  });
+  prescriptionChecklist?.addEventListener("click", (event) => {
+    const deleteButton = event.target.closest?.("[data-delete-prescription-material]");
+    if (!deleteButton) return;
+    const row = deleteButton.closest(".prescription-sheet-row");
+    const input = row?.querySelector("[data-prescription-item]");
+    if (!input) return;
+    const name = input.dataset.prescriptionName || "";
+    if (!confirm(`'${name}' 재료를 이번 처방전에서 삭제할까요?`)) return;
+    const normalizedName = normalizedPrescriptionText(name);
+    let savedChecks = collectPrescriptionChecks()
+      .filter((item) => normalizedPrescriptionText(item.name) !== normalizedName);
+    if (input.checked) {
+      input.checked = false;
+      syncPrescriptionRowToProduct(input);
+    }
+    if (input.dataset.prescriptionCustom !== "true") {
+      savedChecks.push({
+        name,
+        section: input.dataset.prescriptionSection || "공통재료",
+        qty: 0,
+        defaultQty: Math.max(0, num(input.dataset.prescriptionDefaultQty || 0)),
+        checked: false,
+        custom: false,
+        deleted: true,
+        frequency: Number(input.dataset.prescriptionFrequency || 0),
+        matchedProductId: input.dataset.matchedProductId || ""
+      });
+    }
+    renderPrescriptionPattern({ savedChecks });
+    markUseEntryDirty();
+  });
+  prescriptionChecklist?.addEventListener("toggle", (event) => {
+    const group = event.target.closest?.("[data-prescription-group]");
+    if (!group || event.target !== group) return;
+    prescriptionGroupOpenState.set(group.dataset.prescriptionGroup || "", group.open);
+  }, true);
+  prescriptionChecklist?.addEventListener("change", (event) => {
+    const row = event.target.closest?.(".prescription-sheet-row");
+    const input = row?.querySelector("[data-prescription-item]");
+    if (!input) return;
+    const qtyInput = row.querySelector("[data-prescription-actual-qty]");
+    if (event.target.matches("[data-prescription-actual-qty]")) input.checked = num(qtyInput?.value) > 0;
+    if (event.target.matches("[data-prescription-item]") && input.checked && num(qtyInput?.value) <= 0) qtyInput.value = 1;
+    syncPrescriptionRowToProduct(input);
+    const group = row.closest("[data-prescription-group]");
+    if (group) {
+      const activeCount = Array.from(group.querySelectorAll(".prescription-sheet-row")).filter((groupRow) => {
+        const checkbox = groupRow.querySelector("[data-prescription-item]");
+        const groupQty = groupRow.querySelector("[data-prescription-actual-qty]");
+        return checkbox?.checked || num(groupQty?.value) > 0;
+      }).length;
+      const used = group.querySelector("[data-prescription-group-used]");
+      if (used) used.textContent = activeCount ? `${activeCount} 사용` : "";
+      group.classList.toggle("has-used", activeCount > 0);
+    }
+  });
+  renderPrescriptionOrderOptions();
   useRestrictNonpay?.addEventListener("click", () => {
     setRestrictButton(!isRestrictOn());
     markUseEntryDirty();
@@ -5072,6 +6183,8 @@ const bindUse = () => {
   saveUseDraftButton?.addEventListener("click", async () => {
     const snapshot = collectUseDraftSnapshot();
     if (!snapshot) return;
+    const unlinked = snapshot.prescriptionChecks.filter(x => x.checked && !x.matchedProductId);
+    if (unlinked.length && !confirm(`재고가 차감되지 않는 확인 항목 ${unlinked.length}종이 있습니다: ${unlinked.map(x=>x.name).join(", ")}. 확인 기록만 저장하고 진행할까요?`)) return;
     setButtonBusy(saveUseDraftButton, true, "임시저장 중...");
     showSaveToast("임시저장 중입니다...", "saving", { hold: true });
     try {
@@ -5121,7 +6234,7 @@ const bindUse = () => {
     useDraftSnapshot = null;
     useDraftDirty = false;
     if (useDraftPanel) useDraftPanel.hidden = true;
-    if (saveUseDraftButton) saveUseDraftButton.textContent = "임시저장";
+    if (saveUseDraftButton) saveUseDraftButton.textContent = "확인 대기로 저장";
     saveDoneToast("임시저장을 취소했습니다.");
   });
   const showProductSearchModal = () => {
@@ -5334,7 +6447,6 @@ const bindUse = () => {
       alert("임시저장 후 입력 내용이 수정되었습니다. 임시저장 갱신 후 최종저장해 주세요.");
       return;
     }
-    const rule = currentUseRule();
     const restrictActive = isRestrictOn();
     const useItems = (useDraftSnapshot.useItems || []).map((item) => ({
       productId: item.productId,
@@ -5359,24 +6471,7 @@ const bindUse = () => {
     if (restrictActive && selectedNonpayIds.length && !confirm("비급여 제한으로 설정된 수술입니다. 그래도 비급여를 사용할까요?")) {
       return;
     }
-    const recommendationCheck = finalSaveRecommendationCheck({
-      ruleItems: rule ? ruleItems(rule) : [],
-      productIds,
-      uniqueProductIds,
-      useItems,
-      restrictActive
-    });
-    if (recommendationCheck.missingNames) {
-      if (!confirm(`추천 항목이 선택되지 않았습니다: ${recommendationCheck.missingNames}\n정말 사용하지 않겠습니까?\n확인을 누르면 사용안함으로 저장합니다.`)) {
-        return;
-      }
-    }
-    if (recommendationCheck.changedNames) {
-      if (!confirm(`추천 항목 수량과 다릅니다: ${recommendationCheck.changedNames}\n그래도 저장할까요?`)) {
-        return;
-      }
-    }
-    const validationMessage = useDraftValidationMessage(useItems, implantDraftPayload);
+    const validationMessage = useDraftValidationMessage(useItems, implantDraftPayload, useDraftSnapshot.prescriptionChecks || []);
     if (validationMessage) {
       alert(validationMessage);
       return;
@@ -5386,25 +6481,33 @@ const bindUse = () => {
       return;
     }
     setButtonBusy(submitButton, true, "저장 중...");
-    useItems.forEach((item) => {
-      const product = productById(item.productId);
-      if (product && !isVendorManagedProduct(product)) product.stock = num(product.stock) - item.qty;
-    });
     const finalSavedAt = new Date().toISOString();
     const usageRecord = buildFinalUsageRecord({
       caseRoom: finalCaseRoom,
       caseOrder: finalCaseOrder,
       doctorId: useDraftSnapshot.doctorId || document.getElementById("useDoctor").value,
       surgeryId: useDraftSnapshot.surgeryId || document.getElementById("useSurgery").value,
+      surgeryDetail: useDraftSnapshot.surgeryDetail || surgeryDetailInput?.value?.trim() || "",
       productIds,
       usageDate,
       finalSavedAt,
       draftSnapshot: useDraftSnapshot,
       finalSavedBy: draftUserText(),
+      prescriptionPatternId: useDraftSnapshot.prescriptionPatternId || "",
+      prescriptionChecks: useDraftSnapshot.prescriptionChecks || [],
       auditFields: auditCreateFields()
     });
-    state.usages.push(usageRecord);
+    usageRecord.id = loadedPendingUsageId ? `pending:${loadedPendingUsageId}` : usageRecord.id;
     const saved = await saveState("사용내역 저장 완료", {
+      apply: (s) => {
+        if (s.usages.some(u => u.id === usageRecord.id)) throw new Error('이미 최종 저장된 임시저장입니다. 사용내역에서 확인해 주세요.');
+        useItems.forEach(item => {
+          const p = s.products.find(p => p.id === item.productId);
+          if (!p || p.active === false) throw new Error('사용 제품이 삭제되었습니다. 임시저장을 다시 확인해 주세요.');
+          if (!isVendorManagedProduct(p) && !isUnconfirmedStock(p) && Number(p.stock) < item.qty) throw new Error(`${p.name}: 다른 저장으로 재고가 변경되었습니다. 현재고를 확인해 주세요.`);
+        });
+        s.usages.push(usageRecord);
+      },
       savingMessage: "사용내역 저장 중입니다...",
       doneMessage: implantDraftPayload.length ? "사용내역 저장 완료 · 사진 업로드 준비" : "사용내역 저장 완료"
     });
@@ -5468,7 +6571,7 @@ const productUsageSort = (category) => (a, b) => {
 };
 
 const stockStatusClass = (product) => {
-  if (isVendorManagedProduct(product)) return "stock-ok";
+  if (isVendorManagedProduct(product) || isUnconfirmedStock(product)) return "stock-ok";
   const stock = num(product?.stock);
   const warning = num(product?.warningStock);
   if (stock <= warning) return "stock-danger";
@@ -5642,6 +6745,8 @@ const getBackupResetModule = () => {
       getDoc: () => doc,
       getDeleteDoc: () => deleteDoc,
       getGetDoc: () => getDoc,
+      getRunTransaction: () => runTransaction,
+      getMainRef: () => ref,
       alphaFirstCompare,
       escapeHtml,
       currentAuditUser,
@@ -5672,7 +6777,6 @@ const getRoomCloseModule = () => {
     roomCloseModule = window.createRoomCloseModule({
       getState: () => state,
       getApp: () => app,
-      setRoomCloseDirty: (dirty) => { roomCloseDirty = dirty; },
       escapeHtml,
       num,
       today,
@@ -5695,8 +6799,43 @@ const getRoomCloseModule = () => {
   }
   return roomCloseModule;
 };
-const renderRoomClose = () => getRoomCloseModule().renderRoomClose();
-const bindRoomClose = () => getRoomCloseModule().bindRoomClose();
+const renderRoomCloseHistoryCard = () => getRoomCloseModule().renderRoomCloseHistoryCard();
+const bindRoomCloseHistory = () => getRoomCloseModule().bindRoomCloseHistory();
+
+let morningCountModule = null;
+const getMorningCountModule = () => {
+  if (!window.createMorningCountModule) throw new Error("아침 실사 모듈을 불러오지 못했습니다.");
+  if (!morningCountModule) {
+    morningCountModule = window.createMorningCountModule({
+      getState: () => state,
+      setMorningCountDirty: (dirty) => { morningCountDirty = dirty; },
+      escapeHtml,
+      num,
+      today,
+      uid,
+      sameId,
+      productCategory,
+      productCategoryLabel,
+      productDisplaySort,
+      productById,
+      isVendorManagedProduct,
+      formatDateTime,
+      auditCreateFields,
+      auditUpdateFields,
+      auditUserText,
+      currentAuditUser,
+      saveState,
+      render,
+      setButtonBusy,
+      downloadExcel,
+      receiptDateValue,
+      receiptStockDelta
+    });
+  }
+  return morningCountModule;
+};
+const renderMorningCount = () => getMorningCountModule().renderMorningCount() + getPurchaseModule().renderCount();
+const bindMorningCount = () => {getMorningCountModule().bindMorningCount();getPurchaseModule().bind();};
 
 const subscribeImplantCollections = () => {
   if (!db || !collection || !onSnapshot) return;
@@ -5768,7 +6907,9 @@ const boot = async () => {
     } else {
       await setDoc(ref, state);
     }
-    const addedSeedCount = addSeedMasters();
+    // 운영 중 수정·삭제한 마스터를 다음 로그인에서 기본값으로 되돌리지 않는다.
+    // 기본 자료는 app/main이 없는 최초 설치에만 넣는다.
+    const addedSeedCount = snap.exists() ? 0 : addSeedMasters();
     const reconciledStockCount = reconcileProductStocks();
     hydrated = true;
     setStatus("Firebase 연결됨", "ok");

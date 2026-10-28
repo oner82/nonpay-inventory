@@ -1,2 +1,6 @@
 *firebase-adminsdk*.json
 tore index_new.html
+
+# 환자 처방전 스캔 — 절대 커밋/배포 금지 (환자정보 포함)
+환자처방전/
+환자처방전_분석/

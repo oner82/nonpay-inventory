@@ -5,6 +5,7 @@
       set(_target, property, value) { context.getState()[property] = value; return true; }
     });
     const app = context.getApp();
+    let dirty = false;
     const {
       departmentOptions,
       departmentNames,
@@ -23,13 +24,13 @@
       sameId
     } = context;
 
-const renderDoctors = () => renderSimpleManager("doctors", "과", "doctor");
+const renderDoctors = () => renderSimpleManager("doctors", "원장", "doctor");
 
 const renderSurgeryDoctorSelector = () => {
   if (!state.doctors.length) return `<div class="empty">원장코드를 먼저 추가해 주세요. 원장 미선택 시 공통 수술로 저장됩니다.</div>`;
   return `
     <div class="doctor-scope-list" id="surgeryDoctorScopeList">
-      ${state.doctors.slice().sort(byName).map((doctor) => `
+      ${state.doctors.filter(d => d.active !== false).sort(byName).map((doctor) => `
         <label class="doctor-scope-option" data-surgery-doctor-option data-department="${escapeHtml(departmentCode(doctor.name))}">
           <input type="checkbox" value="${escapeHtml(doctor.id)}" data-surgery-doctor>
           <span>${escapeHtml(doctor.name)}</span>
@@ -122,7 +123,7 @@ const renderGroupedDoctors = () => {
             <div class="item-title"><span>${escapeHtml(item.name)}</span></div>
             <div class="actions">
               <button class="secondary" type="button" data-edit-doctor="${item.id}">수정</button>
-              <button class="danger" type="button" data-delete-doctor="${item.id}">삭제</button>
+              <button class="danger" type="button" data-delete-doctor="${item.id}">${item.active === false ? "복원 (삭제됨)" : "삭제"}</button>
             </div>
           </div>
         `).join("")}
@@ -164,7 +165,7 @@ const renderGroupedSurgeries = () => {
               <div class="meta"><span>${escapeHtml(isCommonSurgery(item) ? "같은 과 모든 원장 사용입력에 표시" : "선택한 원장코드 사용입력에만 표시")}</span></div>
               <div class="actions">
                 <button class="secondary" type="button" data-edit-surgery="${item.id}">수정</button>
-                <button class="danger" type="button" data-delete-surgery="${item.id}">삭제</button>
+                <button class="danger" type="button" data-delete-surgery="${item.id}">${item.active === false ? "복원 (삭제됨)" : "삭제"}</button>
               </div>
            </div>
           `).join("")}
@@ -175,7 +176,9 @@ const renderGroupedSurgeries = () => {
 };
 
 const bindSimpleManager = (collection, label, key) => {
+  dirty = false;
   const form = document.getElementById(`${key}Form`);
+  form.addEventListener("input", () => { dirty = true; });
   document.getElementById(`${key}Reset`).addEventListener("click", () => {
     form.reset();
       document.getElementById(`${key}Id`).value = "";
@@ -206,21 +209,26 @@ const bindSimpleManager = (collection, label, key) => {
       return;
     }
     if (!name) return;
-    state[collection] = [...state[collection].filter((item) => item.id !== id), { id, name }];
-    if (key === "doctor" && oldName && oldName !== name) {
-      state.surgeries = state.surgeries.map((item) => item.department === oldName ? { ...item, department: name } : item);
-    }
-    render();
-    await saveState(`${label} 저장 완료`, {
-      savingMessage: `${label} 저장 중입니다...`,
-      doneMessage: `${label} 저장 완료`
-    });
+    if (state[collection].some(item => item.id !== id && item.name.toUpperCase() === name.toUpperCase())) return alert("같은 코드가 이미 등록되어 있습니다.");
+    const previous = state[collection].find(item => item.id === id) || {};
+    const next = {...previous, id, name, ...context.auditUpdateFields(), updatedAt:new Date().toISOString()};
+    event.submitter.disabled = true;
+    try {
+      const ok = await saveState(`${label} 저장 완료`, {apply: target => {
+        if (target[collection].some(item => item.id !== id && item.name.toUpperCase() === name.toUpperCase())) throw new Error("같은 코드가 이미 등록되어 있습니다.");
+        target[collection] = [...target[collection].filter(item => item.id !== id), next];
+        if (key === "doctor" && oldName && oldName !== name) context.renameDoctorPatterns(target, oldName, name);
+      }});
+      if (ok) { dirty = false; render(); }
+    } finally { event.submitter.disabled = false; }
   });
 };
 
-const bindDoctors = () => bindSimpleManager("doctors", "과", "doctor");
+const bindDoctors = () => bindSimpleManager("doctors", "원장", "doctor");
 const bindSurgeries = () => {
+  dirty = false;
   const form = document.getElementById("surgeryForm");
+  form.addEventListener("input", () => { dirty = true; });
   const departmentSelect = document.getElementById("surgeryDepartment");
   const syncSurgeryDoctorScope = () => {
     const department = departmentSelect.value;
@@ -250,12 +258,15 @@ const bindSurgeries = () => {
     const name = document.getElementById("surgeryName").value.trim();
     const doctorIds = Array.from(form.querySelectorAll("[data-surgery-doctor]:checked:not(:disabled)")).map((input) => input.value);
     if (!department || !name) return;
-    state.surgeries = [...state.surgeries.filter((item) => item.id !== id), { ...previous, id, department, name, doctorIds }];
-    render();
-    await saveState("수술 저장 완료", {
-      savingMessage: "수술 저장 중입니다...",
-      doneMessage: "수술 저장 완료"
-    });
+    const next = {...previous, id, department, name, doctorIds, ...context.auditUpdateFields(), updatedAt:new Date().toISOString()};
+    event.submitter.disabled = true;
+    try {
+      const ok = await saveState("수술 저장 완료", {apply: target => {
+        if (target.surgeries.some(x => x.id !== id && x.department === department && x.name.toLowerCase() === name.toLowerCase())) throw new Error("같은 과에 같은 수술명이 있습니다. 기존 수술의 표시 원장을 수정해 주세요.");
+        target.surgeries = [...target.surgeries.filter(x => x.id !== id), next];
+      }});
+      if (ok) { dirty = false; render(); }
+    } finally { event.submitter.disabled = false; }
   });
   syncSurgeryDoctorScope();
 };
@@ -263,6 +274,7 @@ const bindSurgeries = () => {
 
 
     return {
+      isDirty: () => dirty,
       renderDoctors,
       renderSurgeries,
       bindDoctors,

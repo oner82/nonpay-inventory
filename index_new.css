@@ -1302,7 +1302,134 @@
 
     /* 2026-05-05 use input compact search + selected item buttons */
     .use-recommendation-gap { margin-top: 14px; }
+    .prescription-assist-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin-top: 10px; }
+    .prescription-assist-panel { min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: #f8fbff; }
+    .prescription-assist-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+    .prescription-assist-head label { margin: 0; }
+    .prescription-assist-head .helper { margin-top: 2px; }
+    .prescription-assist-head-actions { display: flex; align-items: center; gap: 6px; }
+    .prescription-edit-toggle { min-height: 30px; padding: 4px 9px; font-size: 11px; white-space: nowrap; }
+    .prescription-surgery-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .prescription-material-editor { display: grid; grid-template-columns: 130px minmax(220px, 1fr) auto auto; align-items: center; gap: 6px; margin-top: 7px; padding: 6px; border: 1px dashed #94a3b8; border-radius: 8px; background: #fff; }
+    .prescription-material-editor[hidden] { display: none !important; }
+    .prescription-material-editor > span { color: var(--muted); font-size: 11px; font-weight: 800; }
+    .prescription-checklist { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: start; gap: 6px; max-height: 520px; margin-top: 7px; padding: 6px; overflow: auto; overscroll-behavior: contain; border: 2px solid #475569; background: #fff; }
+    .prescription-sheet-section { min-width: 0; border: 1px solid #94a3b8; background: #fff; break-inside: avoid; }
+    .prescription-sheet-section h4 { margin: 0; padding: 5px 7px; border-bottom: 1px solid #94a3b8; background: #fee2e2; text-align: center; font-size: 12px; font-weight: 950; }
+    .prescription-material-group > summary { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; align-items: center; gap: 5px; min-height: 30px; padding: 4px 7px; background: #fee2e2; color: #7f1d1d; font-size: 11px; font-weight: 950; cursor: pointer; list-style: none; }
+    .prescription-material-group > summary::-webkit-details-marker { display: none; }
+    .prescription-material-group > summary::before { content: "▶"; color: #991b1b; font-size: 9px; transition: transform .12s ease; }
+    .prescription-material-group[open] > summary { border-bottom: 1px solid #94a3b8; }
+    .prescription-material-group[open] > summary::before { transform: rotate(90deg); }
+    .prescription-material-group.has-used > summary { background: #fef3c7; color: #92400e; }
+    .prescription-group-meta { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .prescription-group-meta strong { color: #b45309; font-size: 10px; }
+    .prescription-group-meta em { color: #64748b; font-size: 9px; font-style: normal; }
+    .prescription-unused-items { border-top: 1px dashed #cbd5e1; background: #f8fafc; }
+    .prescription-unused-items > summary { padding: 5px 7px; color: #64748b; font-size: 10px; font-weight: 900; cursor: pointer; list-style-position: inside; }
+    .prescription-unused-items[open] > summary { border-bottom: 1px dashed #cbd5e1; }
+    .prescription-size-family { margin: 3px; border: 1px solid #cbd5e1; border-radius: 5px; background: #f8fafc; overflow: hidden; }
+    .prescription-size-family > summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 5px; padding: 4px 6px; color: #475569; font-size: 10px; font-weight: 950; cursor: pointer; }
+    .prescription-size-family > summary > span:last-child { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .prescription-size-family > summary strong { color: #b45309; font-size: 9px; }
+    .prescription-size-family > summary em { color: #64748b; font-size: 9px; font-style: normal; }
+    .prescription-size-family.has-used { border-color: #f59e0b; background: #fffbeb; }
+    .prescription-size-family[open] > summary { border-bottom: 1px solid #cbd5e1; }
+    .prescription-sheet-head, .prescription-sheet-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) 52px 34px; gap: 4px; align-items: center; }
+    .prescription-sheet-head { padding: 4px 5px; border-bottom: 1px solid #cbd5e1; background: #f1f5f9; color: #475569; font-size: 10px; font-weight: 950; }
+    .prescription-sheet-head span:first-child, .prescription-sheet-head span:nth-child(3) { text-align: center; }
+    .prescription-sheet-row { min-height: 31px; padding: 2px 5px; border-bottom: 1px solid #e2e8f0; background: #fff; font-size: 11px; font-weight: 850; }
+    .prescription-sheet-row.predicted { background: #fffbea; }
+    .prescription-sheet-row.custom { background: #eff6ff; }
+    .prescription-sheet-row.matched { box-shadow: inset 3px 0 #22c55e; }
+    .prescription-sheet-row > input[type="checkbox"] { width: 20px; min-height: 20px; margin: 0 auto; }
+    .prescription-material-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .prescription-sheet-row [data-prescription-actual-qty] { width: 50px; min-height: 27px; padding: 2px 4px; text-align: center; font-weight: 950; }
+    .prescription-link-status { color: #b45309; font-size: 11px; text-align: center; white-space: nowrap; }
+    .prescription-link-status.linked { color: #15803d; }
+    .prescription-row-delete { width: 24px; min-width: 24px; min-height: 24px; padding: 0; border: 1px solid #fecaca; border-radius: 5px; background: #fff1f2; color: #b91c1c; font-size: 16px; font-weight: 950; line-height: 1; }
+    .preferred-implant-list { display: grid; gap: 5px; max-height: 126px; overflow: auto; }
+    .preferred-implant-item { display: flex; justify-content: space-between; gap: 8px; padding: 7px 8px; border: 1px solid #c7d2fe; border-radius: 8px; background: #eef2ff; font-size: 12px; }
+    .preferred-implant-item strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .preferred-implant-item span { flex: 0 0 auto; color: var(--muted); }
+    .compact-use-content { margin-top: 10px !important; padding: 10px !important; }
+    .manual-product-picker { margin-top: 9px; border: 1px solid var(--line); border-radius: 10px; background: #fff; overflow: hidden; }
+    .manual-product-picker > summary { min-height: 38px; padding: 8px 10px; color: var(--brand-dark); font-size: 13px; font-weight: 900; cursor: pointer; }
+    .manual-product-picker > .product-picker { max-height: 330px; padding: 8px; overflow: auto; }
     .use-content-card { margin-top: 18px; }
+    @media (max-width: 900px) {
+      .prescription-assist-grid { grid-template-columns: 1fr; }
+      .prescription-surgery-fields { grid-template-columns: 1fr; }
+      .prescription-material-editor { grid-template-columns: 1fr; }
+      .prescription-checklist { grid-template-columns: 1fr; max-height: 360px; }
+    }
+    @media (min-width: 1100px) and (max-width: 1400px) {
+      body.use-view-active { padding-left: 190px !important; }
+      body.use-view-active > header { width: 190px !important; max-width: 190px !important; }
+      body.use-view-active > header .topbar { padding: 14px 10px !important; }
+      body.use-view-active > header .brand-logo { max-width: 150px !important; }
+      body.use-view-active > header .tab { min-height: 40px !important; padding: 0 11px !important; }
+      body.use-view-active main { padding: 8px 10px 12px !important; }
+      body.use-view-active .page-head { display: none !important; }
+      body.use-view-active #useForm { padding: 8px !important; border-radius: 8px !important; }
+      body.use-view-active .use-form-head { margin-bottom: 4px; }
+      body.use-view-active .use-form-head h2 { font-size: 16px; }
+      body.use-view-active #useForm > .row { gap: 6px; margin-bottom: 3px; }
+      body.use-view-active #useForm label { margin: 2px 0; font-size: 10px; }
+      body.use-view-active #useForm .helper { display: none; }
+      body.use-view-active #useForm input,
+      body.use-view-active #useForm select { min-height: 30px; padding: 3px 6px; font-size: 11px; }
+      body.use-view-active .prescription-assist-grid { grid-template-columns: 1fr; gap: 4px; margin-top: 4px; }
+      body.use-view-active .prescription-assist-panel { padding: 5px; }
+      body.use-view-active .prescription-assist-head { margin-bottom: 3px; }
+      body.use-view-active .prescription-assist-head-actions { gap: 3px; }
+      body.use-view-active .prescription-edit-toggle { min-height: 24px; padding: 2px 6px; font-size: 9px; }
+      body.use-view-active .prescription-surgery-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+      body.use-view-active .prescription-material-editor { grid-template-columns: 92px minmax(0, 1fr) auto; gap: 3px; margin-top: 3px; padding: 3px; }
+      body.use-view-active .prescription-material-editor > span { display: none; }
+      body.use-view-active .prescription-material-editor select,
+      body.use-view-active .prescription-material-editor input { min-height: 25px !important; font-size: 9px !important; }
+      body.use-view-active .prescription-material-editor button { min-height: 25px; padding: 2px 6px; font-size: 9px; }
+      body.use-view-active .prescription-checklist {
+        display: block;
+        height: 458px;
+        max-height: 458px;
+        padding: 3px;
+        column-count: 8;
+        column-gap: 3px;
+        column-fill: auto;
+        overflow: hidden;
+      }
+      body.use-view-active .prescription-sheet-section { display: inline-block; width: 100%; margin: 0 0 3px; vertical-align: top; }
+      body.use-view-active .prescription-sheet-section h4 { padding: 2px 3px; font-size: 9px; line-height: 1.15; }
+      body.use-view-active .prescription-material-group > summary { grid-template-columns: 8px minmax(0, 1fr) auto; gap: 2px; min-height: 18px; padding: 1px 2px; font-size: 8.5px; line-height: 1; }
+      body.use-view-active .prescription-material-group > summary::before { font-size: 7px; }
+      body.use-view-active .prescription-group-meta { gap: 2px; }
+      body.use-view-active .prescription-group-meta strong { font-size: 7px; }
+      body.use-view-active .prescription-group-meta em { font-size: 7px; }
+      body.use-view-active .prescription-unused-items > summary { min-height: 16px; padding: 2px 3px; font-size: 7.5px; line-height: 1.1; }
+      body.use-view-active .prescription-size-family { margin: 1px; border-radius: 3px; }
+      body.use-view-active .prescription-size-family > summary { min-height: 16px; gap: 2px; padding: 1px 2px; font-size: 7.5px; line-height: 1; }
+      body.use-view-active .prescription-size-family > summary > span:last-child { gap: 2px; }
+      body.use-view-active .prescription-size-family > summary strong,
+      body.use-view-active .prescription-size-family > summary em { font-size: 6.5px; }
+      body.use-view-active .prescription-sheet-head { display: none; }
+      body.use-view-active .prescription-sheet-row { grid-template-columns: 18px minmax(0, 1fr) 30px 13px; gap: 1px; min-height: 17px; padding: 0 1px; font-size: 8.2px; line-height: 1; }
+      body.use-view-active #useForm .prescription-sheet-row > input[type="checkbox"] { width: 13px; height: 13px; min-height: 13px !important; padding: 0; }
+      body.use-view-active #useForm .prescription-sheet-row [data-prescription-actual-qty] { width: 29px; height: 16px; min-height: 16px !important; padding: 0 1px; font-size: 8.5px; }
+      body.use-view-active .prescription-link-status { font-size: 0; }
+      body.use-view-active .prescription-link-status.linked::after { content: "●"; color: #16a34a; font-size: 7px; }
+      body.use-view-active .prescription-row-delete { width: 13px; min-width: 13px; min-height: 13px; border: 0; font-size: 12px; }
+      body.use-view-active #useRecommendation { display: none !important; }
+      body.use-view-active .compact-use-content { margin-top: 4px !important; padding: 5px !important; }
+      body.use-view-active .use-content-head { margin-bottom: 3px; }
+      body.use-view-active .use-content-head h3 { font-size: 12px; }
+      body.use-view-active .selected-use-chip { padding: 3px 5px; }
+      body.use-view-active .manual-product-picker { display: none; }
+      body.use-view-active .implant-toggle { margin-top: 4px; padding: 4px 7px; font-size: 10px; }
+      body.use-view-active #saveUseDraft { min-height: 32px; }
+      body.use-view-active #useForm > .actions { margin-top: 4px; }
+    }
     .use-content-head {
       display: flex;
       align-items: center;
@@ -2531,6 +2658,10 @@
     .check-card.use-card > span { min-width: 0; }
     /* 방 마감 카드: 체크박스가 없어 28px 첫 컬럼에 텍스트가 끼므로 2컬럼(내용 + 스테퍼)로 배치 */
     .check-card.use-card.room-close-item { grid-template-columns: minmax(0, 1fr) 112px !important; }
+    /* 아침 실사 카드: 방 마감 카드와 같은 2컬럼(내용 + 수량 입력) 배치 */
+    .check-card.use-card.morning-count-item { grid-template-columns: minmax(0, 1fr) 92px !important; align-items: center; }
+    .morning-count-usage { font-weight: 900; color: #1e3a8a; }
+    .morning-count-over { font-weight: 900; color: #c2410c; }
     /* 스테퍼 위 모드 라벨(채운 수량/남은 개수) — 지금 무엇을 입력 중인지 항상 표시 */
     .room-close-qty-cell { display: grid; gap: 2px; justify-items: center; }
     .room-close-mode { font-size: 11px; font-weight: 900; color: var(--muted); letter-spacing: .02em; }
@@ -2637,3 +2768,81 @@
     @media (max-width: 720px) {
       .rule-card .qty-stepper { justify-self: start; }
     }
+
+    /* 설정 > 처방관리 */
+    .prescription-settings-layout { display: grid; grid-template-columns: minmax(250px, 320px) minmax(0, 1fr); gap: 12px; align-items: start; }
+    .prescription-add-form { position: sticky; top: 8px; display: grid; gap: 8px; }
+    .prescription-add-form label { margin: 0; }
+    .prescription-add-fields { display: grid; gap: 8px; }
+    .prescription-add-fields label { display: grid; gap: 5px; }
+    .prescription-admin-card { min-width: 0; }
+    .prescription-admin-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+    .prescription-admin-head h2 { margin-bottom: 3px; }
+    .prescription-admin-count { flex: 0 0 auto; padding: 7px 9px; border-radius: 9px; background: #eff6ff; color: #475569; font-size: 12px; font-weight: 850; white-space: nowrap; }
+    .prescription-admin-count strong { color: #1d4ed8; }
+    .prescription-admin-tools { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(150px, 220px); gap: 8px; margin: 10px 0 8px; }
+    .prescription-admin-column-head,
+    .prescription-admin-row { display: grid; grid-template-columns: 28px minmax(210px, 1.6fr) minmax(130px, .75fr) minmax(170px, 1fr) 72px; gap: 6px; align-items: center; }
+    .prescription-admin-column-head { padding: 0 9px 5px; color: #64748b; font-size: 11px; font-weight: 900; }
+    .prescription-admin-groups { display: grid; gap: 8px; }
+    details.prescription-admin-group { margin: 0; overflow: visible; }
+    .prescription-admin-group[hidden], .prescription-admin-row[hidden] { display: none !important; }
+    .prescription-admin-dropzone { min-height: 42px; padding: 6px; border-top: 1px solid var(--line); transition: background .12s ease, box-shadow .12s ease; }
+    .prescription-admin-dropzone.drag-over { background: #dbeafe; box-shadow: inset 0 0 0 2px #3b82f6; }
+    .prescription-admin-row { position: relative; min-height: 43px; padding: 4px 3px; border-bottom: 1px solid #e2e8f0; background: #fff; }
+    .prescription-admin-row:last-child { border-bottom: 0; }
+    .prescription-admin-row.inactive { opacity: .55; background: #f8fafc; }
+    .prescription-admin-row.dragging { opacity: .35; }
+    .prescription-admin-row.drop-before::before,
+    .prescription-admin-row.drop-after::after { content: ""; position: absolute; left: 3px; right: 3px; height: 3px; border-radius: 3px; background: #2563eb; z-index: 2; }
+    .prescription-admin-row.drop-before::before { top: -2px; }
+    .prescription-admin-row.drop-after::after { bottom: -2px; }
+    .prescription-drag-handle { display: grid; place-items: center; width: 26px; height: 32px; border: 1px solid #cbd5e1; border-radius: 6px; color: #64748b; background: #f8fafc; cursor: grab; font-size: 14px; font-weight: 950; user-select: none; }
+    .prescription-drag-handle:active { cursor: grabbing; }
+    .prescription-admin-name { min-width: 0; display: grid; gap: 1px; }
+    .prescription-admin-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+    .prescription-admin-name small { color: #94a3b8; font-size: 9px; font-weight: 800; }
+    .prescription-admin-row select,
+    .prescription-admin-row input { min-width: 0; min-height: 32px; padding: 4px 6px; font-size: 11px; }
+    .prescription-admin-row button { min-height: 31px; padding: 4px 6px; font-size: 10px; box-shadow: none; }
+    .prescription-admin-empty { min-height: 42px; padding: 10px; border: 1px dashed #93c5fd; border-radius: 7px; color: #64748b; background: #f8fbff; font-size: 11px; font-weight: 800; text-align: center; }
+    @media (max-width: 1399px) {
+      .prescription-settings-layout { grid-template-columns: 1fr; }
+      .prescription-add-form { position: static; }
+      .prescription-add-form .prescription-add-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 900px) {
+      .prescription-add-form .prescription-add-fields { grid-template-columns: 1fr; }
+      .prescription-admin-column-head { display: none; }
+      .prescription-admin-row { grid-template-columns: 28px minmax(0, 1fr) 72px; }
+      .prescription-admin-row select,
+      .prescription-admin-row input { grid-column: 2 / -1; }
+    }
+.purchase-order-actions { align-items: end; }
+.purchase-layout { grid-template-columns: minmax(0, 1fr); }
+.purchase-layout > *, .purchase-layout .row > *, .purchase-layout input, .purchase-layout select { min-width: 0; max-width: 100%; }
+.purchase-catalog-result { display: block; width: 100%; text-align: left; margin: 6px 0; white-space: normal; }
+.prescription-stock-link { grid-column: 2 / -1; min-width: 0; font-size: 12px; }
+.prescription-stock-link select { width: 100%; max-width: 100%; }
+#purchaseCatalogResults { max-height: 320px; overflow-y: auto; }
+#purchaseCountForm { margin-top: 28px; padding-top: 16px; border-top: 1px solid #cbd5e1; }
+.purchase-order-table-wrap { margin-top: 16px; overflow-x: auto; }
+.purchase-order-table { width: 100%; border-collapse: collapse; min-width: 680px; }
+.purchase-order-table th, .purchase-order-table td { padding: 10px 12px; border-bottom: 1px solid #dbe3ec; text-align: left; }
+.purchase-order-table th { background: #f1f5f9; color: #334155; white-space: nowrap; }
+.purchase-order-table td:nth-child(4), .purchase-order-table td:nth-child(5), .purchase-order-table td:nth-child(6) { text-align: right; }
+/* 원장별 처방 편집: 모바일에서도 행 버튼과 수량을 분리한다. */
+.pattern-admin > * { min-width: 0; }
+.pattern-list { max-height: 620px; overflow: auto; display: grid; gap: 8px; margin-top: 12px; }
+.pattern-list button { text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.pattern-material-row { display: grid; grid-template-columns: minmax(0, 1fr) 88px auto; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid #dbe3ee; }
+.pattern-material-row span { overflow-wrap: anywhere; }
+.pattern-material-row input { width: 100%; }
+.surgery-simple-controls { display: grid; gap: 10px; padding: 14px; border: 1px solid #b8d4f4; border-radius: 12px; background: #f4f9ff; margin: 12px 0; }
+.surgery-simple-controls fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
+.spine-region-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 10px 0; }
+.spine-region-options label { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; padding: 8px 6px; border: 1px solid #a8c5ea; border-radius: 10px; background: white; }
+.spine-region-options input { width: 20px; min-height: 20px; }
+.workflow-warning { border: 2px solid #d97706; border-radius: 12px; padding: 12px; background: #fff8e7; color: #713f12; margin: 12px 0; }
+.workflow-warning[hidden], .surgery-simple-controls [hidden] { display: none; }
+.prescription-sheet-row[hidden], .prescription-checklist details[hidden] { display: none !important; }

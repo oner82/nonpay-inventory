@@ -36,6 +36,7 @@ const renderProducts = () => `
       <label for="productCategory">분류</label>
       <select id="productCategory" required>
         <option>비급여</option>
+        <option value="PURCHASE">구매재료</option>
         <option>인체조직</option>
         <option value="ANCHOR">ANCHOR&etc</option>
         <option value="URO_LANDING">URO 랜딩</option>
@@ -44,6 +45,19 @@ const renderProducts = () => `
       </select>
       <label for="productName">제품명</label>
       <input id="productName" required autocomplete="off">
+      <p class="helper">새 제품은 여기서 직접 등록할 수 있습니다. 이미 있는 비급여는 새로 만들지 말고 기존 제품에 구매코드를 입력하세요. 엑셀 목록 연결·실사 확정은 구매주문에서 합니다.</p>
+      <div id="productOrderCodeWrap">
+        <label for="productOrderCode">구매팀 품목코드</label>
+        <input id="productOrderCode" maxlength="80" placeholder="구매팀 코드 직접 입력 가능">
+        <div class="helper">주문 목록에 제품명과 함께 표시됩니다. 구매재료는 코드 등록을 권장합니다.</div>
+      </div>
+      <div class="row three">
+        <label>재고·사용 단위<input id="productStockUnit" value="EA" required maxlength="20"></label>
+        <label>구매 신청·입고 단위<input id="productOrderUnit" value="EA" required maxlength="20"></label>
+        <label>신청 1단위당 수량<input id="productUnitsPerOrder" type="number" min="1" step="1" value="1" required></label>
+      </div>
+      <label class="toggle-line"><input id="productUnconfirmed" type="checkbox" checked>실사 전: 재고 미확정으로 사용량 기록</label>
+      <p class="helper">예: EA / BOX / 100. 기록이 있는 제품의 재고 단위는 변경하지 마세요. 미확정 해제는 구매주문 화면에서 실제 수량을 확인한 뒤 진행합니다.</p>
       <div id="productCompanyWrap">
         <label for="productCompany">업체명</label>
         <select id="productCompany">
@@ -112,24 +126,27 @@ const bindProducts = () => {
   const markProductFormDirty = () => setProductFormDirty?.(true);
   const syncProductFields = () => {
     const category = document.getElementById("productCategory").value;
+    const purchaseMaterial = category === "PURCHASE";
     const companySelect = document.getElementById("productCompany");
     const companyHelp = document.getElementById("productCompanyHelp");
-    document.getElementById("productCompanyWrap").style.display = category === "비급여" ? "none" : "block";
+    document.getElementById("productCompanyWrap").style.display = category === "비급여" || purchaseMaterial ? "none" : "block";
+    document.getElementById("productOrderCodeWrap").style.display = "block";
     document.getElementById("productSubcategoryWrap").style.display = category === "ANCHOR" ? "block" : "none";
-    document.getElementById("productLandingWrap").style.display = category === "비급여" ? "none" : "block";
+    document.getElementById("productLandingWrap").style.display = category === "비급여" || purchaseMaterial ? "none" : "block";
     document.getElementById("productVendorManagedWrap").style.display = category === "인체조직" ? "block" : "none";
     document.getElementById("productRoomStockedWrap").style.display = category === "비급여" ? "block" : "none";
     document.getElementById("productRoomParWrap").style.display =
       category === "비급여" && document.getElementById("productRoomStocked").checked ? "block" : "none";
-    if (category === "비급여") {
+    if (category === "비급여" || purchaseMaterial) {
       companySelect.value = "";
       document.getElementById("productSubcategory").value = "";
       document.getElementById("productLanding").value = "0";
     }
     if (category !== "인체조직") document.getElementById("productVendorManaged").checked = false;
     if (category !== "비급여") document.getElementById("productRoomStocked").checked = false;
-    companySelect.required = category !== "비급여";
-    companySelect.disabled = category !== "비급여" && !implantVendors().length;
+    companySelect.required = category !== "비급여" && !purchaseMaterial;
+    document.getElementById("productOrderCode").required = false;
+    companySelect.disabled = category !== "비급여" && !purchaseMaterial && !implantVendors().length;
     if (companyHelp) companyHelp.textContent = implantVendors().length
       ? "비급여 외 제품은 등록된 임플란트 업체 중에서 선택합니다."
       : "비급여 외 제품을 등록하려면 먼저 설정 > 임플란트 업체에서 업체를 등록해 주세요.";
@@ -143,6 +160,7 @@ const bindProducts = () => {
     setProductFormDirty?.(false);
     form.reset();
     document.getElementById("productId").value = "";
+    document.getElementById("productStockUnit").readOnly = false;
     document.getElementById("productFormTitle").textContent = "제품 추가";
     document.getElementById("productCompany").innerHTML = productCompanyOptions();
     syncProductFields();
@@ -172,27 +190,43 @@ const bindProducts = () => {
     event.preventDefault();
     const id = document.getElementById("productId").value || uid();
     const category = document.getElementById("productCategory").value;
-    if (category !== "비급여" && !implantVendors().length) {
+    if (category !== "비급여" && category !== "PURCHASE" && !implantVendors().length) {
       alert("비급여 외 제품은 임플란트 업체를 먼저 등록해야 제품등록 할 수 있습니다.");
       return;
     }
-    if (category !== "비급여" && !document.getElementById("productCompany").value.trim()) {
+    if (category !== "비급여" && category !== "PURCHASE" && !document.getElementById("productCompany").value.trim()) {
       alert("비급여 외 제품은 임플란트 업체를 선택해 주세요.");
       return;
     }
     const selectedCompanyValue = document.getElementById("productCompany").value.trim();
-    const selectedCompanyVendor = category === "비급여" ? null : implantVendorById(selectedCompanyValue);
+    const selectedCompanyVendor = category === "비급여" || category === "PURCHASE" ? null : implantVendorById(selectedCompanyValue);
     const existingProduct = productById(id);
+    const orderCode = document.getElementById("productOrderCode").value.trim();
+    const stockUnit = document.getElementById("productStockUnit").value.trim();
+    const orderUnit = document.getElementById("productOrderUnit").value.trim();
+    const unitsPerOrder = Number(document.getElementById("productUnitsPerOrder").value);
+    const stockConfirmed = existingProduct?.stockConfirmed === false ? false : !document.getElementById("productUnconfirmed").checked;
+    if (!stockUnit || !orderUnit || !Number.isSafeInteger(unitsPerOrder) || unitsPerOrder < 1) return alert("단위와 포장당 수량을 확인해 주세요.");
+    if (existingProduct?.stockUnit && stockUnit !== existingProduct.stockUnit) return alert("기존 재고 단위는 변경할 수 없습니다.");
+    if (category === "PURCHASE" && !orderCode) return alert("구매팀 품목코드를 입력해 주세요.");
+    if (orderCode && state.products.some((item) => item.id !== id && String(item.orderCode || "").trim().toLowerCase() === orderCode.toLowerCase())) {
+      alert("이미 등록된 구매팀 품목코드입니다.");
+      document.getElementById("productOrderCode").focus();
+      return;
+    }
     const next = {
+      ...existingProduct,
       id,
       category,
       name: document.getElementById("productName").value.trim(),
-      company: category === "비급여" ? "" : (selectedCompanyVendor?.name || selectedCompanyValue),
-      companyVendorId: category === "비급여" ? "" : (selectedCompanyVendor?.id || ""),
+      orderCode, stockUnit, orderUnit, unitsPerOrder, stockConfirmed,
+      purchaseName: existingProduct?.orderCode ? document.getElementById("productName").value.trim() : (orderCode ? document.getElementById("productName").value.trim() : ""),
+      company: category === "비급여" || category === "PURCHASE" ? "" : (selectedCompanyVendor?.name || selectedCompanyValue),
+      companyVendorId: category === "비급여" || category === "PURCHASE" ? "" : (selectedCompanyVendor?.id || ""),
       subcategory: category === "ANCHOR" ? document.getElementById("productSubcategory").value : "",
       stock: num(document.getElementById("productStock").value),
       warningStock: num(document.getElementById("productWarning").value),
-      landingQty: category === "비급여" ? 0 : num(document.getElementById("productLanding").value),
+      landingQty: category === "비급여" || category === "PURCHASE" ? 0 : num(document.getElementById("productLanding").value),
       vendorManaged: category === "인체조직" && document.getElementById("productVendorManaged").checked,
       roomStocked: category === "비급여" && document.getElementById("productRoomStocked").checked,
       roomParQty: category === "비급여" && document.getElementById("productRoomStocked").checked
@@ -201,6 +235,7 @@ const bindProducts = () => {
       sortOrder: category === "비급여" ? (productSortOrderValue(existingProduct) || nextNonpaySortOrder(id)) : 0
     };
     if (!next.name) return;
+    if (existingProduct?.stockConfirmed === false) next.stock = existingProduct.stock;
     const { used, received } = productMovementCounts();
     const openingStockTodayInput = document.getElementById("productOpeningStockToday").value;
     if (openingStockTodayInput !== "") {
@@ -209,14 +244,28 @@ const bindProducts = () => {
     } else {
       next.baseStock = num(next.stock) - (received.get(id) || 0) + (used.get(id) || 0);
     }
-    state.products = [...state.products.filter((item) => item.id !== id), next];
-    reconcileProductStocks();
-    setProductFormDirty?.(false);
-    render();
-    await saveState("제품 저장 완료", {
-      savingMessage: "제품 저장 중입니다...",
-      doneMessage: "제품 저장 완료"
-    });
+    const auditTime = new Date().toISOString();
+    const stockChanged = !existingProduct || next.stock !== existingProduct.stock || openingStockTodayInput !== "";
+    const button = event.submitter; button.disabled = true;
+    try {
+      const ok = await saveState("제품 저장 완료", {
+        apply: s => {
+          if (orderCode && s.products.some(p => p.id !== id && String(p.orderCode || "").toLowerCase() === orderCode.toLowerCase())) throw new Error("이미 등록된 구매코드입니다.");
+          const latest = s.products.find(p => p.id === id);
+          if (existingProduct && !latest) throw new Error("제품이 삭제되었습니다. 새로고침 후 확인해 주세요.");
+          const merged = {...latest, ...next, updatedAt:auditTime};
+          // 이름·코드만 고칠 때 다른 기기의 최신 재고를 덮어쓰지 않는다.
+          if (latest && !stockChanged) { merged.baseStock = latest.baseStock; merged.stock = latest.stock; }
+          else if (openingStockTodayInput === "" && stockConfirmed) {
+            const movement = window.ORPurchase.movement(s,id);
+            merged.baseStock = next.stock - movement.received + movement.used;
+          }
+          s.products = [...s.products.filter(p => p.id !== id), merged];
+        },
+        savingMessage: "제품 저장 중입니다...", doneMessage: "제품 저장 완료"
+      });
+      if (ok) { setProductFormDirty?.(false); render(); }
+    } finally { button.disabled = false; }
   });
   syncProductFields();
 };

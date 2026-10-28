@@ -11,13 +11,12 @@
       productById,
       formatDateTime,
       auditUserText,
-      downloadExcel,
-      setRoomCloseDirty
+      downloadExcel
     } = context;
 
     // 방 마감(방 단위 보충) 운영은 2026-07-27 종료 — 비급여는 다시 사용입력(케이스 단위)에서 기록한다.
-    // 이 화면은 운영 기간(2026-07-14~)에 쌓인 roomRefills 이력 조회·엑셀 저장 전용이다.
-    // 과거 기록은 productMovementCounts 등 재고 집계에 계속 사용량으로 반영된다.
+    // 운영 기간(2026-07-14~)에 쌓인 roomRefills 이력을 사용내역 화면 하단의 접힌 카드로 제공한다
+    // (조회·엑셀 전용, 관리자·책임사용자만). 과거 기록은 재고 집계에 계속 사용량으로 반영된다.
 
     const monthStart = () => `${today().slice(0, 8)}01`;
 
@@ -74,36 +73,39 @@
       );
     };
 
-    const renderRoomClose = () => `
-      <section class="grid">
-        <div class="card">
-          <h2>방 마감 (운영 종료)</h2>
-          <p class="helper">비급여는 다시 <strong>사용입력(케이스 단위)</strong>에서 기록합니다. 이 화면은 방 마감 방식으로 운영했던 기간(2026-07-14 ~ 2026-07-27)의 이력 조회 전용이며, 새 마감 입력은 받지 않습니다. 과거 마감 수량은 재고·사용 집계에 계속 반영됩니다.</p>
-        </div>
-        <div class="card">
-          <h2>방 마감 이력</h2>
-          <div class="row three">
-            <div>
-              <label for="roomHistoryStart">시작일</label>
-              <input id="roomHistoryStart" type="date" value="${monthStart()}">
+    // 기록이 하나도 없으면 카드 자체를 숨긴다(새 병원/초기화 상태에서 불필요한 과거 메뉴 노출 방지).
+    const renderRoomCloseHistoryCard = () => {
+      if (!(state.roomRefills || []).length) return "";
+      return `
+        <section class="grid">
+          <details class="card">
+            <summary class="use-draft-head">
+              <div>
+                <h3 style="margin:0;">방 마감 이력 (과거 기록)</h3>
+                <div class="muted">방 단위 보충으로 운영했던 2026-07-14~07-27 기록입니다. 조회·엑셀 전용이며 집계에는 이미 포함되어 있습니다.</div>
+              </div>
+            </summary>
+            <div class="row three">
+              <div>
+                <label for="roomHistoryStart">시작일</label>
+                <input id="roomHistoryStart" type="date" value="${monthStart()}">
+              </div>
+              <div>
+                <label for="roomHistoryEnd">종료일</label>
+                <input id="roomHistoryEnd" type="date" value="${today()}">
+              </div>
+              <div>
+                <label>&nbsp;</label>
+                <button class="secondary" type="button" id="exportRoomHistory">엑셀로 저장</button>
+              </div>
             </div>
-            <div>
-              <label for="roomHistoryEnd">종료일</label>
-              <input id="roomHistoryEnd" type="date" value="${today()}">
-            </div>
-            <div>
-              <label>&nbsp;</label>
-              <button class="secondary" type="button" id="exportRoomHistory">엑셀로 저장</button>
-            </div>
-          </div>
-          <div id="roomHistoryList">${refillHistoryHtml(monthStart(), today())}</div>
-        </div>
-      </section>
-    `;
+            <div id="roomHistoryList">${refillHistoryHtml(monthStart(), today())}</div>
+          </details>
+        </section>
+      `;
+    };
 
-    const bindRoomClose = () => {
-      // 입력이 없는 조회 전용 화면 — 원격 재렌더 보호가 필요 없다.
-      setRoomCloseDirty?.(false);
+    const bindRoomCloseHistory = () => {
       const historyStart = document.getElementById("roomHistoryStart");
       const historyEnd = document.getElementById("roomHistoryEnd");
       const historyList = document.getElementById("roomHistoryList");
@@ -116,8 +118,8 @@
     };
 
     return {
-      renderRoomClose,
-      bindRoomClose
+      renderRoomCloseHistoryCard,
+      bindRoomCloseHistory
     };
   };
 })();

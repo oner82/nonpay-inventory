@@ -10,7 +10,8 @@
     const renderDashboard = () => {
       const state = context.getState();
       const lowProducts = state.products
-        .filter((item) => !context.isVendorManagedProduct?.(item) && context.num(item.stock) <= context.num(item.warningStock))
+        .filter(item => item.active !== false)
+        .filter((item) => !context.isVendorManagedProduct?.(item) && !window.ORPurchase.unconfirmed(item) && context.num(item.stock) <= context.num(item.warningStock))
         .sort((a, b) => context.num(a.stock) - context.num(b.stock) || context.alphaFirstCompare(a.name, b.name));
       const hiddenLowIds = new Set(state.hiddenLowProductIds || []);
       const visibleLowProducts = lowProducts.filter((item) => !hiddenLowIds.has(item.id));
@@ -171,7 +172,7 @@
                 <div class="summary-table">
                   ${context.PRODUCT_CATEGORIES.map((category) => {
                     const items = state.products.filter((item) => context.productCategory(item.category) === category);
-                    const stockItems = items.filter((item) => !context.isVendorManagedProduct?.(item));
+                    const stockItems = items.filter((item) => !context.isVendorManagedProduct?.(item) && !window.ORPurchase.unconfirmed(item));
                     const stock = stockItems.reduce((sum, item) => sum + context.num(item.stock), 0);
                     const low = stockItems.filter((item) => context.num(item.stock) <= context.num(item.warningStock)).length;
                     return `

@@ -31,7 +31,8 @@
   const productCategoryLabel = (value) => ({
     ANCHOR: "ANCHOR&etc",
     URO_LANDING: "URO 랜딩",
-    GS_LANDING: "GS 랜딩"
+    GS_LANDING: "GS 랜딩",
+    PURCHASE: "구매재료"
   }[productCategory(value)] || productCategory(value));
 
   const formatDateTime = (value) => {

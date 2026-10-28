@@ -39,201 +39,30 @@
       uid,
       landingUsageLines
     } = context;
-    let morningCheckDate = today();
     let receiptHistoryType = "nonpay";
 
 const landingCarryoverProducts = () => state.products
-  .filter((item) => productCategory(item.category) !== "비급여" && !isVendorManagedProduct?.(item))
+  .filter(item => item.active !== false)
+  .filter((item) => productCategory(item.category) !== "비급여" && !window.ORPurchase.isPurchase(item) && !isVendorManagedProduct?.(item))
   .slice()
   .sort((a, b) => productDisplaySort(productCategory(a.category))(a, b) || byName(a, b));
 
 const nonpayReceiptProducts = () => state.products
+  .filter(item => item.active !== false)
   .filter((item) => productCategory(item.category) === "비급여")
   .slice()
   .sort(productDisplaySort("비급여"));
-
-const morningCheckProducts = () => state.products
-  .filter((product) => product?.name && !isVendorManagedProduct?.(product))
-  .slice()
-  .sort((a, b) => productDisplaySort(productCategory(a.category))(a, b) || byName(a, b));
-
-const morningCheckCategoryOrder = ["비급여", "인체조직", "ANCHOR", "GS_LANDING", "URO_LANDING"];
-const morningCheckCategorySort = (a, b) => {
-  const left = morningCheckCategoryOrder.indexOf(productCategory(a));
-  const right = morningCheckCategoryOrder.indexOf(productCategory(b));
-  const leftOrder = left === -1 ? morningCheckCategoryOrder.length : left;
-  const rightOrder = right === -1 ? morningCheckCategoryOrder.length : right;
-  return leftOrder - rightOrder || String(a || "").localeCompare(String(b || ""), "ko");
-};
-
-const productUsageCountBefore = (productId, date) => {
-  if (isVendorManagedProduct?.(productById(productId))) return 0;
-  const fromUsages = state.usages.reduce((sum, usage) => {
-    if (!usage?.date || usage.date >= date) return sum;
-    return sum + (usage.productIds || []).filter((id) => sameId(id, productId)).length;
-  }, 0);
-  // 방 마감 보충 기록(비급여)도 사용량으로 계산
-  const fromRefills = (state.roomRefills || []).reduce((sum, refill) => {
-    if (!refill?.date || refill.date >= date) return sum;
-    return sum + (refill.items || []).filter((item) => sameId(item.productId, productId))
-      .reduce((qty, item) => qty + Math.max(0, num(item.qty)), 0);
-  }, 0);
-  return fromUsages + fromRefills;
-};
-
-const productReceiptDeltaBefore = (productId, date) => state.receipts.reduce((sum, receipt) => {
-  if (!sameId(receipt.productId, productId)) return sum;
-  const receiptDate = receiptDateValue(receipt);
-  if (!receiptDate || receiptDate >= date) return sum;
-  return sum + receiptStockDelta(receipt);
-}, 0);
-
-const productReceiptDeltaAll = (productId) => state.receipts.reduce((sum, receipt) => (
-  sameId(receipt.productId, productId) ? sum + receiptStockDelta(receipt) : sum
-), 0);
-
-const productUsageCountAll = (productId) => {
-  if (isVendorManagedProduct?.(productById(productId))) return 0;
-  const fromUsages = state.usages.reduce((sum, usage) => (
-    sum + (usage.productIds || []).filter((id) => sameId(id, productId)).length
-  ), 0);
-  const fromRefills = (state.roomRefills || []).reduce((sum, refill) => (
-    sum + (refill.items || []).filter((item) => sameId(item.productId, productId))
-      .reduce((qty, item) => qty + Math.max(0, num(item.qty)), 0)
-  ), 0);
-  return fromUsages + fromRefills;
-};
-
-const productBaseStockForCheck = (product) => Number.isFinite(Number(product.baseStock))
-  ? num(product.baseStock)
-  : num(product.stock) - productReceiptDeltaAll(product.id) + productUsageCountAll(product.id);
-
-const morningExpectedStock = (product, date) => Math.max(
-  0,
-  productBaseStockForCheck(product) + productReceiptDeltaBefore(product.id, date) - productUsageCountBefore(product.id, date)
-);
-
-const morningCheckStatus = (product, stock) => {
-  const warning = num(product.warningStock);
-  if (stock <= 0) return { className: "danger", label: "0 이하" };
-  if (warning > 0 && stock <= warning) return { className: "warn", label: "경고 이하" };
-  return { className: "ok", label: "정상" };
-};
-
-const morningStockCheckHtml = () => {
-  const products = morningCheckProducts();
-  const checkDate = morningCheckDate || today();
-  const categories = [...new Set(products.map((product) => productCategory(product.category)))].filter(Boolean).sort(morningCheckCategorySort);
-  const stockRows = products.map((product) => {
-    const expectedStock = morningExpectedStock(product, checkDate);
-    return { product, expectedStock, status: morningCheckStatus(product, expectedStock) };
-  });
-  const attention = stockRows.filter((row) => row.status.className !== "ok").length;
-  const zero = stockRows.filter((row) => row.expectedStock <= 0).length;
-  const low = stockRows.filter((row) => row.expectedStock > 0 && row.status.className === "warn").length;
-  const groupedRows = categories.map((category) => {
-    const rows = stockRows.filter((row) => productCategory(row.product.category) === category);
-    return {
-      category,
-      rows,
-      attention: rows.filter((row) => row.status.className !== "ok").length
-    };
-  });
-  return `
-    <div class="morning-check-panel" id="receiptMorningCheckPanel">
-      <div class="morning-check-summary">
-        <div class="morning-check-metric">
-          <strong>${products.length}</strong>
-          <span>전체 품목</span>
-        </div>
-        <div class="morning-check-metric ${attention ? "warn" : "ok"}">
-          <strong>${attention}</strong>
-          <span>확인 필요</span>
-        </div>
-        <div class="morning-check-metric danger">
-          <strong>${zero}</strong>
-          <span>0 이하</span>
-        </div>
-        <div class="morning-check-metric warn">
-          <strong>${low}</strong>
-          <span>경고 이하</span>
-        </div>
-      </div>
-      <div class="row three morning-check-controls">
-        <div>
-          <label for="receiptMorningDate">점검 기준일</label>
-          <input id="receiptMorningDate" type="date" value="${escapeHtml(checkDate)}">
-        </div>
-        <div>
-          <label for="receiptMorningSearch">제품 검색</label>
-          <input id="receiptMorningSearch" autocomplete="off" placeholder="제품명, 업체, 분류">
-        </div>
-        <div>
-          <label for="receiptMorningCategory">분류</label>
-          <select id="receiptMorningCategory">
-            <option value="">전체 분류</option>
-            ${categories.map((category) => `<option value="${escapeHtml(category)}">${escapeHtml(productCategoryLabel(category))}</option>`).join("")}
-          </select>
-        </div>
-      </div>
-      <p class="helper">선택한 날짜의 아침 시작 기준 프로그램 재고입니다. 당일 사용·입고는 제외하고 전날까지의 기록으로 계산합니다. 이 화면은 확인용이며 재고 수량을 저장하지 않습니다.</p>
-      <div class="morning-check-list" id="receiptMorningCheckList">
-        ${groupedRows.map(({ category, rows, attention: groupAttention }) => `
-          <details class="morning-check-group" data-morning-group>
-            <summary>
-              <span>${escapeHtml(productCategoryLabel(category))}</span>
-              <span class="pill ${groupAttention ? "low" : ""}">${rows.length}품목${groupAttention ? ` · 확인 ${groupAttention}` : ""}</span>
-            </summary>
-            <div class="morning-check-group-body">
-              ${rows.map(({ product, expectedStock, status }) => {
-        const searchText = normalizedName([
-          product.name,
-          productCategoryLabel(product.category),
-          product.company,
-          product.subcategory
-        ].filter(Boolean).join(" "));
-        return `
-                <div class="morning-check-row ${status.className}" data-morning-row data-category="${escapeHtml(productCategory(product.category))}" data-search="${escapeHtml(searchText)}">
-                  <div>
-                    <div class="morning-check-title">
-                      <span>${escapeHtml(product.name)}</span>
-                      <span class="pill ${status.className === "danger" || status.className === "warn" ? "low" : ""}">${escapeHtml(status.label)}</span>
-                    </div>
-                    <div class="morning-check-meta">
-                      <span>${escapeHtml(productCategoryLabel(product.category))}</span>
-                      ${product.company ? `<span>${escapeHtml(product.company)}</span>` : ""}
-                      ${product.subcategory ? `<span>${escapeHtml(product.subcategory)}</span>` : ""}
-                      <span>경고 ${num(product.warningStock)}</span>
-                    </div>
-                  </div>
-                  <div class="morning-check-stock">
-                    <span>프로그램</span>
-                    <strong>${expectedStock}</strong>
-                  </div>
-                  <label class="morning-check-actual">
-                    <span>실사</span>
-                    <input type="number" inputmode="numeric" min="0" step="1" data-morning-actual data-stock="${expectedStock}" aria-label="${escapeHtml(product.name)} 실사 수량">
-                  </label>
-                  <div class="morning-check-diff" data-morning-diff>미확인</div>
-                </div>
-              `;
-      }).join("")}
-            </div>
-          </details>
-        `).join("")}
-      </div>
-    </div>
-  `;
-};
+const purchaseReceiptProducts = () => state.products
+  .filter(item => item.active !== false)
+  .filter((item) => window.ORPurchase.isPurchase(item))
+  .slice().sort(byName);
 
 const renderReceipts = () => {
   const canEnterReceipts = canRegisterNonpayReceipts();
   const canEnterLanding = canManageLandingReceipts();
   const canViewReceiptHistory = canManageReceipts();
-  const canCheckMorningStock = canEnterReceipts || canEnterLanding || canViewReceiptHistory;
   const allowedReceiptViews = [
-    ...(canEnterReceipts ? ["nonpay"] : []),
-    ...(canCheckMorningStock ? ["morning"] : []),
+    ...(canEnterReceipts ? ["nonpay", "purchase"] : []),
     ...(canEnterLanding ? ["landing"] : []),
     ...(canViewReceiptHistory ? ["history"] : []),
     ...(canEnterReceipts ? ["loan"] : [])
@@ -244,7 +73,7 @@ const renderReceipts = () => {
   <section class="grid">
     <div class="receipt-tabs">
       ${canEnterReceipts ? `<button class="receipt-tab ${receiptView === "nonpay" ? "active" : ""}" data-receipt-view="nonpay" type="button">비급여 입고관리</button>` : ""}
-      ${canCheckMorningStock ? `<button class="receipt-tab ${receiptView === "morning" ? "active" : ""}" data-receipt-view="morning" type="button">아침 점검</button>` : ""}
+      ${canEnterReceipts ? `<button class="receipt-tab ${receiptView === "purchase" ? "active" : ""}" data-receipt-view="purchase" type="button">구매재료 입고</button>` : ""}
       ${canEnterLanding ? `<button class="receipt-tab ${receiptView === "landing" ? "active" : ""}" data-receipt-view="landing" type="button">랜딩 입고관리</button>` : ""}
       ${canViewReceiptHistory ? `<button class="receipt-tab ${receiptView === "history" ? "active" : ""}" data-receipt-view="history" type="button">입고내역</button>` : ""}
       ${canEnterReceipts ? `<button class="receipt-tab ${receiptView === "loan" ? "active" : ""}" data-receipt-view="loan" type="button">타부서 대여</button>` : ""}
@@ -267,11 +96,17 @@ const renderReceipts = () => {
         <div class="actions"><button type="submit">비급여 입고 저장</button></div>
       </form>
     ` : ""}
-    ${receiptView === "morning" ? `
-      <div class="card receipt-wide">
-        <h2>아침 재고 점검</h2>
-        ${morningStockCheckHtml()}
-      </div>
+    ${receiptView === "purchase" ? `
+      <form class="card receipt-wide" id="purchaseReceiptForm">
+        <h2>구매재료 입고 등록</h2>
+        <p class="helper">구매팀에서 도착한 수량을 저장하면 해당 창고 현재고에 더해집니다.</p>
+        <label for="purchaseReceiptProduct">제품 선택</label>
+        <select id="purchaseReceiptProduct" required><option value="">구매재료를 선택하세요</option>${purchaseReceiptProducts().map((item) => `<option value="${item.id}">${escapeHtml(item.orderCode || "코드 미등록")} / ${escapeHtml(item.name)} / ${escapeHtml(window.ORPurchase.stockText(item))}</option>`).join("")}</select>
+        <p id="purchaseReceiptUnit" class="helper">제품 선택 후 입고 단위를 확인하세요.</p>
+        <div class="row two"><div><label for="purchaseReceiptDate">입고일</label><input id="purchaseReceiptDate" type="date" value="${today()}" required></div><div><label for="purchaseReceiptQty">입고 수량 (신청 단위)</label><input id="purchaseReceiptQty" type="number" min="1" step="1" value="1" required></div></div>
+        <label for="purchaseReceiptMemo">메모</label><textarea id="purchaseReceiptMemo" class="memo-input" placeholder="발주번호 등(선택)"></textarea>
+        <div class="actions"><button type="submit">구매재료 입고 저장</button></div>
+      </form>
     ` : ""}
     ${receiptView === "loan" ? `
       <form class="card receipt-wide" id="departmentLoanForm">
@@ -324,6 +159,7 @@ const renderReceipts = () => {
         <h2>입고내역</h2>
         <div class="receipt-history-tabs">
           <button class="receipt-history-tab ${receiptHistoryType === "nonpay" ? "active" : ""}" type="button" data-receipt-history-type="nonpay">비급여</button>
+          <button class="receipt-history-tab ${receiptHistoryType === "purchase" ? "active" : ""}" type="button" data-receipt-history-type="purchase">구매재료</button>
           <button class="receipt-history-tab ${receiptHistoryType === "landing" ? "active" : ""}" type="button" data-receipt-history-type="landing">랜딩</button>
           <button class="receipt-history-tab ${receiptHistoryType === "loan" ? "active" : ""}" type="button" data-receipt-history-type="loan">타부서 대여</button>
         </div>
@@ -367,7 +203,9 @@ const updateReceiptRecord = async (receiptId, values) => {
   // 최신 서버 상태의 해당 입고건에 동일 수정을 덧입힌다(동시 추가분 보존).
   const applyReceiptEdit = (s) => {
     const target = s.receipts.find((item) => sameId(item.id, receiptId));
-    if (target) Object.assign(target, patch);
+    if (!target) throw new Error('입고이력이 다른 사용자에 의해 삭제되었습니다.');
+    Object.assign(target, patch);
+    if (target.type === 'purchase' && Number(target.unitsPerOrder) > 0) target.orderQty = patch.qty / Number(target.unitsPerOrder);
   };
   Object.assign(receipt, patch);
   reconcileProductStocks();
@@ -410,7 +248,7 @@ const bindReceiptHistoryControls = (prefix, listId) => {
     if (!productMenu) return;
     const query = normalizedName(searchInput.value);
     const products = state.products
-      .slice()
+      .filter(product => product.active !== false)
       .sort(byName)
       .filter((product) => !isVendorManagedProduct?.(product))
       .filter((product) => !query || normalizedName(product.name).includes(query))
@@ -492,63 +330,15 @@ const bindReceiptHistoryControls = (prefix, listId) => {
 };
 
 const bindReceipts = () => {
-  const morningPanel = document.getElementById("receiptMorningCheckPanel");
-  const updateMorningDiff = (input) => {
-    const row = input.closest("[data-morning-row]");
-    const diff = row?.querySelector("[data-morning-diff]");
-    if (!row || !diff) return;
-    const rawValue = String(input.value || "").trim();
-    row.classList.remove("matched", "short", "over");
-    if (!rawValue) {
-      diff.textContent = "미확인";
-      return;
-    }
-    const actual = num(rawValue);
-    const stock = num(input.dataset.stock);
-    const delta = actual - stock;
-    if (delta === 0) {
-      row.classList.add("matched");
-      diff.textContent = "맞음";
-      return;
-    }
-    row.classList.add(delta < 0 ? "short" : "over");
-    diff.textContent = delta < 0 ? `${Math.abs(delta)} 부족` : `${delta} 초과`;
-  };
-  const filterMorningRows = () => {
-    const search = normalizedName(document.getElementById("receiptMorningSearch")?.value || "");
-    const category = document.getElementById("receiptMorningCategory")?.value || "";
-    morningPanel?.querySelectorAll("[data-morning-row]").forEach((row) => {
-      const matchesSearch = !search || String(row.dataset.search || "").includes(search);
-      const matchesCategory = !category || row.dataset.category === category;
-      row.hidden = !(matchesSearch && matchesCategory);
-    });
-    morningPanel?.querySelectorAll("[data-morning-group]").forEach((group) => {
-      const hasVisibleRows = Array.from(group.querySelectorAll("[data-morning-row]")).some((row) => !row.hidden);
-      group.hidden = !hasVisibleRows;
-    });
-  };
+  document.getElementById('purchaseReceiptProduct')?.addEventListener('change', (event) => {
+    const p = productById(event.target.value);
+    document.getElementById('purchaseReceiptUnit').textContent = p && window.ORPurchase.factor(p) ? `입고 1 ${p.orderUnit} = 재고 ${p.unitsPerOrder} ${p.stockUnit}. ${window.ORPurchase.stockText(p)}` : '구매주문 화면에서 신청 단위를 먼저 연결해 주세요.';
+  });
   app.querySelectorAll("[data-receipt-view]").forEach((button) => {
     button.addEventListener("click", () => {
       context.setCurrentReceiptView(button.dataset.receiptView);
       render();
     });
-  });
-  morningPanel?.addEventListener("input", (event) => {
-    const actualInput = event.target.closest("[data-morning-actual]");
-    if (actualInput) {
-      updateMorningDiff(actualInput);
-      return;
-    }
-    const dateInput = event.target.closest("#receiptMorningDate");
-    if (dateInput) {
-      morningCheckDate = dateInput.value || today();
-      render();
-      return;
-    }
-    if (event.target.closest("#receiptMorningSearch")) filterMorningRows();
-  });
-  morningPanel?.addEventListener("change", (event) => {
-    if (event.target.closest("#receiptMorningCategory")) filterMorningRows();
   });
   document.getElementById("nonpayReceiptForm")?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -566,6 +356,33 @@ const bindReceipts = () => {
     state.receipts.push({ id: uid(), type: "nonpay", productId, productName: product.name, qty, date, memo, createdAt: new Date().toISOString(), ...auditCreateFields() });
     render();
     await saveState();
+  });
+  document.getElementById("purchaseReceiptForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!canRegisterNonpayReceipts()) {
+      alert("구매재료 입고 등록은 관리자, 책임사용자, 입고담당자만 가능합니다.");
+      return;
+    }
+    const productId = document.getElementById("purchaseReceiptProduct").value;
+    const product = productById(productId);
+    if (!product || !window.ORPurchase.isPurchase(product)) return;
+    const orderQty = Number(document.getElementById("purchaseReceiptQty").value);
+    const unitsPerOrder = window.ORPurchase.factor(product);
+    if (!unitsPerOrder || !Number.isSafeInteger(orderQty) || orderQty < 1) return alert('신청 단위와 입고 수량을 확인해 주세요.');
+    const qty = orderQty * unitsPerOrder;
+    if (!Number.isSafeInteger(qty)) return alert('입고 수량이 너무 큽니다.');
+    const date = document.getElementById("purchaseReceiptDate")?.value || today();
+    const memo = document.getElementById("purchaseReceiptMemo")?.value.trim() || "";
+    const receipt = { id: uid(), type: "purchase", productId, productName: product.name, orderCode: product.orderCode || "", category: product.category, qty, orderQty, orderUnit: product.orderUnit, stockUnit: product.stockUnit, unitsPerOrder, date, memo, createdAt: new Date().toISOString(), ...auditCreateFields() };
+    const button = event.submitter;
+    button.disabled = true;
+    try {
+      const saved = await saveState('구매재료 입고 저장 완료', { apply: s => {
+        if (!s.products.some(p => p.id === productId && p.active !== false)) throw new Error('제품이 삭제되었습니다.');
+        if (!s.receipts.some(r => r.id === receipt.id)) s.receipts.push(receipt);
+      }});
+      if (saved) render();
+    } finally { button.disabled = false; }
   });
   document.getElementById("departmentLoanForm")?.addEventListener("submit", async (event) => {
     event.preventDefault();
