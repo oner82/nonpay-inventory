@@ -25,14 +25,19 @@
     const rows = [];
     let excludedCount = 0;
     for (const c of records) {
-      if (c.length !== 103 || !['처방', '조제'].includes(c[1])) throw Error('열 구조 또는 처방 상태가 샘플과 다릅니다. 취소·중지 여부를 확인해 주세요.');
+      if (c.length !== 103) throw Error(`복사된 ${records.indexOf(c)+1}번째 행의 열 구조가 다릅니다. 전체 행을 다시 복사해 주세요.`);
+      if (!['처방', '조제', '접수'].includes(c[1])) throw Error(`복사된 ${records.indexOf(c)+1}번째 행의 처방 상태를 확인할 수 없습니다. 취소·중지 여부를 확인해 주세요.`);
       const deletedName = /^\s*D\/C:1\]\s*/.test(c[4]);
       const deletedFlag = c[14].trim() === 'D';
       if (deletedName !== deletedFlag || (/D\/C/i.test(c[4]) && !deletedName)) throw Error('삭제 표식이 일치하지 않습니다. OCS에서 상태를 확인해 주세요.');
       const cancelled = deletedName && deletedFlag;
       if (cancelled) { excludedCount++; continue; }
       const code = c[3].trim(), name = c[4].replace(/^\s*(?:추가\]|D\/C:1\])\s*/, '').trim();
-      if (code === '@AAOP' && name === '<< Op. Room Order >>') continue;
+      // 실제 OCS 화면과 대조한 제목만 제외한다. P 값만으로 행위료를 제외하지 않는다.
+      const heading = (code === '@AAOP' && name === '<< Op. Room Order >>')
+        || (code === '@HH' && name === '▶ 처치수술 처방')
+        || (code === '@' && ['[GS 3D Cage (2cage)]','[GS medical]','1. MIS & Long Arm Screw','<<수술팀 Order>>'].includes(name));
+      if (heading) continue;
       if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$/.test(code) || !name || name.length > 250 || /[\r\n]/.test(name)) throw Error('코드 또는 제품명 형식을 확인해 주세요.');
       const dose = number(c[7]), times = number(c[8]), days = number(c[9]);
       if ([dose, times, days].some(v => v === null || !Number.isFinite(v) || v <= 0 || v > 10000)) throw Error('수량·횟수·일수가 비어 있거나 해석할 수 없습니다.');
