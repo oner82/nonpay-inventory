@@ -131,9 +131,9 @@
         <div><label for="ocsDoctor">원장 코드</label><select id="ocsDoctor"><option value="">선택</option>${context.getState().doctors.filter(d=>d.active!==false||d.id===record?.doctorId).map(d=>`<option value="${e(d.id)}" ${d.id===record?.doctorId?'selected':''}>${e(d.name)}</option>`).join('')}</select></div></div>
         <label for="ocsSurgery">수술명 (붙여넣기 또는 직접 입력)</label><input id="ocsSurgery" type="text" maxlength="200" autocomplete="off" value="${e(record?.surgeryDetail==='OCS 수술 후 사용'?'':record?.surgeryDetail||'')}" placeholder="예: Laparoscopic appendectomy">
         <p class="helper">수술명만 복사해 붙여넣으세요. 목록에 없는 수술명도 입력할 수 있습니다. 환자명·등록번호는 입력하지 마세요. 처방 붙여넣기 원문은 저장하지 않습니다.</p>
-        ${record?'':`<label for="ocsPaste">OCS에서 복사한 내용</label><textarea id="ocsPaste" rows="4" autocomplete="off" spellcheck="false" placeholder="OCS 처방 행을 복사해 여기에 붙여넣으세요"></textarea><button id="ocsParse" type="button">처방 읽기</button>`}
+        ${record?'':`<div class="ocs-paste-box"><details id="ocsPasteDetails" open><summary><span id="ocsPasteTitle">OCS 처방 붙여넣기</span><span class="ocs-paste-hint">펼치기 / 접기</span></summary><label class="helper" for="ocsPaste">아래 칸을 누르고 Ctrl+V 또는 ⌘V로 붙여넣으세요.</label><textarea id="ocsPaste" rows="3" autocomplete="off" spellcheck="false" wrap="off" placeholder="여기에 OCS 처방을 붙여넣으세요"></textarea></details><div class="ocs-paste-actions"><span id="ocsPasteStatus" role="status">복사한 내용은 읽기 후 지워집니다.</span><button id="ocsParse" type="button">처방 읽기</button></div></div>`}
         <p id="ocsMessage" role="status"></p><div id="ocsRows"></div>
-        <label><input type="checkbox" id="ocsConfirm"> 수술 후 사용 수량과 연결·미연결 항목을 확인했습니다.</label>
+        <div class="ocs-confirm"><input type="checkbox" id="ocsConfirm"><label for="ocsConfirm">수술 후 사용 수량과 연결·미연결 항목을 확인했습니다.</label></div>
         <button id="ocsSave" type="button">${record?'수량 수정 저장':'확인 후 최종 저장'}</button>
         ${record?'<button id="ocsBack" class="secondary" type="button">사용내역으로</button>':''}
         <details><summary>OCS 코드·명칭 누적 목록 (${(context.getState().ocsCatalog||[]).length}코드)</summary><p class="helper">관리자는 처방 행에서 재고 제품을 선택하면 다음 등록부터 같은 코드·명칭에 적용됩니다. 1회량 1과 선택 제품의 재고 단위 1이 같을 때만 연결하세요. 인체조직·임플란트 등 별도 장부 품목은 기존 입력을 이용하세요.</p>
@@ -168,6 +168,13 @@
       paint();
       panel.addEventListener('input',event=>{
         if(event.target.id==='ocsConfirm')return;
+        if(event.target.id==='ocsPaste'){
+          const hasText=!!event.target.value.trim();
+          if(hasText)message('');
+          $('ocsPasteTitle').textContent=hasText?'복사한 내용이 준비되었습니다':'OCS 처방 붙여넣기';
+          $('ocsPasteStatus').textContent=hasText?'처방 읽기를 누르면 품목과 수량이 정리됩니다.':'복사한 내용은 읽기 후 지워집니다.';
+          if(hasText && (event.inputType==='insertFromPaste' || (event.data||'').length>20)){$('ocsPasteDetails').open=false;$('ocsParse').focus();}
+        }
         touch();
         if(event.target.hasAttribute('data-ocs-qty'))rows[Number(event.target.dataset.ocsQty)].qty=number(event.target.value);
       });
@@ -178,8 +185,8 @@
         message(`${excludedCount?`삭제 ${excludedCount}행 제외 · `:''}등록 대상 ${rows.length}행 · 미연결 ${rows.filter(r=>r.mode==='unresolved').length}행은 재고에 반영되지 않습니다.`);
       });
       $('ocsParse')?.addEventListener('click',()=>{
-        try {catalogSnapshot=clone(context.getState().ocsCatalog||[]);const parsed=parse($('ocsPaste').value);excludedCount=parsed.excludedCount;rows=prepare(parsed,catalogSnapshot);$('ocsPaste').value='';touch();paint();}
-        catch(error){rows=[];excludedCount=0;touch();paint();message(error.message);}
+        try {catalogSnapshot=clone(context.getState().ocsCatalog||[]);const parsed=parse($('ocsPaste').value);excludedCount=parsed.excludedCount;rows=prepare(parsed,catalogSnapshot);$('ocsPaste').value='';$('ocsPasteTitle').textContent='다른 처방 다시 붙여넣기';$('ocsPasteStatus').textContent=`읽기 완료 · 등록 대상 ${rows.length}행${excludedCount?` · 삭제 ${excludedCount}행 제외`:''}`;touch();paint();}
+        catch(error){rows=[];excludedCount=0;touch();paint();message(error.message);$('ocsPasteTitle').textContent='복사한 내용 확인하기';$('ocsPasteStatus').textContent='읽지 못했습니다. 내용을 펼쳐 확인하거나 다시 붙여넣으세요.';}
       });
       $('ocsBack')?.addEventListener('click',()=>{if(!dirty||confirm('저장하지 않은 변경을 닫을까요?')){dirty=false;context.back();}});
       $('ocsSave').addEventListener('click',async()=>{

@@ -2846,3 +2846,18 @@
 .workflow-warning { border: 2px solid #d97706; border-radius: 12px; padding: 12px; background: #fff8e7; color: #713f12; margin: 12px 0; }
 .workflow-warning[hidden], .surgery-simple-controls [hidden] { display: none; }
 .prescription-sheet-row[hidden], .prescription-checklist details[hidden] { display: none !important; }
+
+/* OCS 원문은 접힌 입력 영역에, 읽기 결과는 별도 목록에 표시한다. */
+#ocsPanel .ocs-paste-box { margin:20px 0; padding:16px; border:1px solid #cbdcf0; border-radius:14px; background:#f6f9fe; }
+#ocsPanel .ocs-paste-box details { margin:0; border:0; padding:0; background:transparent; }
+#ocsPanel .ocs-paste-box summary { padding:8px 0; cursor:pointer; color:#214d7c; font-weight:700; }
+#ocsPanel .ocs-paste-hint { margin-left:12px; font-size:12px; font-weight:400; color:#60758c; }
+#ocsPanel #ocsPaste { display:block; box-sizing:border-box; width:100%; height:104px; min-height:80px; max-height:240px; margin-top:8px; padding:12px; border:1px dashed #a7bfdc; border-radius:10px; background:#fff; font:13px/1.6 ui-monospace,monospace; overflow:auto; resize:vertical; }
+#ocsPanel #ocsPaste:focus { outline:2px solid #4387cf; outline-offset:2px; }
+#ocsPanel .ocs-paste-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:12px; }
+#ocsPanel #ocsPasteStatus { color:#52677e; font-size:13px; overflow-wrap:anywhere; }
+#ocsPanel #ocsParse { flex-shrink:0; margin:0; }
+#ocsPanel .ocs-confirm { display:flex; align-items:flex-start; gap:10px; margin:18px 0; }
+#ocsPanel .ocs-confirm label { margin:0; }
+#ocsPanel #ocsConfirm { width:20px; height:20px; min-width:20px; flex:0 0 20px; margin:2px 0 0; }
+@media(max-width:480px) { #ocsPanel .ocs-paste-actions { align-items:stretch; flex-direction:column; } #ocsPanel .ocs-paste-hint { display:block; margin:4px 0 0 18px; } }
