@@ -482,6 +482,7 @@
           <div class="meta">
             ${context.auditMetaHtml(usage, "입력")}
             ${doubleCheckText ? `<span>${context.escapeHtml(doubleCheckText)}</span>` : ""}
+            ${usage.source === 'ocs-paste' ? `<span>OCS 붙여넣기 · ${(usage.ocsRows || []).length}행 · 미연결 ${(usage.ocsRows || []).filter(r => r.mode === 'unresolved').length}행 (재고 미반영)</span>` : ''}
             <span>과/원장 코드: ${context.escapeHtml(doctor?.name || "-")} · 수술: ${context.escapeHtml(surgeryDepartment)} - ${context.escapeHtml(usage.surgeryDetail || surgery?.name || "-")}</span>
             <div class="usage-check-badges">
               <span class="usage-check-badge ${nonpayTotal ? "warn" : "muted"}">비급여 ${nonpayTotal}개</span>

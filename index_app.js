@@ -109,6 +109,7 @@ const blankState = () => ({
   prescriptionMaterialSettings: [],
   prescriptionPatternSettings: [],
   purchaseRequests: [],
+  ocsCatalog: [],
   hiddenLowProductIds: [],
   backupVersions: [],
   updatedAt: ""
@@ -528,8 +529,8 @@ const setStatus = (message, type = "ok") => {
   status.className = type;
 };
 
-const isUseEntryProtected = () => currentView === "use" && useEntryDirty;
-const isEditEntryProtected = () => currentView === "edit" && editEntryDirty;
+const isUseEntryProtected = () => currentView === "use" && (useEntryDirty || ocsModule?.isDirty());
+const isEditEntryProtected = () => currentView === "edit" && (editEntryDirty || ocsModule?.isDirty());
 const isProductFormProtected = () => currentView === "settings" && ((currentSettingsView === "products" && productFormDirty) || (["doctors", "surgeries"].includes(currentSettingsView) && departmentsModule?.isDirty()));
 const isPrescriptionSettingsProtected = () => currentView === "settings" && ((currentSettingsView === "prescriptions" && prescriptionSettingsDirty) || (currentSettingsView === "patterns" && prescriptionAdminModule?.isDirty()));
 const isMorningCountProtected = () => currentView === "morningcount" && morningCountDirty;
@@ -807,6 +808,7 @@ const normalizeState = (data) => ({
   morningCounts: dedupeMorningCounts(Array.isArray(data?.morningCounts) ? data.morningCounts : []),
   usageRules: Array.isArray(data?.usageRules) ? data.usageRules : [],
   purchaseRequests: Array.isArray(data?.purchaseRequests) ? data.purchaseRequests : [],
+  ocsCatalog: Array.isArray(data?.ocsCatalog) ? data.ocsCatalog : [],
   prescriptionPatternSettings: Array.isArray(data?.prescriptionPatternSettings) ? data.prescriptionPatternSettings : [],
   prescriptionMaterialSettings: Array.isArray(data?.prescriptionMaterialSettings) ? data.prescriptionMaterialSettings : [],
   hiddenLowProductIds: Array.isArray(data?.hiddenLowProductIds) ? data.hiddenLowProductIds : [],
@@ -1227,6 +1229,8 @@ const mergeStates = (remoteData, localData) => {
     ]),
     usageRules: mergeArrayById(remote.usageRules, local.usageRules, remote.updatedAt, local.updatedAt),
     purchaseRequests: mergeArrayById(remote.purchaseRequests, local.purchaseRequests, remote.updatedAt, local.updatedAt),
+    // OCS 목록은 거래 저장 안에서 최신 목록에 추가한다. 오래된 단말의 목록으로 덮어쓰지 않는다.
+    ocsCatalog: remote.ocsCatalog,
     prescriptionPatternSettings: mergeArrayById(remote.prescriptionPatternSettings, local.prescriptionPatternSettings, remote.updatedAt, local.updatedAt),
     prescriptionMaterialSettings: mergeArrayById(remote.prescriptionMaterialSettings, local.prescriptionMaterialSettings, remote.updatedAt, local.updatedAt),
     backupVersions: mergeArrayById(remote.backupVersions || [], local.backupVersions || [], remote.updatedAt, local.updatedAt),
@@ -2959,8 +2963,21 @@ const getUsageEntryModule = () => {
 const pendingUsageSummary = (item) => getUsageEntryModule().pendingUsageSummary(item);
 const renderPendingUsageList = () => getUsageEntryModule().renderPendingUsageList();
 
+let ocsModule = null;
+const getOcsModule = () => {
+  if (!ocsModule) ocsModule = window.createOcsModule({
+    getState:()=>state,escapeHtml,today,uid,saveState,validateCase:caseNumberValidationMessage,
+    canEdit:canEditUsage,canManage:canManageSettings,canModify:canModifyUsageRecord,
+    actor:currentAuditUser,stockUnconfirmed:isUnconfirmedStock,
+    otherFormDirty:()=>currentView==='use' && useEntryDirty,
+    saved:id=>{useEntryDirty=false;editEntryDirty=false;pendingEditUsageId=id;currentView='edit';render();},
+    back:()=>{pendingEditUsageId='';editEntryDirty=false;currentView='history';render();}
+  });
+  return ocsModule;
+};
 const renderUse = () => `
   <section class="grid">
+    ${getOcsModule().render()}
     ${renderPendingUsageList()}
     <form class="card" id="useForm">
       <div class="use-form-head">
@@ -3169,6 +3186,7 @@ const renderImplantPhotoModal = () => getUsageEntryModule().renderImplantPhotoMo
 const renderEditUsage = () => {
   if (!canEditUsage()) return `<div class="empty">사용내역 수정은 관리자, 책임사용자, 일반사용자만 가능합니다.</div>`;
   const pendingUsage = pendingEditUsageId ? state.usages.find((usage) => usage.id === pendingEditUsageId) : null;
+  if (pendingUsage?.source === 'ocs-paste') return getOcsModule().render(pendingUsage);
   const editSelectDate = pendingUsage?.date || today();
   return `
   <section class="grid">
@@ -3320,6 +3338,7 @@ const renderEditUsage = () => {
 
 const bindEditUsage = () => {
   if (!canEditUsage()) return;
+  if (document.getElementById('ocsPanel')) { getOcsModule().bind(); return; }
   // 수정 화면이 새로 그려질 때 편집 보호 상태를 초기화한다.
   editEntryDirty = false;
   // 수정은 사용내역·대시보드에서 진입하는 화면이라 전용 탭이 없다 — 돌아가기 버튼 제공.
@@ -3838,6 +3857,7 @@ const bindEditUsage = () => {
   const loadUsage = (id) => {
     pendingEditUsageId = id || "";
     const usage = state.usages.find((item) => item.id === id);
+    if (usage?.source === 'ocs-paste') { render(); return; }
     loadedUsageSnapshot = usage ? JSON.parse(JSON.stringify(usage)) : null;
     if (!usage) {
       form.style.display = "none";
@@ -4894,6 +4914,7 @@ const createImplantRecordFromUsage = async (usage, implantDrafts, options = {}) 
 };
 
 const bindUse = () => {
+  getOcsModule().bind();
   const useDepartment = document.getElementById("useDepartment");
   const departmentSelect = document.getElementById("useDoctor");
   const surgerySelect = document.getElementById("useSurgery");
@@ -6953,7 +6974,8 @@ const boot = async () => {
   }
 };
 
-window.addEventListener("beforeunload", () => {
+window.addEventListener("beforeunload", (event) => {
+  if (ocsModule?.isDirty()) { event.preventDefault(); event.returnValue = ''; }
   if (unsubscribe) unsubscribe();
   if (implantRecordsUnsubscribe) implantRecordsUnsubscribe();
   if (implantVendorsUnsubscribe) implantVendorsUnsubscribe();
