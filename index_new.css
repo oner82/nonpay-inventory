@@ -2861,3 +2861,24 @@
 #ocsPanel .ocs-confirm label { margin:0; }
 #ocsPanel #ocsConfirm { width:20px; height:20px; min-width:20px; flex:0 0 20px; margin:2px 0 0; }
 @media(max-width:480px) { #ocsPanel .ocs-paste-actions { align-items:stretch; flex-direction:column; } #ocsPanel .ocs-paste-hint { display:block; margin:4px 0 0 18px; } }
+
+/* OCS 처방전: 원본 순서와 구분 메모를 유지한 압축 행 배치 */
+#ocsPanel .ocs-sheet { border:1px solid #cbd5e1; border-radius:10px; overflow:hidden; margin:16px 0; }
+#ocsPanel .ocs-sheet-head, #ocsPanel .ocs-sheet-row { display:grid; grid-template-columns:125px minmax(0,1fr) 70px minmax(150px,230px); gap:10px; align-items:center; padding:8px 12px; }
+#ocsPanel .ocs-sheet-head { background:#eef3f9; font-weight:700; font-size:12px; }
+#ocsPanel .ocs-sheet-row { border:0; border-bottom:1px solid #e2e8f0; border-radius:0; margin:0; background:#fff; font-size:13px; }
+#ocsPanel .ocs-sheet-row:nth-child(even) { background:#fafcfe; }
+#ocsPanel .ocs-sheet-section { background:#dceaf7; color:#254667; font-weight:700; padding:7px 12px; font-size:13px; overflow-wrap:anywhere; }
+#ocsPanel .ocs-sheet-code { font-size:11px; color:#586c83; overflow-wrap:anywhere; }
+#ocsPanel .ocs-sheet-name { min-width:0; overflow-wrap:anywhere; }
+#ocsPanel .ocs-sheet-name small { display:block; color:#64748b; font-size:10px; margin-top:2px; }
+#ocsPanel .ocs-sheet-row input, #ocsPanel .ocs-sheet-row select { min-width:0; width:100%; min-height:34px; padding:5px; font-size:12px; margin:0; }
+#manualUseEntry > summary { padding:16px; cursor:pointer; color:#52677e; background:#f1f5f9; border-radius:10px; font-weight:700; }
+@media(max-width:600px) {
+ #ocsPanel .ocs-sheet-head { display:none; }
+ #ocsPanel .ocs-sheet-row { grid-template-columns:minmax(0,1fr) 65px; gap:6px 10px; padding:10px; }
+ #ocsPanel .ocs-sheet-code { grid-column:1; }
+ #ocsPanel .ocs-sheet-name { grid-column:1; grid-row:auto; }
+ #ocsPanel .ocs-sheet-row input { grid-column:2; grid-row:span 2; }
+ #ocsPanel .ocs-sheet-row select { grid-column:1 / -1; }
+}

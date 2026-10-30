@@ -24,24 +24,22 @@
     }
     const rows = [];
     let excludedCount = 0;
+    let section = "";
     for (const c of records) {
       if (c.length !== 103) throw Error(`복사된 ${records.indexOf(c)+1}번째 행의 열 구조가 다릅니다. 전체 행을 다시 복사해 주세요.`);
-      if (!['처방', '조제', '접수'].includes(c[1])) throw Error(`복사된 ${records.indexOf(c)+1}번째 행의 처방 상태를 확인할 수 없습니다. 취소·중지 여부를 확인해 주세요.`);
+      if (!['처방', '조제', '접수', '출력'].includes(c[1])) throw Error(`복사된 ${records.indexOf(c)+1}번째 행의 처방 상태를 확인할 수 없습니다. 취소·중지 여부를 확인해 주세요.`);
       const deletedName = /^\s*D\/C:1\]\s*/.test(c[4]);
       const deletedFlag = c[14].trim() === 'D';
       if (deletedName !== deletedFlag || (/D\/C/i.test(c[4]) && !deletedName)) throw Error('삭제 표식이 일치하지 않습니다. OCS에서 상태를 확인해 주세요.');
       const cancelled = deletedName && deletedFlag;
       if (cancelled) { excludedCount++; continue; }
       const code = c[3].trim(), name = c[4].replace(/^\s*(?:추가\]|D\/C:1\])\s*/, '').trim();
-      // 실제 OCS 화면과 대조한 제목만 제외한다. P 값만으로 행위료를 제외하지 않는다.
-      const heading = (code === '@AAOP' && name === '<< Op. Room Order >>')
-        || (code === '@HH' && name === '▶ 처치수술 처방')
-        || (code === '@' && ['[GS 3D Cage (2cage)]','[GS medical]','1. MIS & Long Arm Screw','<<수술팀 Order>>'].includes(name));
-      if (heading) continue;
+      // 사용자가 확인한 @ 코드는 구분 메모이며 재고 품목이 아니다.
+      if (/^@[A-Z]*$/.test(code)) { section=name.slice(0,250); continue; }
       if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$/.test(code) || !name || name.length > 250 || /[\r\n]/.test(name)) throw Error('코드 또는 제품명 형식을 확인해 주세요.');
       const dose = number(c[7]), times = number(c[8]), days = number(c[9]);
       if ([dose, times, days].some(v => v === null || !Number.isFinite(v) || v <= 0 || v > 10000)) throw Error('수량·횟수·일수가 비어 있거나 해석할 수 없습니다.');
-      rows.push({code, name, dose, times, days, cancelled, qty: cancelled ? 0 : times === 1 && days === 1 && Number.isInteger(dose) ? dose : null, mode:cancelled?'cancelled':'unresolved', productId:''});
+      rows.push({code, name, section, dose, times, days, cancelled, qty: cancelled ? 0 : times === 1 && days === 1 && Number.isInteger(dose) ? dose : null, mode:cancelled?'cancelled':'unresolved', productId:''});
     }
     if ((!rows.length && !excludedCount) || records.length > 201) throw Error('처방 1~200행을 한 케이스씩 입력해 주세요.');
     rows.excludedCount = excludedCount;
@@ -81,7 +79,7 @@
       const sameLink = r => r && r.mode === row.mode && (r.productId || '') === (row.productId || '');
       if (!canManage && !row.cancelled && row.mode !== 'unresolved' && !sameLink(oldRow) && !(stored?.names?.includes(row.name) && sameLink(stored))) throw Error('새 재고 연결·차감 제외는 관리자가 확인해야 합니다.');
       if (row.mode === 'linked' && !supportedProduct(target.products.find(p => p.id === row.productId))) throw Error('연결 제품이 삭제되었거나 별도 장부 대상입니다. 연결을 다시 확인해 주세요.');
-      return {code:row.code,name:row.name,dose:row.dose,times:row.times,days:row.days,cancelled:!!row.cancelled,qty:row.qty,mode:row.mode,productId:row.mode==='linked'?row.productId:''};
+      return {code:row.code,name:row.name,section:String(row.section||'').slice(0,250),dose:row.dose,times:row.times,days:row.days,cancelled:!!row.cancelled,qty:row.qty,mode:row.mode,productId:row.mode==='linked'?row.productId:''};
     });
     // 같은 코드의 복수 행은 합산하되 연결 결정은 일치해야 한다.
     for (const row of rows.filter(r=>!r.cancelled)) if (rows.some(r => !r.cancelled && r.code === row.code && (r.mode !== row.mode || r.productId !== row.productId))) throw Error('같은 코드의 연결 설정이 서로 다릅니다.');
@@ -158,10 +156,11 @@
       });
       const paint=()=>{
         const products=context.getState().products.filter(supportedProduct);
-        $('ocsRows').innerHTML=rows.map((r,i)=>r.cancelled?`<div class="item" data-ocs-cancelled style="display:block;overflow-wrap:anywhere;margin:8px 0"><strong>OCS 삭제 · 사용량 제외</strong><p>${e(r.code)} · ${e(r.name)}</p><p class="helper">원본 1회량 ${e(r.dose)} · 재고 차감 없음. 과거에 저장한 기록을 자동 취소하지는 않습니다.</p></div>`:`<div class="item" style="display:block;overflow-wrap:anywhere;margin:8px 0"><strong>${e(r.code)}</strong> · ${e(r.name)}
-          <div class="helper">복사된 1회량 ${e(r.dose)} / 횟수 ${e(r.times)} / 일수 ${e(r.days)}${r.times!==1||r.days!==1?' · 자동 곱셈하지 않음: 실제 사용 수량을 입력하세요':''}</div>
-          <div class="row two"><div><label for="ocsQty${i}">확인한 사용 수량</label><input id="ocsQty${i}" data-ocs-qty="${i}" type="number" min="0" max="10000" step="1" value="${r.qty===null?'':r.qty}"></div>
-          <div><label for="ocsLink${i}">재고 연결 (단위 1:1 확인)</label><select id="ocsLink${i}" data-ocs-link="${i}" ${context.canManage()?'':'disabled'}><option value="unresolved" ${r.mode==='unresolved'?'selected':''}>미연결 · 기록만 저장</option><option value="excluded" ${r.mode==='excluded'?'selected':''}>행위료·비용 등 차감 제외</option>${products.map(p=>`<option value="p:${e(p.id)}" ${r.mode==='linked'&&r.productId===p.id?'selected':''}>${e(p.orderCode||'코드 없음')} · ${e(p.name)} (${e(p.stockUnit||'개')})</option>`).join('')}${r.mode==='linked'&&!products.some(p=>p.id===r.productId)?'<option selected value="invalid">기존 연결 제품 확인 필요</option>':''}</select></div></div></div>`).join('');
+        $('ocsRows').innerHTML=rows.length ? '<div class="ocs-sheet"><div class="ocs-sheet-head"><span>처방코드</span><span>품목 · 규격</span><span>사용량</span><span>재고 연결</span></div>'+rows.map((r,i)=>
+          (i===0 || r.section!==rows[i-1].section ? '<div class="ocs-sheet-section">'+e(r.section||'처방 목록')+'</div>' : '')+
+          `<div class="item ocs-sheet-row"><span class="ocs-sheet-code">${e(r.code)}</span><div class="ocs-sheet-name">${e(r.name)}<small>원본 ${e(r.dose)} × ${e(r.times)}회 × ${e(r.days)}일${r.times!==1||r.days!==1?' · 실제 사용량 확인':''}</small></div>
+          <input id="ocsQty${i}" aria-label="${e(r.name)} 사용 수량" data-ocs-qty="${i}" type="number" min="0" max="10000" step="1" value="${r.qty===null?'':r.qty}">
+          <select id="ocsLink${i}" aria-label="${e(r.name)} 재고 연결" data-ocs-link="${i}" ${context.canManage()?'':'disabled'}><option value="unresolved" ${r.mode==='unresolved'?'selected':''}>미연결 · 재고 미반영</option><option value="excluded" ${r.mode==='excluded'?'selected':''}>차감 제외</option>${products.map(p=>`<option value="p:${e(p.id)}" ${r.mode==='linked'&&r.productId===p.id?'selected':''}>${e(p.orderCode||'')} · ${e(p.name)} (${e(p.stockUnit||'개')})</option>`).join('')}${r.mode==='linked'&&!products.some(p=>p.id===r.productId)?'<option selected value="invalid">기존 연결 확인 필요</option>':''}</select></div>`).join('')+'</div>' : '';
         message(`${excludedCount?`삭제 ${excludedCount}행 제외 · `:''}${rows.length?`등록 대상 ${rows.length}행 · 미연결 ${rows.filter(r=>r.mode==='unresolved').length}행은 재고에 반영되지 않습니다.`:'등록할 처방이 없습니다.'}`);
         $('ocsSave').disabled=!rows.length;
       };

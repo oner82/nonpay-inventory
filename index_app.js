@@ -2979,6 +2979,7 @@ const renderUse = () => `
   <section class="grid">
     ${getOcsModule().render()}
     ${renderPendingUsageList()}
+    <details id="manualUseEntry"><summary>직접 입력 · OCS에 없는 품목 / 인체조직·임플란트 장부</summary>
     <form class="card" id="useForm">
       <div class="use-form-head">
         <h2>사용입력</h2>
@@ -3127,6 +3128,7 @@ const renderUse = () => `
         </div>
       </div>
     </form>
+    </details>
   </section>
 `;
 
@@ -5801,6 +5803,7 @@ const bindUse = () => {
     renderUseDraftPanel();
   };
   const loadPendingUsageIntoForm = (pending) => {
+    document.getElementById('manualUseEntry').open = true;
     if (!pending) return;
     if (useDate) useDate.value = pending.date || today();
     if (caseRoomInput) caseRoomInput.value = caseRoomText(pending);
