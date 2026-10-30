@@ -15,6 +15,10 @@
     for (const line of text.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').split('\n')) {
       if (!line.trim()) continue;
       const columns = line.split('\t');
+      // OCS 마지막 빈 입력 행: X와 기본값만 있고 처방코드/명칭이 없다.
+      // 다른 X 행은 임의로 버리지 않는다.
+      const emptyDefaults={0:'X',7:'1',8:'1',9:'1',11:'N',24:'C1'};
+      if (columns.length===103 && columns[0]==='X' && columns.every((value,index)=>value.trim()===(emptyDefaults[index]||''))) continue;
       // 상태가 다른 행도 버리지 않고 아래에서 중단한다. 설명 칸의 줄바꿈만 이어 붙인다.
       if (columns[0] === 'A' && columns.length >= 10) records.push(columns);
       else if (records.length && records.at(-1).length < 103) {
