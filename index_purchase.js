@@ -104,7 +104,7 @@
     let selectedCode = '', query = '', from = c.today(), to = c.today(), dirty = false;
     let importRows = null, preview = null, importText = '', importError = '';
     const catalog = () => {
-      const live = products().filter(p => p.purchaseSource && p.orderCode).map(p => ({code:p.orderCode,name:p.purchaseName||p.name,spec:p.purchaseSpec,orderUnit:p.historicalStockUnit||p.orderUnit,source:p.purchaseSource,historicalStock:p.historicalStock,target:p.targetStock,location:p.storageLocation}));
+      const live = products().filter(p => p.purchaseSource && (p.orderCode || p.purchaseImportKey)).map(p => ({code:p.orderCode,name:p.purchaseName||p.name,spec:p.purchaseSpec,orderUnit:p.historicalStockUnit||p.orderUnit,source:p.purchaseSource,historicalStock:p.historicalStock,target:p.targetStock,location:p.storageLocation}));
       return [...live, ...(window.ORPurchaseCatalog || []).filter(r => !live.some(x => normalized(x.code) === normalized(r.code)))];
     };
     const products = () => c.getState().products;
@@ -138,7 +138,7 @@
     const orderRows = () => `<p class="helper">${from > to ? '시작일은 종료일보다 늦을 수 없습니다.' : '최종 저장된 사용 중 아직 전달 완료로 기록하지 않은 수량입니다. 목록 복사만으로는 전송·신청되지 않습니다.'}</p><div class="purchase-order-table-wrap"><table class="purchase-order-table"><thead><tr><th>구매코드</th><th>제품명·규격</th><th>사용량</th><th>신청 제안</th><th>현재고</th></tr></thead><tbody>${lines().map(({p,qty}) => `<tr><td>${e(p.orderCode || '미등록')}</td><td>${e(p.purchaseName || p.name)}<br>${e(p.purchaseSpec || '')}</td><td>${qty} ${e(p.stockUnit || '개')}</td><td>${orderQty(p,qty) ?? '단위 확인 필요'} ${e(p.orderUnit || '')}</td><td>${e(stockText(p))}</td></tr>`).join('') || '<tr><td colspan="5">이 기간의 구매팀 연결 품목 사용량이 없습니다.</td></tr>'}</tbody></table></div>`;
     const setup = () => {
       const item = selected(), p = item ? linked(item.code) : null;
-      return `<details class="card" open><summary>구매 품목 연결·재고 확정</summary><p class="helper">물류코드와 OCS 처방코드는 별도로 관리합니다. 비산정품목도 등록할 수 있습니다. 기존 제품은 연결해 중복을 방지하고, 과거 실사 수량은 참고값으로만 보관합니다.</p>
+      return `<details class="card" open><summary>구매 품목 연결·재고 확정</summary><p class="helper">물류코드와 OCS 처방코드는 별도로 관리합니다. 비산정품목도 등록할 수 있습니다. 기존 제품은 연결해 중복을 방지하고, 과거 실사 수량은 참고값으로만 보관합니다.</p><p><strong>물류 등록 ${products().filter(p=>p.purchaseSource).length}품목 · 코드 미확인 ${products().filter(p=>p.purchaseSource&&!p.orderCode).length}품목</strong></p>
         <label for="purchaseCatalogSearch">코드·품명·보관위치 검색</label><input id="purchaseCatalogSearch" value="${e(query)}" type="search">
         <div id="purchaseCatalogResults">${catalogResults()}</div>
         ${item ? `<form id="purchaseLinkForm"><h3>${e(item.code)} · ${e(item.name)}</h3><p>${e(item.spec)} · 출고단위 ${e(item.orderUnit || '미기재')} · ${e(item.location)} · ${e(item.source || '2026-09')} 참고 실사 ${e(item.historicalStock)} ${e(item.orderUnit)}</p>
