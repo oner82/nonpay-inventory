@@ -44,12 +44,69 @@
       return { ...a, current, difference: a.requested - current };
     }).filter(a => a.difference > 0);
   };
-  window.ORPurchase = { isPurchase, unconfirmed, stockText, factor, orderQty, suggestedFactor, movement, confirmStock, requestDifferences };
+  // 물류 품목 일괄 등록: 처방코드와 재고 원장은 수정하지 않는다.
+  const importPlan = (state, rows) => {
+    if (!Array.isArray(rows) || !rows.length || rows.length > 1000) throw Error('1~1000행의 품목 목록을 넣어 주세요.');
+    const seen = new Set(), targets = new Set();
+    return rows.map((r, i) => {
+      const code = normalized(r.code), name = String(r.name || '').trim();
+      if (!name || !/^20\d{2}-\d{2}$/.test(r.source || '')) throw Error(`${i+1}행: 제품명과 기준월을 확인해 주세요.`);
+      const key = code || `${r.source}:${r.location}:${r.row}`;
+      if (seen.has(key)) throw Error(`${code || name}: 중복 행입니다.`);
+      seen.add(key);
+      const matches = state.products.filter(p => code ? normalized(p.orderCode) === code : p.purchaseImportKey === key);
+      if (matches.length > 1) throw Error(`${code}: 이미 여러 제품에 연결되어 있습니다.`);
+      const p = r.productId ? state.products.find(p => p.id === r.productId) : matches[0];
+      if (r.productId && !p) throw Error(`${name}: 연결할 제품을 찾지 못했습니다.`);
+      if (p?.active === false) throw Error(`${name}: 삭제된 제품입니다. 연결을 확인해 주세요.`);
+      if (p?.orderCode && normalized(p.orderCode) !== code) throw Error(`${name}: 기존 물류코드와 다릅니다.`);
+      if (matches[0] && matches[0].id !== p?.id) throw Error(`${code}: 다른 제품에 연결되어 있습니다.`);
+      if (p && targets.has(p.id)) throw Error(`${name}: 한 제품에 여러 물류코드를 연결할 수 없습니다.`);
+      if (p) targets.add(p.id);
+      if (!r.reviewRequired && !p && state.products.some(x => normalized(x.name) === normalized(name))) throw Error(`${name}: 같은 이름의 기존 제품을 선택해 주세요.`);
+      // 연결이 모호한 행도 미리보기에는 남기되 제품을 중복 생성하지 않는다.
+      const status = r.reviewRequired ? 'review' : p ? 'link' : 'new';
+      const orderUnit = String(r.orderUnit || '').trim();
+      const simple = suggestedFactor(r.spec, orderUnit);
+      const stockUnit = p?.stockUnit || (simple ? 'EA' : orderUnit);
+      const units = p ? (factor(p) || (normalized(stockUnit) === normalized(orderUnit) ? 1 : null)) : (simple || (orderUnit ? 1 : null));
+      const productName = rows.filter(x => normalized(x.name) === normalized(name)).length > 1 && r.spec ? `${name} / ${r.spec}` : name;
+      return { key, code, name, productName, spec:String(r.spec || ''), orderUnit, stockUnit, units,
+        source:r.source, location:String(r.location || ''), historicalStock: typeof r.historicalStock === 'number' ? r.historicalStock : null,
+        target:typeof r.target === 'number' ? r.target : null, productId:p?.id || '', status };
+    });
+  };
+  const applyImport = (state, rows, expected, ids, audit) => {
+    const plan = importPlan(state, rows);
+    if (JSON.stringify(plan) !== JSON.stringify(expected)) throw Error('제품·연결 정보가 변경되었습니다. 목록을 다시 검토해 주세요.');
+    const next = state.products.map(p => ({...p}));
+    plan.filter(r => r.status !== 'review').forEach(r => {
+      let p = next.find(p => p.id === r.productId);
+      if (!p) {
+        if (!ids[r.key] || next.some(p => p.id === ids[r.key])) throw Error('신규 제품 ID가 중복되었습니다. 다시 검토해 주세요.');
+        p = {id:ids[r.key],name:r.productName,category:'PURCHASE',stock:0,baseStock:0,stockConfirmed:false,warningStock:0,company:'',landingQty:0};
+        next.push(p);
+      }
+      Object.assign(p, {orderCode:r.code,purchaseName:r.name,purchaseSpec:r.spec,purchaseSource:r.source,
+        storageLocation:r.location,historicalStock:r.historicalStock,historicalStockUnit:r.orderUnit,targetStock:r.target,purchaseImportKey:r.key,...audit});
+      // 기존 단위와 환산값을 보존한다. 신규품의 복합 포장은 엑셀 출고단위 그대로 관리한다.
+      if (!p.stockUnit) p.stockUnit=r.stockUnit;
+      if (!p.orderUnit) p.orderUnit=r.orderUnit;
+      if (!factor(p)) p.unitsPerOrder=r.units;
+    });
+    state.products = next;
+  };
+
+  window.ORPurchase = { isPurchase, unconfirmed, stockText, factor, orderQty, suggestedFactor, movement, confirmStock, requestDifferences, importPlan, applyImport };
 
   window.createPurchaseModule = (c) => {
     const e = c.escapeHtml;
     let selectedCode = '', query = '', from = c.today(), to = c.today(), dirty = false;
-    const catalog = () => window.ORPurchaseCatalog || [];
+    let importRows = null, preview = null, importText = '', importError = '';
+    const catalog = () => {
+      const live = products().filter(p => p.purchaseSource && p.orderCode).map(p => ({code:p.orderCode,name:p.purchaseName||p.name,spec:p.purchaseSpec,orderUnit:p.historicalStockUnit||p.orderUnit,source:p.purchaseSource,historicalStock:p.historicalStock,target:p.targetStock,location:p.storageLocation}));
+      return [...live, ...(window.ORPurchaseCatalog || []).filter(r => !live.some(x => normalized(x.code) === normalized(r.code)))];
+    };
     const products = () => c.getState().products;
     const selected = () => catalog().find(x => x.code && x.code === selectedCode);
     const linked = (code) => code ? products().find(p => normalized(p.orderCode) === normalized(code)) : null;
@@ -81,10 +138,10 @@
     const orderRows = () => `<p class="helper">${from > to ? '시작일은 종료일보다 늦을 수 없습니다.' : '최종 저장된 사용 중 아직 전달 완료로 기록하지 않은 수량입니다. 목록 복사만으로는 전송·신청되지 않습니다.'}</p><div class="purchase-order-table-wrap"><table class="purchase-order-table"><thead><tr><th>구매코드</th><th>제품명·규격</th><th>사용량</th><th>신청 제안</th><th>현재고</th></tr></thead><tbody>${lines().map(({p,qty}) => `<tr><td>${e(p.orderCode || '미등록')}</td><td>${e(p.purchaseName || p.name)}<br>${e(p.purchaseSpec || '')}</td><td>${qty} ${e(p.stockUnit || '개')}</td><td>${orderQty(p,qty) ?? '단위 확인 필요'} ${e(p.orderUnit || '')}</td><td>${e(stockText(p))}</td></tr>`).join('') || '<tr><td colspan="5">이 기간의 구매팀 연결 품목 사용량이 없습니다.</td></tr>'}</tbody></table></div>`;
     const setup = () => {
       const item = selected(), p = item ? linked(item.code) : null;
-      return `<details class="card" open><summary>구매 품목 연결·재고 확정</summary><p class="helper">2026년 9월 목록 581행. 기존 비급여는 기존 제품을 선택해 연결하세요. 처방이 없는 비산정품목은 지금 등록할 필요가 없습니다. 9월 실사 수량은 참고값입니다.</p>
+      return `<details class="card" open><summary>구매 품목 연결·재고 확정</summary><p class="helper">물류코드와 OCS 처방코드는 별도로 관리합니다. 비산정품목도 등록할 수 있습니다. 기존 제품은 연결해 중복을 방지하고, 과거 실사 수량은 참고값으로만 보관합니다.</p>
         <label for="purchaseCatalogSearch">코드·품명·보관위치 검색</label><input id="purchaseCatalogSearch" value="${e(query)}" type="search">
         <div id="purchaseCatalogResults">${catalogResults()}</div>
-        ${item ? `<form id="purchaseLinkForm"><h3>${e(item.code)} · ${e(item.name)}</h3><p>${e(item.spec)} · 출고단위 ${e(item.orderUnit || '미기재')} · ${e(item.location)} · 9월 실사 ${e(item.historicalStock)}</p>
+        ${item ? `<form id="purchaseLinkForm"><h3>${e(item.code)} · ${e(item.name)}</h3><p>${e(item.spec)} · 출고단위 ${e(item.orderUnit || '미기재')} · ${e(item.location)} · ${e(item.source || '2026-09')} 참고 실사 ${e(item.historicalStock)} ${e(item.orderUnit)}</p>
           <label>앱 제품 연결<select id="purchaseExisting" required><option value="">선택하세요</option><option value="__new__">새 구매재료로 등록</option>${products().map(x => `<option value="${e(x.id)}" ${p?.id === x.id ? 'selected' : ''}>${e(x.name)} / ${e(x.category)}${x.orderCode ? ` / ${e(x.orderCode)}` : ''}</option>`).join('')}</select></label>
           <div class="row three"><label>재고·사용 단위<input id="purchaseStockUnit" value="${e(p?.stockUnit || 'EA')}" required></label><label>신청·입고 단위<input id="purchaseOrderUnit" value="${e(p?.orderUnit || item.orderUnit)}" required></label><label>신청 1단위당 재고 수량<input id="purchaseFactor" type="number" min="1" step="1" value="${e(p?.unitsPerOrder || suggestedFactor(item.spec,item.orderUnit) || '')}" required></label></div>
           <p id="purchaseUnitPreview" class="workflow-warning"></p><p class="helper">예: 재고 EA, 신청 BOX, 100EA/BOX이면 100. 기존 제품의 재고·사용 단위를 유지하세요. PACK·CLIPS 및 여러 포장이 섞인 규격은 실제 단위를 확인해 입력하세요. 새 제품은 재고 미확정으로 시작합니다.</p>
@@ -93,13 +150,22 @@
         <p class="helper">실사 기록과 현재고 확정은 실사·재고 메뉴에서 함께 관리합니다.</p><button type="button" class="secondary" id="purchaseGoCount">실사·재고로 이동</button>
       </details>`;
     };
+    const importView = () => `<details class="card" id="purchaseImportPanel" ${preview || importError ? 'open' : ''}><summary>물류 품목 일괄 등록·연결</summary>
+      <p class="helper">코드·제품명·규격·출고단위를 검토한 JSON 목록을 넣으세요. 물류코드는 OCS 코드로 자동 연결되지 않습니다. 기존 제품의 재고·사용기록을 보존하며 새 제품은 재고 미확정으로 등록합니다.</p>
+      <label for="purchaseImportText">물류 목록 JSON</label><textarea id="purchaseImportText" rows="4" spellcheck="false">${e(importText)}</textarea>
+      <button type="button" id="purchaseImportReview">목록 검토</button><p role="status">${e(importError)}</p>
+      ${preview ? `<p><strong>신규 ${preview.filter(r=>r.status==='new').length} · 기존 연결 ${preview.filter(r=>r.status==='link').length} · 확인 대기 ${preview.filter(r=>r.status==='review').length}</strong></p>
+      <p class="helper">확인 대기는 저장 대상에서 제외합니다. 코드 미기재는 코드 확인 필요로 등록됩니다. BOX·PACK 등은 아래 재고단위를 확인하세요.</p>
+      <div style="max-height:420px;overflow:auto"><table class="purchase-order-table"><thead><tr><th>처리</th><th>물류코드 · 제품명</th><th>규격</th><th>신청 → 재고</th></tr></thead><tbody>${preview.map(r=>`<tr><td>${r.status==='review'?'확인 대기':r.status==='link'?'기존 연결':'신규'}</td><td>${e(r.code||'코드 확인 필요')}<br>${e(r.name)}</td><td>${e(r.spec)}</td><td>1 ${e(r.orderUnit||'단위 확인 필요')} → ${r.units??'?'} ${e(r.stockUnit)}</td></tr>`).join('')}</tbody></table></div>
+      <label class="toggle-line"><input type="checkbox" id="purchaseImportConfirmed">등록 대상과 단위를 확인했습니다. 과거 실사값은 현재고에 반영하지 않습니다.</label>
+      <button type="button" id="purchaseImportSave" disabled>검토한 품목 등록·연결</button>` : ''}</details>`;
     const renderCount = () => c.canManageSettings() ? `<section class="card"><h2>② 실사 수량을 현재고에 반영 (관리자)</h2><p class="workflow-warning">위 실사 기록 저장과 다릅니다. 실제 수량을 다시 확인한 후 아래에서 확정해야 현재고가 바뀝니다.</p><form id="purchaseCountForm"><h3>실사로 현재고 확정</h3><p class="helper">선택 품목의 사용·입고 기록을 모두 저장한 뒤 실제 수량을 입력하세요. 이 저장 시점까지 기록된 내역을 포함한 실사입니다. 이전 기록을 나중에 수정·삭제하면 현재고도 다시 계산됩니다.</p><label>제품<select id="purchaseCountProduct" required><option value="">선택</option>${products().filter(x => x.active !== false && !x.vendorManaged).map(x=>`<option value="${e(x.id)}">${e(x.orderCode)} · ${e(x.name)} / ${e(stockText(x))}</option>`).join('')}</select></label><label>실제 수량 (재고·사용 단위)<input id="purchaseCountQty" type="number" min="0" step="1" required></label><button type="submit">실사 수량으로 재고 확정</button></form></section>` : '';
     const catalogResults = () => {
       const needle = normalized(query);
       const matches = catalog().filter(x => !needle || normalized(`${x.code} ${x.name} ${x.spec} ${x.location}`).includes(needle));
       return `<p>${matches.length}행 · 최대 40행 표시</p>${matches.slice(0,40).map(x=>`<button class="secondary purchase-catalog-result" type="button" data-purchase-code="${e(x.code)}" ${!x.code ? 'disabled' : ''}>${e(x.code || '코드 확인 필요')} · ${e(x.name)} · ${e(x.spec)} · ${e(x.location)} ${linked(x.code) ? '(연결됨)' : ''}</button>`).join('')}`;
     };
-    const render = () => `<section class="grid purchase-layout"><div class="card"><h2>구매팀 신청</h2><div class="row two"><label>시작일<input id="purchaseFrom" type="date" value="${from}" required></label><label>종료일<input id="purchaseTo" type="date" value="${to}" required></label></div><div id="purchaseOrders">${orderRows()}</div><div class="actions"><button id="purchaseCopy" type="button">구매팀 전달용 목록 복사</button>${mayMark()?'<button id="purchaseMarkRequested" type="button" class="secondary">구매팀 전달 완료 기록</button>':''}</div><textarea id="purchaseCopyFallback" aria-label="복사용 신청 목록" hidden readonly></textarea></div>${c.canManageSettings() ? setup() : ''}</section>${requestHistory()}`;
+    const render = () => `<section class="grid purchase-layout"><div class="card"><h2>구매팀 신청</h2><div class="row two"><label>시작일<input id="purchaseFrom" type="date" value="${from}" required></label><label>종료일<input id="purchaseTo" type="date" value="${to}" required></label></div><div id="purchaseOrders">${orderRows()}</div><div class="actions"><button id="purchaseCopy" type="button">구매팀 전달용 목록 복사</button>${mayMark()?'<button id="purchaseMarkRequested" type="button" class="secondary">구매팀 전달 완료 기록</button>':''}</div><textarea id="purchaseCopyFallback" aria-label="복사용 신청 목록" hidden readonly></textarea></div>${c.canManageSettings() ? importView()+setup() : ''}</section>${requestHistory()}`;
     const bind = () => {
       dirty = false;
       document.getElementById('purchaseGoCount')?.addEventListener('click', () => c.openCount?.());
@@ -111,6 +177,21 @@
       ['purchaseFactor','purchaseStockUnit','purchaseOrderUnit'].forEach(id=>el(id)?.addEventListener('input',showUnit));showUnit();
       ['purchaseLinkForm', 'purchaseCountForm'].forEach(id => el(id)?.addEventListener('input', () => { dirty = true; }));
       ['purchaseFrom','purchaseTo'].forEach(id => el(id)?.addEventListener('change',()=> { from=el('purchaseFrom').value;to=el('purchaseTo').value;el('purchaseOrders').innerHTML=orderRows(); }));
+      el('purchaseImportText')?.addEventListener('input', ev => {importText=ev.target.value;preview=null;dirty=true; if(el('purchaseImportSave'))el('purchaseImportSave').disabled=true;});
+      el('purchaseImportReview')?.addEventListener('click', () => {
+        try {importRows=JSON.parse(importText);preview=importPlan(c.getState(),importRows);importError='';}
+        catch(err){preview=null;importError=err.message;}
+        c.render();
+      });
+      el('purchaseImportConfirmed')?.addEventListener('change',ev=>{el('purchaseImportSave').disabled=!ev.target.checked;});
+      el('purchaseImportSave')?.addEventListener('click',async ev=>{
+        if(!c.canManageSettings() || !preview || !el('purchaseImportConfirmed')?.checked)return;
+        const rows=importRows, plan=preview, ids=Object.fromEntries(plan.filter(r=>r.status==='new').map(r=>[r.key,c.uid()])), audit={...c.auditUpdateFields(),updatedAt:new Date().toISOString()};
+        const b=ev.currentTarget;b.disabled=true;
+        try {if(await c.saveState(`물류 품목 ${plan.filter(r=>r.status!=='review').length}건 등록·연결 완료`,{requireTransaction:true,apply:s=>applyImport(s,rows,plan,ids,audit)})){
+          importRows=null;preview=null;importText='';importError='등록·연결 완료. 과거 실사값은 참고값으로 저장했습니다.';c.render();
+        }} finally{b.disabled=false;}
+      });
       el('purchaseMarkRequested')?.addEventListener('click',async ev=>{
         if(!mayMark())return;
         const rows=lines(), allocations=allocationsFor(c.getState());
@@ -155,7 +236,7 @@
           if(p?.stockUnit && p.stockUnit!==stockUnit)throw new Error('사용 중인 재고 단위는 변경할 수 없습니다.');
           if(!p){if(choice!=='__new__')throw new Error('제품이 삭제되었습니다.');p={id,name:item.name,category:'PURCHASE',stock:0,baseStock:0,stockConfirmed:false,warningStock:0,company:'',landingQty:0};s.products.push(p);}
           if(pendingStock) p.stockConfirmed=false;
-          Object.assign(p,{orderCode:item.code,purchaseName:item.name,purchaseSpec:item.spec,orderUnit,stockUnit,unitsPerOrder:units,storageLocation:item.location,purchaseSource:'2026-09',historicalStock:item.historicalStock,targetStock:item.target,...c.auditUpdateFields(),updatedAt:new Date().toISOString()});
+          Object.assign(p,{orderCode:item.code,purchaseName:item.name,purchaseSpec:item.spec,orderUnit,stockUnit,unitsPerOrder:units,storageLocation:item.location,purchaseSource:item.source || '2026-09',historicalStock:item.historicalStock,targetStock:item.target,...c.auditUpdateFields(),updatedAt:new Date().toISOString()});
         };
         const b=ev.submitter;b.disabled=true;
         try{if(await c.saveState('구매 품목 연결 완료',{apply}))c.render();}finally{b.disabled=false;}
