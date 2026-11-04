@@ -18,6 +18,16 @@
     if (caseRoom<1 || caseRoom>10 || caseOrder<1 || caseOrder>99) throw Error('수술명 앞 번호를 확인해 주세요. 수술실은 1~10, 순서는 1~99입니다.');
     return {name:name.slice(match[0].length),caseRoom,caseOrder};
   };
+  // 수술팩은 제외하지 않는다. 확인된 비용 명칭만 제외하며 실제 버/쏘 제품은 유지한다.
+  const isServiceOrder = row => {
+    const name=String(row.name || '').replace(/\s+/g,' ').trim();
+    if (/수술팩/.test(name)) return false;
+    return /(?:사용료|이용료|수술료|행위료)$/.test(name)
+      || /수술.*(?:사용하는|사용한).*치료재료 비용/.test(name)
+      || /^복강경하 수술-복강경을 사용한 경우$/.test(name)
+      || /^조직병리검사(?:\s|\[)/.test(name)
+      || /BURR\s*[,·/]\s*SAW.*절삭기류/i.test(name);
+  };
   function parse(text) {
     if (!text.trim() || text.length > 500000) throw Error('복사 내용을 확인해 주세요. 한 번에 한 케이스만 붙여넣어 주세요.');
     const records = [];
@@ -37,6 +47,7 @@
     }
     const rows = [];
     let excludedCount = 0;
+    let excludedServiceCount = 0;
     let section = "";
     for (const c of records) {
       if (c.length !== 103) throw Error(`복사된 ${records.indexOf(c)+1}번째 행의 열 구조가 다릅니다. 전체 행을 다시 복사해 주세요.`);
@@ -50,12 +61,14 @@
       // 사용자가 확인한 @ 코드는 구분 메모이며 재고 품목이 아니다.
       if (/^@[A-Z]*$/.test(code)) { section=name.slice(0,250); continue; }
       if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$/.test(code) || !name || name.length > 250 || /[\r\n]/.test(name)) throw Error('코드 또는 제품명 형식을 확인해 주세요.');
+      if (isServiceOrder({code,name})) { excludedServiceCount++; continue; }
       const dose = number(c[7]), times = number(c[8]), days = number(c[9]);
       if ([dose, times, days].some(v => v === null || !Number.isFinite(v) || v <= 0 || v > 10000)) throw Error('수량·횟수·일수가 비어 있거나 해석할 수 없습니다.');
       rows.push({code, name, section, dose, times, days, cancelled, qty: cancelled ? 0 : times === 1 && days === 1 && Number.isInteger(dose) ? dose : null, mode:cancelled?'cancelled':'unresolved', productId:''});
     }
-    if ((!rows.length && !excludedCount) || records.length > 201) throw Error('처방 1~200행을 한 케이스씩 입력해 주세요.');
+    if ((!rows.length && !excludedCount && !excludedServiceCount) || records.length > 201) throw Error('처방 1~200행을 한 케이스씩 입력해 주세요.');
     rows.excludedCount = excludedCount;
+    rows.excludedServiceCount = excludedServiceCount;
     return rows;
   }
   function prepare(rows, catalog) {
@@ -126,13 +139,13 @@
     // 전체 상태가 단일 Firestore 문서이므로 크기 초과 시 부분 저장 없이 중단한다.
     if (new TextEncoder().encode(JSON.stringify(target)).length > 850000) throw Error('저장 공간이 부족합니다. 관리자에게 OCS 목록 저장소 분리를 요청해 주세요.');
   }
-  window.OROcs = {parse,prepare,apply,supportedProduct,surgeryName,surgeryCase};
+  window.OROcs = {parse,prepare,apply,supportedProduct,surgeryName,surgeryCase,isServiceOrder};
   window.createOcsModule = context => {
     const e=context.escapeHtml;
-    let rows=[], previous=null, dirty=false, busy=false, catalogSnapshot=[], excludedCount=0;
+    let rows=[], previous=null, dirty=false, busy=false, catalogSnapshot=[], excludedCount=0, excludedServiceCount=0;
     const render = (record=null) => {
       previous=record?clone(record):null;rows=record?clone(record.ocsRows):[];dirty=false;
-      excludedCount=0;
+      excludedCount=0;excludedServiceCount=0;
       catalogSnapshot=clone(context.getState().ocsCatalog||[]);
       return `<section class="card" id="ocsPanel"><h2>${record?'OCS 사용 수량 수정':'OCS 처방 붙여넣기'}</h2>
         <p>수술 후 확정된 처방을 복사해 등록하세요. 붙여넣기만으로는 재고가 바뀌지 않습니다.</p>
@@ -188,8 +201,8 @@
           (i===0 || r.section!==rows[i-1].section ? '<div class="ocs-sheet-section">'+e(r.section||'처방 목록')+'</div>' : '')+
           `<div class="item ocs-sheet-row"><span class="ocs-sheet-code">${e(r.code)}</span><div class="ocs-sheet-name">${e(r.name)}<small>원본 ${e(r.dose)} × ${e(r.times)}회 × ${e(r.days)}일${r.times!==1||r.days!==1?' · 실제 사용량 확인':''}</small></div>
           <input id="ocsQty${i}" aria-label="${e(r.name)} 사용 수량" data-ocs-qty="${i}" type="number" min="0" max="10000" step="1" value="${r.qty===null?'':r.qty}">
-          <select id="ocsLink${i}" aria-label="${e(r.name)} 재고 연결" data-ocs-link="${i}" ${context.canManage()?'':'disabled'}><option value="unresolved" ${r.mode==='unresolved'?'selected':''}>미연결 · 재고 미반영</option><option value="excluded" ${r.mode==='excluded'?'selected':''}>차감 제외</option>${products.map(p=>`<option value="p:${e(p.id)}" ${r.mode==='linked'&&r.productId===p.id?'selected':''}>${e(p.orderCode||'')} · ${e(p.name)} (${e(p.stockUnit||'개')})</option>`).join('')}${r.mode==='linked'&&!products.some(p=>p.id===r.productId)?'<option selected value="invalid">기존 연결 확인 필요</option>':''}</select></div>`).join('')+'</div>' : '';
-        message(`${excludedCount?`삭제 ${excludedCount}행 제외 · `:''}${rows.length?`등록 대상 ${rows.length}행 · 미연결 ${rows.filter(r=>r.mode==='unresolved').length}행은 재고에 반영되지 않습니다.`:'등록할 처방이 없습니다.'}`);
+          <select id="ocsLink${i}" aria-label="${e(r.name)} 재고 연결" data-ocs-link="${i}" ${context.canManage()?'':'disabled'}><option value="unresolved" ${r.mode==='unresolved'?'selected':''}>미연결 · 재고 미반영</option><option value="excluded" ${r.mode==='excluded'?'selected':''}>사용량만 기록 · 차감 제외</option>${products.map(p=>`<option value="p:${e(p.id)}" ${r.mode==='linked'&&r.productId===p.id?'selected':''}>${e(p.orderCode||'')} · ${e(p.name)} (${e(p.stockUnit||'개')})</option>`).join('')}${r.mode==='linked'&&!products.some(p=>p.id===r.productId)?'<option selected value="invalid">기존 연결 확인 필요</option>':''}</select></div>`).join('')+'</div>' : '';
+        message(`${excludedServiceCount?`비용·검사 ${excludedServiceCount}행 제외 · `:''}${excludedCount?`삭제 ${excludedCount}행 제외 · `:''}${rows.length?`등록 대상 ${rows.length}행 · 미연결 ${rows.filter(r=>r.mode==='unresolved').length}행은 재고에 반영되지 않습니다.`:'등록할 처방이 없습니다.'}`);
         $('ocsSave').disabled=!rows.length;
       };
       paint();
@@ -209,11 +222,11 @@
         if(!event.target.hasAttribute('data-ocs-link'))return;
         const row=rows[Number(event.target.dataset.ocsLink)];const v=event.target.value;
         row.mode=v.startsWith('p:')?'linked':v;row.productId=v.startsWith('p:')?v.slice(2):'';touch();
-        message(`${excludedCount?`삭제 ${excludedCount}행 제외 · `:''}등록 대상 ${rows.length}행 · 미연결 ${rows.filter(r=>r.mode==='unresolved').length}행은 재고에 반영되지 않습니다.`);
+        message(`${excludedServiceCount?`비용·검사 ${excludedServiceCount}행 제외 · `:''}${excludedCount?`삭제 ${excludedCount}행 제외 · `:''}등록 대상 ${rows.length}행 · 미연결 ${rows.filter(r=>r.mode==='unresolved').length}행은 재고에 반영되지 않습니다.`);
       });
       $('ocsParse')?.addEventListener('click',()=>{
-        try {catalogSnapshot=clone(context.getState().ocsCatalog||[]);const parsed=parse($('ocsPaste').value);excludedCount=parsed.excludedCount;rows=prepare(parsed,catalogSnapshot);$('ocsPaste').value='';$('ocsPasteTitle').textContent='다른 처방 다시 붙여넣기';$('ocsPasteStatus').textContent=`읽기 완료 · 등록 대상 ${rows.length}행${excludedCount?` · 삭제 ${excludedCount}행 제외`:''}`;touch();paint();}
-        catch(error){rows=[];excludedCount=0;touch();paint();message(error.message);$('ocsPasteTitle').textContent='복사한 내용 확인하기';$('ocsPasteStatus').textContent='읽지 못했습니다. 내용을 펼쳐 확인하거나 다시 붙여넣으세요.';}
+        try {catalogSnapshot=clone(context.getState().ocsCatalog||[]);const parsed=parse($('ocsPaste').value);excludedCount=parsed.excludedCount;excludedServiceCount=parsed.excludedServiceCount||0;rows=prepare(parsed,catalogSnapshot);$('ocsPaste').value='';$('ocsPasteTitle').textContent='다른 처방 다시 붙여넣기';$('ocsPasteStatus').textContent=`읽기 완료 · 등록 대상 ${rows.length}행${excludedCount?` · 삭제 ${excludedCount}행 제외`:''}${excludedServiceCount?` · 비용·검사 ${excludedServiceCount}행 제외`:''}`;touch();paint();}
+        catch(error){rows=[];excludedCount=0;excludedServiceCount=0;touch();paint();message(error.message);$('ocsPasteTitle').textContent='복사한 내용 확인하기';$('ocsPasteStatus').textContent='읽지 못했습니다. 내용을 펼쳐 확인하거나 다시 붙여넣으세요.';}
       });
       $('ocsBack')?.addEventListener('click',()=>{if(!dirty||confirm('저장하지 않은 변경을 닫을까요?')){dirty=false;context.back();}});
       $('ocsSave').addEventListener('click',async()=>{
