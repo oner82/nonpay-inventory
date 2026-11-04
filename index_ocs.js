@@ -146,6 +146,8 @@
         ${record?'':`<div class="ocs-paste-box"><details id="ocsPasteDetails" open><summary><span id="ocsPasteTitle">OCS 처방 붙여넣기</span><span class="ocs-paste-hint">펼치기 / 접기</span></summary><label class="helper" for="ocsPaste">아래 칸을 누르고 Ctrl+V 또는 ⌘V로 붙여넣으세요.</label><textarea id="ocsPaste" rows="3" autocomplete="off" spellcheck="false" wrap="off" placeholder="여기에 OCS 처방을 붙여넣으세요"></textarea></details><div class="ocs-paste-actions"><span id="ocsPasteStatus" role="status">복사한 내용은 읽기 후 지워집니다.</span><button id="ocsParse" type="button">처방 읽기</button></div></div>`}
         <p id="ocsMessage" role="status"></p><div id="ocsRows"></div>
         <div class="ocs-confirm"><input type="checkbox" id="ocsConfirm"><label for="ocsConfirm">수술 후 사용 수량과 연결·미연결 항목을 확인했습니다.</label></div>
+        <p id="ocsSaveMessage" role="status" aria-live="polite"></p>
+        <div id="ocsUnlinkedNotice" hidden><p id="ocsUnlinkedText"></p><label><input type="checkbox" id="ocsUnlinkedConfirm"> 미연결 항목은 재고 차감 없이 기록만 저장하는 데 동의합니다.</label></div>
         <button id="ocsSave" type="button">${record?'수량 수정 저장':'확인 후 최종 저장'}</button>
         ${record?'<button id="ocsBack" class="secondary" type="button">사용내역으로</button>':''}
         <details><summary>OCS 코드·명칭 누적 목록 (${(context.getState().ocsCatalog||[]).length}코드)</summary><p class="helper">관리자는 처방 행에서 재고 제품을 선택하면 다음 등록부터 같은 코드·명칭에 적용됩니다. 1회량 1과 선택 제품의 재고 단위 1이 같을 때만 연결하세요. 인체조직·임플란트 등 별도 장부 품목은 기존 입력을 이용하세요.</p>
@@ -157,12 +159,12 @@
     function bind() {
       const panel=document.getElementById('ocsPanel');if(!panel)return;
       const $=id=>document.getElementById(id);
-      const message=s=>{$('ocsMessage').textContent=s;};
+      const message=s=>{$('ocsMessage').textContent=s;$('ocsSaveMessage').textContent=s;};
       // 두 입력 방식의 미저장 내용을 서로 덮어쓰지 않는다.
       const protectOtherSave=event=>{if(dirty){event.preventDefault();event.stopImmediatePropagation();message('위 OCS 입력을 먼저 저장하거나 화면을 다시 열어 정리해 주세요.');panel.scrollIntoView({block:'start'});}};
       document.getElementById('useForm')?.addEventListener('submit',protectOtherSave,true);
       document.getElementById('saveUseDraft')?.addEventListener('click',protectOtherSave,true);
-      const touch=()=>{dirty=true;$('ocsConfirm').checked=false;};
+      const touch=()=>{dirty=true;$('ocsConfirm').checked=false;$('ocsUnlinkedConfirm').checked=false;$('ocsUnlinkedNotice').hidden=true;};
       const fillSurgeryCase=value=>{
         const parsed=surgeryCase(value);
         if (parsed.caseRoom!==undefined) {
@@ -192,7 +194,7 @@
       };
       paint();
       panel.addEventListener('input',event=>{
-        if(event.target.id==='ocsConfirm')return;
+        if(['ocsConfirm','ocsUnlinkedConfirm'].includes(event.target.id))return;
         if(event.target.id==='ocsPaste'){
           const hasText=!!event.target.value.trim();
           if(hasText)message('');
@@ -225,15 +227,19 @@
         try {surgeryDetail=surgeryName($('ocsSurgery').value);}catch(error){message(error.message);return;}
         if(!rows.length||!$('ocsConfirm').checked){message('처방을 읽고 사용 수량 확인에 체크해 주세요.');return;}
         const unresolved=rows.filter(r=>r.mode==='unresolved').length;
-        if(unresolved&&!confirm(`미연결 ${unresolved}행은 기록만 저장되며 재고가 차감되지 않습니다. 계속할까요?`))return;
+        if(unresolved&&!$('ocsUnlinkedConfirm').checked){
+          $('ocsUnlinkedText').textContent=`미연결 ${unresolved}행은 기록만 저장되며 재고가 차감되지 않습니다.`;
+          $('ocsUnlinkedNotice').hidden=false;message('아래 미연결 항목 저장 동의에 체크한 뒤 최종 저장을 눌러 주세요.');return;
+        }
         const request={id:previous?.id||context.uid(),previous:clone(previous),catalogSnapshot:clone(catalogSnapshot),rows:clone(rows),date,caseRoom,caseOrder,doctorId:$('ocsDoctor').value,surgeryDetail,at:new Date().toISOString()};
-        busy=true;$('ocsSave').disabled=true;
+        busy=true;$('ocsSave').disabled=true;$('ocsSave').textContent='저장 중…';message('서버에 저장 중입니다. 잠시 기다려 주세요.');
         try {
           const saved=await context.saveState('OCS 사용 기록 저장 완료',{requireTransaction:true,preserveFormOnFailure:true,apply:(target,remote)=>apply(target,remote,request,{
             canEdit:context.canEdit(),canManage:context.canManage(),canModify:context.canModify,actor:context.actor()||{},stockUnconfirmed:context.stockUnconfirmed
           })});
           if(saved){dirty=false;context.saved(request.id);}else message('저장하지 못했습니다. 입력은 유지됩니다. 오류 안내를 확인해 주세요.');
-        } finally {busy=false;if($('ocsSave'))$('ocsSave').disabled=false;}
+        } catch(error) {message(`저장하지 못했습니다: ${error.message || '알 수 없는 오류'}. 입력은 유지됩니다.`);
+        } finally {busy=false;if($('ocsSave')){$('ocsSave').disabled=false;$('ocsSave').textContent=previous?'수량 수정 저장':'확인 후 최종 저장';}}
       });
     }
     return {render,bind,isDirty:()=>dirty};
