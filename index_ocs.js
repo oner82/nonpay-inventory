@@ -9,6 +9,15 @@
     if (name.length>200 || /[\t\r\n]/.test(name)) throw Error('수술명만 한 줄로 복사해 주세요. 최대 200자까지 입력할 수 있습니다.');
     return name;
   };
+  // 맨 앞의 방-순서만 인식한다. L4-5 같은 수술 부위 표기는 건드리지 않는다.
+  const surgeryCase = value => {
+    const name=surgeryName(value);
+    const match=name.match(/^(\d+)\s*[-–－]\s*(\d+)(?=\s|[:：.]|$)\s*[:：.]?\s*/);
+    if (!match) return {name};
+    const caseRoom=Number(match[1]),caseOrder=Number(match[2]);
+    if (caseRoom<1 || caseRoom>10 || caseOrder<1 || caseOrder>99) throw Error('수술명 앞 번호를 확인해 주세요. 수술실은 1~10, 순서는 1~99입니다.');
+    return {name:name.slice(match[0].length),caseRoom,caseOrder};
+  };
   function parse(text) {
     if (!text.trim() || text.length > 500000) throw Error('복사 내용을 확인해 주세요. 한 번에 한 케이스만 붙여넣어 주세요.');
     const records = [];
@@ -117,7 +126,7 @@
     // 전체 상태가 단일 Firestore 문서이므로 크기 초과 시 부분 저장 없이 중단한다.
     if (new TextEncoder().encode(JSON.stringify(target)).length > 850000) throw Error('저장 공간이 부족합니다. 관리자에게 OCS 목록 저장소 분리를 요청해 주세요.');
   }
-  window.OROcs = {parse,prepare,apply,supportedProduct,surgeryName};
+  window.OROcs = {parse,prepare,apply,supportedProduct,surgeryName,surgeryCase};
   window.createOcsModule = context => {
     const e=context.escapeHtml;
     let rows=[], previous=null, dirty=false, busy=false, catalogSnapshot=[], excludedCount=0;
@@ -131,8 +140,9 @@
         <div><label for="ocsRoom">수술실</label><input id="ocsRoom" type="number" min="1" max="10" value="${e(record?.caseRoom||'')}" ${record?'disabled':''}></div>
         <div><label for="ocsOrder">오늘 순서</label><input id="ocsOrder" type="number" min="1" max="99" value="${e(record?.caseOrder||'')}" ${record?'disabled':''}></div>
         <div><label for="ocsDoctor">원장 코드</label><select id="ocsDoctor"><option value="">선택</option>${context.getState().doctors.filter(d=>d.active!==false||d.id===record?.doctorId).map(d=>`<option value="${e(d.id)}" ${d.id===record?.doctorId?'selected':''}>${e(d.name)}</option>`).join('')}</select></div></div>
-        <label for="ocsSurgery">수술명 (붙여넣기 또는 직접 입력)</label><input id="ocsSurgery" type="text" maxlength="200" autocomplete="off" value="${e(record?.surgeryDetail==='OCS 수술 후 사용'?'':record?.surgeryDetail||'')}" placeholder="예: Laparoscopic appendectomy">
-        <p class="helper">수술명만 복사해 붙여넣으세요. 목록에 없는 수술명도 입력할 수 있습니다. 환자명·등록번호는 입력하지 마세요. 처방 붙여넣기 원문은 저장하지 않습니다.</p>
+        <label for="ocsSurgery">수술명 (붙여넣기 또는 직접 입력)</label><input id="ocsSurgery" type="text" maxlength="200" autocomplete="off" value="${e(record?.surgeryDetail==='OCS 수술 후 사용'?'':record?.surgeryDetail||'')}" placeholder="예: 7-1 Laparoscopic appendectomy">
+        <p class="helper">앞에 7-1이 있으면 7번방·첫 번째 수술로 자동 입력합니다. 목록에 없는 수술명도 입력할 수 있습니다. 환자명·등록번호는 입력하지 마세요. 처방 붙여넣기 원문은 저장하지 않습니다.</p>
+        <p id="ocsCaseHint" class="helper" role="status"></p>
         ${record?'':`<div class="ocs-paste-box"><details id="ocsPasteDetails" open><summary><span id="ocsPasteTitle">OCS 처방 붙여넣기</span><span class="ocs-paste-hint">펼치기 / 접기</span></summary><label class="helper" for="ocsPaste">아래 칸을 누르고 Ctrl+V 또는 ⌘V로 붙여넣으세요.</label><textarea id="ocsPaste" rows="3" autocomplete="off" spellcheck="false" wrap="off" placeholder="여기에 OCS 처방을 붙여넣으세요"></textarea></details><div class="ocs-paste-actions"><span id="ocsPasteStatus" role="status">복사한 내용은 읽기 후 지워집니다.</span><button id="ocsParse" type="button">처방 읽기</button></div></div>`}
         <p id="ocsMessage" role="status"></p><div id="ocsRows"></div>
         <div class="ocs-confirm"><input type="checkbox" id="ocsConfirm"><label for="ocsConfirm">수술 후 사용 수량과 연결·미연결 항목을 확인했습니다.</label></div>
@@ -153,11 +163,23 @@
       document.getElementById('useForm')?.addEventListener('submit',protectOtherSave,true);
       document.getElementById('saveUseDraft')?.addEventListener('click',protectOtherSave,true);
       const touch=()=>{dirty=true;$('ocsConfirm').checked=false;};
+      const fillSurgeryCase=value=>{
+        const parsed=surgeryCase(value);
+        if (parsed.caseRoom!==undefined) {
+          if(previous && (Number(previous.caseRoom)!==parsed.caseRoom || Number(previous.caseOrder)!==parsed.caseOrder)) throw Error('저장된 케이스와 수술명 앞 번호가 다릅니다. 기존 방·순서는 변경하지 않았습니다.');
+          if(!previous){$('ocsRoom').value=parsed.caseRoom;$('ocsOrder').value=parsed.caseOrder;}
+          $('ocsCaseHint').textContent=`${parsed.caseRoom}번방 · ${parsed.caseOrder}번째 수술로 인식했습니다.${previous?'':' 위에서 직접 수정할 수 있습니다.'}`;
+        }
+        $('ocsSurgery').value=parsed.name;
+        touch();
+      };
       $('ocsSurgery').addEventListener('paste',event=>{
         event.preventDefault();
-        try {const input=$('ocsSurgery'),name=surgeryName(event.clipboardData.getData('text/plain'));surgeryName(input.value.slice(0,input.selectionStart)+name+input.value.slice(input.selectionEnd));input.setRangeText(name,input.selectionStart,input.selectionEnd,'end');touch();}
+        try {const input=$('ocsSurgery'),name=surgeryName(event.clipboardData.getData('text/plain'));fillSurgeryCase(input.value.slice(0,input.selectionStart)+name+input.value.slice(input.selectionEnd));}
         catch(error){message(error.message);}
       });
+      $('ocsSurgery').addEventListener('change',()=>{try{fillSurgeryCase($('ocsSurgery').value);}catch(error){message(error.message);}});
+      ['ocsRoom','ocsOrder'].forEach(id=>$(id).addEventListener('input',()=>{$('ocsCaseHint').textContent='방·순서를 직접 수정했습니다. 저장 전 확인해 주세요.';}));
       const paint=()=>{
         const products=context.getState().products.filter(supportedProduct);
         $('ocsRows').innerHTML=rows.length ? '<div class="ocs-sheet"><div class="ocs-sheet-head"><span>처방코드</span><span>품목 · 규격</span><span>사용량</span><span>재고 연결</span></div>'+rows.map((r,i)=>
@@ -195,6 +217,7 @@
       $('ocsSave').addEventListener('click',async()=>{
         if(busy)return;
         if(context.otherFormDirty?.()){message('아래 기존 사용입력에 저장하지 않은 내용이 있습니다. 먼저 저장하거나 새 케이스 입력으로 정리해 주세요.');return;}
+        try {if(surgeryCase($('ocsSurgery').value).caseRoom!==undefined){fillSurgeryCase($('ocsSurgery').value);message('자동 입력된 방·순서를 확인한 뒤 확인에 체크해 주세요.');return;}}catch(error){message(error.message);return;}
         const date=$('ocsDate').value,caseRoom=$('ocsRoom').value,caseOrder=$('ocsOrder').value;
         const invalid=context.validateCase(caseRoom,caseOrder);
         if(invalid||!date||!$('ocsDoctor').value){message(invalid||'사용일과 원장 코드를 선택해 주세요.');return;}
