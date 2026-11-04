@@ -204,12 +204,28 @@
           (i===0 || r.section!==rows[i-1].section ? '<div class="ocs-sheet-section">'+e(r.section||'처방 목록')+'</div>' : '')+
           `<div class="item ocs-sheet-row"><span class="ocs-sheet-code">${e(r.code)}</span><div class="ocs-sheet-name">${e(r.name)}<small>원본 ${e(r.dose)} × ${e(r.times)}회 × ${e(r.days)}일${r.times!==1||r.days!==1?' · 실제 사용량 확인':''}</small></div>
           <input id="ocsQty${i}" aria-label="${e(r.name)} 사용 수량" data-ocs-qty="${i}" type="number" min="0" max="10000" step="1" value="${r.qty===null?'':r.qty}">
-          <select id="ocsLink${i}" aria-label="${e(r.name)} 재고 연결" data-ocs-link="${i}" ${context.canManage()?'':'disabled'}><option value="unresolved" ${r.mode==='unresolved'?'selected':''}>미연결 · 재고 미반영</option><option value="excluded" ${r.mode==='excluded'?'selected':''}>사용량만 기록 · 차감 제외</option>${products.map(p=>`<option value="p:${e(p.id)}" ${r.mode==='linked'&&r.productId===p.id?'selected':''}>${e(p.orderCode||'')} · ${e(p.name)} (${e(p.stockUnit||'개')})</option>`).join('')}${r.mode==='linked'&&!products.some(p=>p.id===r.productId)?'<option selected value="invalid">기존 연결 확인 필요</option>':''}</select></div>`).join('')+'</div>' : '';
+          <div class="ocs-link-control">${context.canManage()?`<input type="search" id="ocsSearch${i}" data-ocs-search="${i}" aria-label="${e(r.name)} 연결 제품 검색" placeholder="제품명 · 규격 · 물류코드 검색" autocomplete="off">`:""}<select id="ocsLink${i}" aria-label="${e(r.name)} 재고 연결" data-ocs-link="${i}" ${context.canManage()?'':'disabled'}><option value="unresolved" ${r.mode==='unresolved'?'selected':''}>미연결 · 재고 미반영</option><option value="excluded" ${r.mode==='excluded'?'selected':''}>사용량만 기록 · 차감 제외</option>${products.map(p=>`<option value="p:${e(p.id)}" ${r.mode==='linked'&&r.productId===p.id?'selected':''}>${e(p.orderCode||'')} · ${e(p.name)}${p.purchaseSpec?' · '+e(p.purchaseSpec):''} (${e(p.stockUnit||'개')})</option>`).join('')}${r.mode==='linked'&&!products.some(p=>p.id===r.productId)?'<option selected value="invalid">기존 연결 확인 필요</option>':''}</select><small id="ocsSearchStatus${i}" role="status" aria-live="polite"></small></div></div>`).join('')+'</div>' : '';
         message(`${excludedServiceCount?`비용·검사 ${excludedServiceCount}행 제외 · `:''}${excludedCount?`삭제 ${excludedCount}행 제외 · `:''}${rows.length?`등록 대상 ${rows.length}행 · 미연결 ${rows.filter(r=>r.mode==='unresolved').length}행은 재고에 반영되지 않습니다.`:'등록할 처방이 없습니다.'}`);
         $('ocsSave').disabled=!rows.length;
       };
       paint();
       panel.addEventListener('input',event=>{
+        if(event.target.hasAttribute('data-ocs-search')){
+          const i=Number(event.target.dataset.ocsSearch),row=rows[i],select=$('ocsLink'+i);
+          const normalize=value=>String(value||'').normalize('NFKC').toLocaleLowerCase().replace(/\s+/g,' ').trim();
+          const terms=normalize(event.target.value).split(' ').filter(Boolean);
+          const products=context.getState().products.filter(supportedProduct);
+          const found=products.filter(p=>terms.every(term=>normalize([p.name,p.purchaseName,p.purchaseSpec,p.orderCode].join(' ')).includes(term)));
+          const selected=products.find(p=>row.mode==='linked'&&p.id===row.productId);
+          const keep=selected&&!found.some(p=>p.id===selected.id);
+          const options=keep?[selected,...found]:found;
+          select.innerHTML=`<option value="unresolved">미연결 · 재고 미반영</option><option value="excluded">사용량만 기록 · 차감 제외</option>`+options.map(p=>`<option value="p:${e(p.id)}">${keep&&p.id===selected.id?'현재 연결 · ':''}${e(p.orderCode||'')} · ${e(p.name)}${p.purchaseSpec?' · '+e(p.purchaseSpec):''} (${e(p.stockUnit||'개')})</option>`).join('');
+          const value=row.mode==='linked'?'p:'+row.productId:row.mode;
+          if(row.mode==='linked'&&!selected)select.insertAdjacentHTML('beforeend','<option value="invalid">기존 연결 확인 필요</option>');
+          select.value=row.mode==='linked'&&!selected?'invalid':value;
+          $('ocsSearchStatus'+i).textContent=terms.length?(found.length?`검색 ${found.length}개 · 아래 목록에서 선택하세요.`:'일치하는 제품이 없습니다. 검색어를 바꿔 주세요.')+(keep?' 현재 연결은 유지됩니다.':''):'';
+          return;
+        }
         if(['ocsConfirm','ocsUnlinkedConfirm'].includes(event.target.id))return;
         if(event.target.id==='ocsPaste'){
           const hasText=!!event.target.value.trim();
