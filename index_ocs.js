@@ -152,6 +152,11 @@
   window.OROcs = {parse,prepare,apply,supportedProduct,surgeryName,surgeryCase,isServiceOrder};
   window.createOcsModule = context => {
     const e=context.escapeHtml;
+    const productLabel=p=>`${p.orderCode||''} · ${p.name}${p.purchaseSpec?' · '+p.purchaseSpec:''} (${p.stockUnit||'개'})`;
+    const linkLabel=row=>{
+      const product=context.getState().products.find(p=>p.id===row.productId&&supportedProduct(p));
+      return row.mode==='linked'?(product?productLabel(product):'기존 연결 확인 필요'):row.mode==='excluded'?'사용량만 기록 · 차감 제외':'미연결 · 재고 미반영';
+    };
     let rows=[], previous=null, dirty=false, busy=false, catalogSnapshot=[], excludedCount=0, excludedServiceCount=0;
     const render = (record=null) => {
       previous=record?clone(record):null;rows=record?clone(record.ocsRows):[];dirty=false;
@@ -166,9 +171,9 @@
         <label for="ocsSurgery">수술명 (붙여넣기 또는 직접 입력)</label><input id="ocsSurgery" type="text" maxlength="200" autocomplete="off" value="${e(record?.surgeryDetail==='OCS 수술 후 사용'?'':record?.surgeryDetail||'')}" placeholder="예: 7-1 Laparoscopic appendectomy">
         <p class="helper">앞에 7-1이 있으면 7번방·첫 번째 수술로 자동 입력합니다. 목록에 없는 수술명도 입력할 수 있습니다. 환자명·등록번호는 입력하지 마세요. 처방 붙여넣기 원문은 저장하지 않습니다.</p>
         <p id="ocsCaseHint" class="helper" role="status"></p>
-        ${record?'':`<div class="ocs-paste-box"><details id="ocsPasteDetails" open><summary><span id="ocsPasteTitle">OCS 처방 붙여넣기</span><span class="ocs-paste-hint">펼치기 / 접기</span></summary><label class="helper" for="ocsPaste">아래 칸을 누르고 Ctrl+V 또는 ⌘V로 붙여넣으세요.</label><textarea id="ocsPaste" rows="3" autocomplete="off" spellcheck="false" wrap="off" placeholder="여기에 OCS 처방을 붙여넣으세요"></textarea></details><div class="ocs-paste-actions"><span id="ocsPasteStatus" role="status">복사한 내용은 읽기 후 지워집니다.</span><button id="ocsParse" type="button">처방 읽기</button></div></div>`}
-        ${record?'':`<div class="ocs-paste-box"><label for="ocsExcelFile">또는 OCS 처방 엑셀 불러오기 (.xlsx)</label><input id="ocsExcelFile" type="file" accept=".xlsx"><div id="ocsExcelSheets" hidden><label for="ocsExcelSheet">읽을 시트 · 한 케이스씩</label><select id="ocsExcelSheet"></select><button id="ocsExcelRead" type="button">선택한 시트 읽기</button></div><p id="ocsExcelStatus" role="status">파일은 이 기기에서만 읽으며 서버에 첨부하지 않습니다. 읽은 뒤 수량을 확인하고 최종 저장해 주세요.</p></div>`}
+        ${record?'':`<div class="ocs-paste-box"><button id="ocsExcelOpen" type="button" title="OCS 처방 엑셀 불러오기 (.xlsx)"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M6 2h11v16H6zM10 6h5M10 10h5M10 14h5" stroke="currentColor"/><rect x="1" y="5" width="10" height="10" rx="1" fill="currentColor"/><path d="m4 8 4 4m0-4-4 4" stroke="#167345" stroke-width="1.7"/></svg>엑셀 불러오기</button><input id="ocsExcelFile" type="file" accept=".xlsx" hidden><details id="ocsPasteDetails" open><summary><span id="ocsPasteTitle">OCS 처방 붙여넣기</span><span class="ocs-paste-hint">펼치기 / 접기</span></summary><label class="helper" for="ocsPaste">아래 칸을 누르고 Ctrl+V 또는 ⌘V로 붙여넣으세요.</label><textarea id="ocsPaste" rows="3" autocomplete="off" spellcheck="false" wrap="off" placeholder="여기에 OCS 처방을 붙여넣으세요"></textarea></details><div class="ocs-paste-actions"><span id="ocsPasteStatus" role="status">복사한 내용은 읽기 후 지워집니다.</span><button id="ocsParse" type="button">처방 읽기</button></div><div id="ocsExcelSheets" hidden><label for="ocsExcelSheet">읽을 시트 · 한 케이스씩</label><select id="ocsExcelSheet"></select><button id="ocsExcelRead" type="button">선택한 시트 읽기</button></div><p id="ocsExcelStatus" class="helper" role="status"></p></div>`}
         <p id="ocsMessage" role="status"></p><div id="ocsRows"></div>
+        <div id="ocsLinkPicker" popover="auto" role="dialog" aria-label="재고 연결 제품 선택"><div class="ocs-picker-heading"><strong id="ocsPickerTitle">재고 연결</strong><button type="button" id="ocsPickerClose" aria-label="제품 검색 닫기">×</button></div><input id="ocsLinkSearch" type="search" aria-label="연결 제품 검색" placeholder="제품명 · 규격 · 물류코드 검색" autocomplete="off"><small id="ocsLinkStatus" role="status" aria-live="polite"></small><div id="ocsLinkOptions"></div></div>
         <div class="ocs-confirm"><input type="checkbox" id="ocsConfirm"><label for="ocsConfirm">수술 후 사용 수량과 연결·미연결 항목을 확인했습니다.</label></div>
         <p id="ocsSaveMessage" role="status" aria-live="polite"></p>
         <div id="ocsUnlinkedNotice" hidden><p id="ocsUnlinkedText"></p><label><input type="checkbox" id="ocsUnlinkedConfirm"> 미연결 항목은 재고 차감 없이 기록만 저장하는 데 동의합니다.</label></div>
@@ -212,33 +217,58 @@
       $('ocsSurgery').addEventListener('change',()=>{try{fillSurgeryCase($('ocsSurgery').value);}catch(error){message(error.message);}});
       ['ocsRoom','ocsOrder'].forEach(id=>$(id).addEventListener('input',()=>{$('ocsCaseHint').textContent='방·순서를 직접 수정했습니다. 저장 전 확인해 주세요.';}));
       const paint=()=>{
-        const products=context.getState().products.filter(supportedProduct);
         $('ocsRows').innerHTML=rows.length ? '<div class="ocs-sheet"><div class="ocs-sheet-head"><span>처방코드</span><span>품목 · 규격</span><span>사용량</span><span>재고 연결</span></div>'+rows.map((r,i)=>
           (i===0 || r.section!==rows[i-1].section ? '<div class="ocs-sheet-section">'+e(r.section||'처방 목록')+'</div>' : '')+
           `<div class="item ocs-sheet-row"><span class="ocs-sheet-code">${e(r.code)}</span><div class="ocs-sheet-name">${e(r.name)}<small>원본 ${e(r.dose)} × ${e(r.times)}회 × ${e(r.days)}일${r.times!==1||r.days!==1?' · 실제 사용량 확인':''}</small></div>
           <input id="ocsQty${i}" aria-label="${e(r.name)} 사용 수량" data-ocs-qty="${i}" type="number" min="0" max="10000" step="1" value="${r.qty===null?'':r.qty}">
-          <div class="ocs-link-control">${context.canManage()?`<input type="search" id="ocsSearch${i}" data-ocs-search="${i}" aria-label="${e(r.name)} 연결 제품 검색" placeholder="제품명 · 규격 · 물류코드 검색" autocomplete="off">`:""}<select id="ocsLink${i}" aria-label="${e(r.name)} 재고 연결" data-ocs-link="${i}" ${context.canManage()?'':'disabled'}><option value="unresolved" ${r.mode==='unresolved'?'selected':''}>미연결 · 재고 미반영</option><option value="excluded" ${r.mode==='excluded'?'selected':''}>사용량만 기록 · 차감 제외</option>${products.map(p=>`<option value="p:${e(p.id)}" ${r.mode==='linked'&&r.productId===p.id?'selected':''}>${e(p.orderCode||'')} · ${e(p.name)}${p.purchaseSpec?' · '+e(p.purchaseSpec):''} (${e(p.stockUnit||'개')})</option>`).join('')}${r.mode==='linked'&&!products.some(p=>p.id===r.productId)?'<option selected value="invalid">기존 연결 확인 필요</option>':''}</select><small id="ocsSearchStatus${i}" role="status" aria-live="polite"></small></div></div>`).join('')+'</div>' : '';
+          <button type="button" class="ocs-link-control" id="ocsLink${i}" data-ocs-open="${i}" aria-label="${e(r.name)} 재고 연결" aria-haspopup="dialog" title="${e(linkLabel(r))}" ${context.canManage()?'':'disabled'}><span>${e(linkLabel(r))}</span><span aria-hidden="true">▾</span></button></div>`).join('')+'</div>' : '';
         message(`${excludedServiceCount?`비용·검사 ${excludedServiceCount}행 제외 · `:''}${excludedCount?`삭제 ${excludedCount}행 제외 · `:''}${rows.length?`등록 대상 ${rows.length}행 · 미연결 ${rows.filter(r=>r.mode==='unresolved').length}행은 재고에 반영되지 않습니다.`:'등록할 처방이 없습니다.'}`);
         $('ocsSave').disabled=!rows.length;
       };
+      let pickerRow=null;
+      const picker=$('ocsLinkPicker');
+      const filterLinks=()=>{
+        if(pickerRow===null)return;
+        const normalize=value=>String(value||'').normalize('NFKC').toLocaleLowerCase().replace(/\s+/g,' ').trim();
+        const terms=normalize($('ocsLinkSearch').value).split(' ').filter(Boolean);
+        const found=context.getState().products.filter(supportedProduct).filter(p=>terms.every(term=>normalize([p.name,p.purchaseName,p.purchaseSpec,p.orderCode].join(' ')).includes(term)));
+        const row=rows[pickerRow],selected=row.mode==='linked'?'p:'+row.productId:row.mode;
+        const options=[{value:'unresolved',label:'미연결 · 재고 미반영'},{value:'excluded',label:'사용량만 기록 · 차감 제외'},...found.map(p=>({value:'p:'+p.id,label:productLabel(p)}))];
+        $('ocsLinkStatus').textContent=found.length?`${found.length}개 제품 · 선택해야 연결이 바뀝니다.`:'일치하는 제품이 없습니다. 기존 연결은 유지됩니다.';
+        $('ocsLinkOptions').innerHTML=options.map(o=>`<button type="button" data-ocs-choice="${e(o.value)}" aria-pressed="${selected===o.value}">${e(o.label)}</button>`).join('');
+      };
+      const closePicker=()=>{picker.hidePopover();$('ocsLink'+pickerRow)?.focus();};
+      $('ocsPickerClose').addEventListener('click',closePicker);
+      panel.addEventListener('click',event=>{
+        const opener=event.target.closest('[data-ocs-open]');
+        if(opener && context.canManage()){
+          pickerRow=Number(opener.dataset.ocsOpen);$('ocsLinkSearch').value='';$('ocsPickerTitle').textContent=rows[pickerRow].name;filterLinks();
+          const rect=opener.getBoundingClientRect(),width=Math.min(440,innerWidth-24),height=Math.min(360,innerHeight-24);
+          picker.style.width=width+'px';picker.style.maxHeight=height+'px';
+          picker.style.left=Math.max(12,Math.min(rect.right-width,innerWidth-width-12))+'px';
+          picker.style.top=Math.max(12,Math.min(rect.bottom+4,innerHeight-height-12))+'px';
+          picker.showPopover();$('ocsLinkSearch').focus();return;
+        }
+        const choice=event.target.closest('[data-ocs-choice]');
+        if(!choice || pickerRow===null || !context.canManage())return;
+        const row=rows[pickerRow],v=choice.dataset.ocsChoice;
+        row.mode=v.startsWith('p:')?'linked':v;row.productId=v.startsWith('p:')?v.slice(2):'';touch();
+        const button=$('ocsLink'+pickerRow);button.querySelector('span').textContent=linkLabel(row);button.title=linkLabel(row);closePicker();
+        message(`${excludedServiceCount?`비용·검사 ${excludedServiceCount}행 제외 · `:''}${excludedCount?`삭제 ${excludedCount}행 제외 · `:''}등록 대상 ${rows.length}행 · 미연결 ${rows.filter(r=>r.mode==='unresolved').length}행은 재고에 반영되지 않습니다.`);
+      });
+      picker.addEventListener('keydown',event=>{
+        if(event.key==='Escape'){event.preventDefault();closePicker();return;}
+        if(!['ArrowDown','ArrowUp'].includes(event.key))return;
+        const options=[...$('ocsLinkOptions').querySelectorAll('button')];
+        const i=options.indexOf(document.activeElement),next=event.key==='ArrowDown'?Math.min(i+1,options.length-1):Math.max(i-1,0);
+        event.preventDefault();options[next]?.focus();
+      });
+      // 스크롤할 때 목록만 닫으며 행의 연결과 수량은 보존한다.
+      panel.addEventListener('wheel',event=>{if(picker.matches(':popover-open')&&!picker.contains(event.target))picker.hidePopover();},{passive:true});
+      $('ocsExcelOpen')?.addEventListener('click',()=>{if(!busy)$('ocsExcelFile').click();});
       paint();
       panel.addEventListener('input',event=>{
-        if(event.target.hasAttribute('data-ocs-search')){
-          const i=Number(event.target.dataset.ocsSearch),row=rows[i],select=$('ocsLink'+i);
-          const normalize=value=>String(value||'').normalize('NFKC').toLocaleLowerCase().replace(/\s+/g,' ').trim();
-          const terms=normalize(event.target.value).split(' ').filter(Boolean);
-          const products=context.getState().products.filter(supportedProduct);
-          const found=products.filter(p=>terms.every(term=>normalize([p.name,p.purchaseName,p.purchaseSpec,p.orderCode].join(' ')).includes(term)));
-          const selected=products.find(p=>row.mode==='linked'&&p.id===row.productId);
-          const keep=selected&&!found.some(p=>p.id===selected.id);
-          const options=keep?[selected,...found]:found;
-          select.innerHTML=`<option value="unresolved">미연결 · 재고 미반영</option><option value="excluded">사용량만 기록 · 차감 제외</option>`+options.map(p=>`<option value="p:${e(p.id)}">${keep&&p.id===selected.id?'현재 연결 · ':''}${e(p.orderCode||'')} · ${e(p.name)}${p.purchaseSpec?' · '+e(p.purchaseSpec):''} (${e(p.stockUnit||'개')})</option>`).join('');
-          const value=row.mode==='linked'?'p:'+row.productId:row.mode;
-          if(row.mode==='linked'&&!selected)select.insertAdjacentHTML('beforeend','<option value="invalid">기존 연결 확인 필요</option>');
-          select.value=row.mode==='linked'&&!selected?'invalid':value;
-          $('ocsSearchStatus'+i).textContent=terms.length?(found.length?`검색 ${found.length}개 · 아래 목록에서 선택하세요.`:'일치하는 제품이 없습니다. 검색어를 바꿔 주세요.')+(keep?' 현재 연결은 유지됩니다.':''):'';
-          return;
-        }
+        if(event.target.id==='ocsLinkSearch'){filterLinks();return;}
         if(['ocsConfirm','ocsUnlinkedConfirm','ocsTestStockConfirm'].includes(event.target.id))return;
         if(event.target.id==='ocsPaste'){
           const hasText=!!event.target.value.trim();
@@ -249,12 +279,6 @@
         }
         touch();
         if(event.target.hasAttribute('data-ocs-qty'))rows[Number(event.target.dataset.ocsQty)].qty=number(event.target.value);
-      });
-      panel.addEventListener('change',event=>{
-        if(!event.target.hasAttribute('data-ocs-link'))return;
-        const row=rows[Number(event.target.dataset.ocsLink)];const v=event.target.value;
-        row.mode=v.startsWith('p:')?'linked':v;row.productId=v.startsWith('p:')?v.slice(2):'';touch();
-        message(`${excludedServiceCount?`비용·검사 ${excludedServiceCount}행 제외 · `:''}${excludedCount?`삭제 ${excludedCount}행 제외 · `:''}등록 대상 ${rows.length}행 · 미연결 ${rows.filter(r=>r.mode==='unresolved').length}행은 재고에 반영되지 않습니다.`);
       });
       $('ocsParse')?.addEventListener('click',()=>{
         try {catalogSnapshot=clone(context.getState().ocsCatalog||[]);const parsed=parse($('ocsPaste').value);excludedCount=parsed.excludedCount;excludedServiceCount=parsed.excludedServiceCount||0;rows=prepare(parsed,catalogSnapshot);$('ocsPaste').value='';$('ocsPasteTitle').textContent='다른 처방 다시 붙여넣기';$('ocsPasteStatus').textContent=`읽기 완료 · 등록 대상 ${rows.length}행${excludedCount?` · 삭제 ${excludedCount}행 제외`:''}${excludedServiceCount?` · 비용·검사 ${excludedServiceCount}행 제외`:''}`;touch();paint();}

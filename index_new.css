@@ -2883,9 +2883,28 @@
  #ocsPanel .ocs-sheet-row select { grid-column:1 / -1; }
 }
 
-/* 처방 행의 검색은 연결 선택과 별도이며 모바일에서도 한 줄 폭을 사용한다. */
-#ocsPanel .ocs-link-control { min-width:0; display:flex; flex-direction:column; gap:5px; }
-#ocsPanel .ocs-link-control small { font-size:12px; color:#526477; overflow-wrap:anywhere; }
+/* 한 줄 연결 버튼과 화면 위에 뜨는 검색 목록: 행 높이를 늘리지 않는다. */
+#ocsPanel .ocs-link-control { display:flex; align-items:center; justify-content:space-between; gap:6px; min-width:0; width:100%; height:34px; min-height:34px; padding:5px 8px; margin:0; border:1px solid #cbd5e1; border-radius:8px; background:white; color:#24354b; box-shadow:none; font-size:12px; font-weight:400; text-align:left; }
+#ocsPanel .ocs-link-control span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#ocsPanel .ocs-link-control:focus-visible { outline:2px solid #4387cf; }
+#ocsPanel #ocsLinkPicker { box-sizing:border-box; inset:auto; margin:0; padding:12px; border:1px solid #b8c9dc; border-radius:12px; background:white; box-shadow:0 8px 30px #203b5d33; color:#24354b; overflow:hidden; }
+#ocsPanel #ocsLinkPicker:popover-open { display:flex; flex-direction:column; gap:8px; }
+#ocsPanel .ocs-picker-heading { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+#ocsPanel #ocsPickerTitle { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:13px; }
+#ocsPanel #ocsPickerClose { flex-shrink:0; width:30px; min-height:30px; padding:0; margin:0; background:#edf2f7; color:#34465c; box-shadow:none; }
+#ocsPanel #ocsLinkSearch { flex-shrink:0; min-height:36px; margin:0; font-size:13px; }
+#ocsPanel #ocsLinkStatus { color:#60758c; font-size:12px; }
+#ocsPanel #ocsLinkOptions { overflow:auto; min-height:0; }
+#ocsPanel #ocsLinkOptions button { display:block; width:100%; margin:0; padding:9px; border:0; border-radius:5px; background:white; color:#24354b; box-shadow:none; text-align:left; font-size:13px; font-weight:400; overflow-wrap:anywhere; }
+#ocsPanel #ocsLinkOptions button:hover, #ocsPanel #ocsLinkOptions button:focus-visible { background:#edf4fc; }
+#ocsPanel #ocsLinkOptions button[aria-pressed="true"] { background:#e1edfb; font-weight:700; }
+#ocsPanel .ocs-paste-box { position:relative; }
+#ocsPanel .ocs-paste-box summary { padding-right:140px; min-height:36px; }
+#ocsPanel #ocsExcelOpen { position:absolute; top:16px; right:16px; display:flex; align-items:center; gap:6px; margin:0; padding:8px 10px; min-height:34px; background:#167345; color:white; border:1px solid #12633b; border-radius:7px; box-shadow:none; font-size:12px; }
+#ocsPanel #ocsExcelOpen:hover { background:#125f39; }
+#ocsPanel #ocsExcelFile[hidden] { display:none; }
+#ocsPanel #ocsExcelStatus:empty { display:none; }
+#ocsPanel #ocsExcelSheets { margin-top:10px; }
 @media(max-width:600px) { #ocsPanel .ocs-link-control { grid-column:1 / -1; } }
 
 /* 재고 부족은 저장 버튼 옆에서 품목별로 확인한다. */
