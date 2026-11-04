@@ -115,9 +115,16 @@
     if (productIds.length > 20000) throw Error('한 케이스의 수량이 너무 큽니다. 단위를 확인해 주세요.');
     const counts = ids => ids.reduce((m,id) => (m.set(id,(m.get(id)||0)+1),m),new Map());
     const oldCounts = counts(previous?.productIds || []);
+    const shortages=[];
     for (const [id,qty] of counts(productIds)) {
-      const p = target.products.find(p => p.id === id);
-      if (qty - (oldCounts.get(id)||0) > Number(p.stock || 0) && !stockUnconfirmed(p)) throw Error('최신 재고가 부족합니다. 입력은 유지됩니다.');
+      const p = remote.products.find(p => p.id === id) || target.products.find(p => p.id === id);
+      const increase=qty-(oldCounts.get(id)||0),stock=Number(p.stock||0);
+      if (increase>0 && increase>stock && !stockUnconfirmed(p)) shortages.push({productId:id,name:p.name,orderCode:p.orderCode||'',unit:p.stockUnit||'개',stock,qty,increase,shortage:increase-stock});
+    }
+    // 허용은 이번 저장에서 확인한 부족 목록에만 적용한다. 동시 변경 시 다시 확인한다.
+    if (shortages.length && !(canManage && request.testStockOverride===true && canonical(shortages)===canonical(request.confirmedShortages||[]))) {
+      permissions.onStockShortage?.(clone(shortages));
+      throw Error('최신 재고 부족: '+shortages.map(p=>`${p.name} [${p.orderCode||p.productId}] 현재 ${p.stock}${p.unit} / 추가 차감 ${p.increase}${p.unit} / 부족 ${p.shortage}${p.unit}`).join('; ')+'. 입력은 유지됩니다.');
     }
     const at = request.at;
     const entry = {
@@ -125,6 +132,7 @@
       doctorId:request.doctorId || '', surgeryId:'', surgeryDetail, productIds,
       source:'ocs-paste', ocsRows:rows, ocsOriginalRows:previous?.ocsOriginalRows || rows.map(({code,name,dose,times,days,cancelled})=>({code,name,dose,times,days,cancelled})),
       ocsRevision:(previous?.ocsRevision || 0)+1,
+      ...(shortages.length?{ocsStockOverrides:[...(previous?.ocsStockOverrides||[]),{at,by:actor,reason:'test',shortages:clone(shortages)}]}:{}),
       ocsChanges:[...(previous?.ocsChanges || []), ...(previous ? [{at,by:actor,before:previous.ocsRows,after:rows,surgeryBefore:previous.surgeryDetail || '',surgeryAfter:surgeryDetail}] : [])],
       ...(previous ? {} : {createdAt:at,createdBy:actor,createdByName:actor.name || ''}), updatedAt:at,updatedBy:actor,updatedByName:actor.name || ''
     };
@@ -164,6 +172,9 @@
         <div class="ocs-confirm"><input type="checkbox" id="ocsConfirm"><label for="ocsConfirm">수술 후 사용 수량과 연결·미연결 항목을 확인했습니다.</label></div>
         <p id="ocsSaveMessage" role="status" aria-live="polite"></p>
         <div id="ocsUnlinkedNotice" hidden><p id="ocsUnlinkedText"></p><label><input type="checkbox" id="ocsUnlinkedConfirm"> 미연결 항목은 재고 차감 없이 기록만 저장하는 데 동의합니다.</label></div>
+        <div id="ocsStockNotice" hidden role="status" aria-live="polite"><strong>재고 부족 품목</strong><div id="ocsStockList"></div>
+        ${context.canManage()?'<label><input type="checkbox" id="ocsTestStockConfirm"> 이번 케이스는 테스트이므로 재고 부족을 허용하고 저장합니다.</label><p class="helper">사용량 전체가 저장되며 재고는 0까지 차감됩니다. 부족 수량과 확인자는 이 케이스에 기록됩니다. 다음 케이스에는 자동 적용되지 않습니다.</p>':'<p>관리자에게 재고 확인을 요청해 주세요.</p>'}</div>
+        ${record?.ocsStockOverrides?.length?`<details><summary>테스트 재고 부족 허용 이력 (${record.ocsStockOverrides.length}회)</summary>${record.ocsStockOverrides.map(a=>`<p>${e(a.at)} · ${e(a.by?.name||'')}<br>${a.shortages.map(p=>`${e(p.name)} · 부족 ${e(p.shortage)}${e(p.unit)}`).join('<br>')}</p>`).join('')}</details>`:''}
         <button id="ocsSave" type="button">${record?'수량 수정 저장':'확인 후 최종 저장'}</button>
         ${record?'<button id="ocsBack" class="secondary" type="button">사용내역으로</button>':''}
         <details><summary>OCS 코드·명칭 누적 목록 (${(context.getState().ocsCatalog||[]).length}코드)</summary><p class="helper">관리자는 처방 행에서 재고 제품을 선택하면 다음 등록부터 같은 코드·명칭에 적용됩니다. 1회량 1과 선택 제품의 재고 단위 1이 같을 때만 연결하세요. 인체조직·임플란트 등 별도 장부 품목은 기존 입력을 이용하세요.</p>
@@ -180,7 +191,9 @@
       const protectOtherSave=event=>{if(dirty){event.preventDefault();event.stopImmediatePropagation();message('위 OCS 입력을 먼저 저장하거나 화면을 다시 열어 정리해 주세요.');panel.scrollIntoView({block:'start'});}};
       document.getElementById('useForm')?.addEventListener('submit',protectOtherSave,true);
       document.getElementById('saveUseDraft')?.addEventListener('click',protectOtherSave,true);
-      const touch=()=>{dirty=true;$('ocsConfirm').checked=false;$('ocsUnlinkedConfirm').checked=false;$('ocsUnlinkedNotice').hidden=true;};
+      let confirmedShortages=[];
+      const showShortages=list=>{confirmedShortages=clone(list);$('ocsStockNotice').hidden=false;if($('ocsTestStockConfirm'))$('ocsTestStockConfirm').checked=false;$('ocsStockList').innerHTML=list.map(p=>`<p><strong>${e(p.name)}</strong> · ${e(p.orderCode||'물류코드 미등록')}<br>현재고 ${e(p.stock)}${e(p.unit)} · 입력 ${e(p.qty)}${e(p.unit)} · 추가 차감 ${e(p.increase)}${e(p.unit)} · <strong>부족 ${e(p.shortage)}${e(p.unit)}</strong></p>`).join('');};
+      const touch=()=>{confirmedShortages=[];$('ocsStockNotice').hidden=true;if($('ocsTestStockConfirm'))$('ocsTestStockConfirm').checked=false;dirty=true;$('ocsConfirm').checked=false;$('ocsUnlinkedConfirm').checked=false;$('ocsUnlinkedNotice').hidden=true;};
       const fillSurgeryCase=value=>{
         const parsed=surgeryCase(value);
         if (parsed.caseRoom!==undefined) {
@@ -226,7 +239,7 @@
           $('ocsSearchStatus'+i).textContent=terms.length?(found.length?`검색 ${found.length}개 · 아래 목록에서 선택하세요.`:'일치하는 제품이 없습니다. 검색어를 바꿔 주세요.')+(keep?' 현재 연결은 유지됩니다.':''):'';
           return;
         }
-        if(['ocsConfirm','ocsUnlinkedConfirm'].includes(event.target.id))return;
+        if(['ocsConfirm','ocsUnlinkedConfirm','ocsTestStockConfirm'].includes(event.target.id))return;
         if(event.target.id==='ocsPaste'){
           const hasText=!!event.target.value.trim();
           if(hasText)message('');
@@ -283,14 +296,15 @@
           $('ocsUnlinkedText').textContent=`미연결 ${unresolved}행은 기록만 저장되며 재고가 차감되지 않습니다.`;
           $('ocsUnlinkedNotice').hidden=false;message('아래 미연결 항목 저장 동의에 체크한 뒤 최종 저장을 눌러 주세요.');return;
         }
-        const request={id:previous?.id||context.uid(),previous:clone(previous),catalogSnapshot:clone(catalogSnapshot),rows:clone(rows),date,caseRoom,caseOrder,doctorId:$('ocsDoctor').value,surgeryDetail,at:new Date().toISOString()};
+        const request={testStockOverride:!!$('ocsTestStockConfirm')?.checked,confirmedShortages:clone(confirmedShortages),id:previous?.id||context.uid(),previous:clone(previous),catalogSnapshot:clone(catalogSnapshot),rows:clone(rows),date,caseRoom,caseOrder,doctorId:$('ocsDoctor').value,surgeryDetail,at:new Date().toISOString()};
         busy=true;$('ocsSave').disabled=true;$('ocsSave').textContent='저장 중…';message('서버에 저장 중입니다. 잠시 기다려 주세요.');
+        let failedShortages=null;
         try {
           const saved=await context.saveState('OCS 사용 기록 저장 완료',{requireTransaction:true,preserveFormOnFailure:true,apply:(target,remote)=>apply(target,remote,request,{
-            canEdit:context.canEdit(),canManage:context.canManage(),canModify:context.canModify,actor:context.actor()||{},stockUnconfirmed:context.stockUnconfirmed
+            canEdit:context.canEdit(),canManage:context.canManage(),canModify:context.canModify,actor:context.actor()||{},stockUnconfirmed:context.stockUnconfirmed,onStockShortage:list=>{failedShortages=list;}
           })});
-          if(saved){dirty=false;context.saved(request.id);}else message('저장하지 못했습니다. 입력은 유지됩니다. 오류 안내를 확인해 주세요.');
-        } catch(error) {message(`저장하지 못했습니다: ${error.message || '알 수 없는 오류'}. 입력은 유지됩니다.`);
+          if(saved){dirty=false;context.saved(request.id);}else if(failedShortages){showShortages(failedShortages);message('재고가 부족합니다. 아래 품목·수량을 확인해 주세요.');$('ocsStockNotice').scrollIntoView({block:'nearest'});}else message('저장하지 못했습니다. 입력은 유지됩니다. 오류 안내를 확인해 주세요.');
+        } catch(error) {if(failedShortages)showShortages(failedShortages);message(`저장하지 못했습니다: ${error.message || '알 수 없는 오류'}. 입력은 유지됩니다.`);
         } finally {busy=false;if($('ocsSave')){$('ocsSave').disabled=false;$('ocsSave').textContent=previous?'수량 수정 저장':'확인 후 최종 저장';}}
       });
     }
