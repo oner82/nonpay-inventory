@@ -2,60 +2,25 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>수술실 재고관리 로그인</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>수술실 재고관리 · 직원 인증</title>
   <style>
-    :root{--bg:#f5f7fb;--panel:#fff;--ink:#122033;--muted:#667085;--line:#dbe7f5;--brand:#2f6fd6;--danger:#ef4444;--ok:#16a34a;--shadow:0 16px 44px rgba(15,23,42,.16)}
-    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.screen{min-height:100vh;display:grid;place-items:center;padding:18px}.card{width:min(460px,100%);background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:24px;box-shadow:var(--shadow)}h1{margin:0 0 6px;font-size:24px;letter-spacing:-.04em}p{margin:0 0 18px;color:var(--muted);font-weight:750;line-height:1.45}label{display:block;margin:12px 0 6px;color:var(--muted);font-size:14px;font-weight:850}input,select{width:100%;min-height:46px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;font:inherit;outline:none;background:#fff}button{min-height:44px;padding:0 14px;border:0;border-radius:12px;background:linear-gradient(135deg,#2f8df4,#176bd2);color:#fff;font-weight:900;cursor:pointer}button.secondary{background:#fff;color:var(--ink);border:1px solid var(--line)}button.danger{background:var(--danger)}.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.status{min-height:22px;margin-top:12px;color:var(--muted);font-size:13px;font-weight:800}.error{color:#c2410c}.ok{color:var(--ok)}.app-shell{display:none;min-height:100vh;grid-template-rows:minmax(0,1fr)}.userbar{display:none}.userbar .actions{flex:0 0 auto;margin-top:0}.userbar button{white-space:nowrap}.user-info{min-width:0;font-size:13px;font-weight:900}.user-info span{display:block;color:var(--muted);font-size:12px;font-weight:800}iframe{display:block;width:100%;height:100vh;border:0;background:#fff}dialog{width:min(760px,96vw);max-height:86vh;border:1px solid var(--line);border-radius:18px;padding:0;box-shadow:var(--shadow)}dialog::backdrop{background:rgba(15,23,42,.38)}.modal{padding:18px;display:grid;gap:14px}.grid{display:grid;grid-template-columns:1fr;gap:10px}.account-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:14px;background:#fff}.account-row strong{display:block}.account-row span{display:block;color:var(--muted);font-size:12px;font-weight:800}.pill{display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border-radius:999px;background:#edf4ff;color:#1f4f99;font-size:12px;font-weight:900}.pill.pending{background:#fff7ed;color:#c2410c}.helper{margin:2px 0 0;color:var(--muted);font-size:12px;font-weight:750;line-height:1.45}.permission-guide{display:grid;gap:6px;padding:12px;border:1px solid var(--line);border-radius:14px;background:#f8fbff}.permission-guide strong{font-size:13px}.permission-guide span{color:var(--muted);font-size:12px;font-weight:800;line-height:1.45}.app-version{margin-top:16px;text-align:center;color:var(--muted);font-size:12px;font-weight:800;letter-spacing:.02em;opacity:.85}@media(max-width:640px){.actions button{flex:1 1 auto}.account-row{grid-template-columns:1fr}}
+    * { box-sizing:border-box; } body { margin:0; min-height:100vh; padding:20px; display:grid; place-items:center; color:#182e49; background:#f3f6fa; font:16px/1.5 system-ui,sans-serif; }
+    main { width:min(100%,440px); padding:28px; border:1px solid #d2deec; border-radius:16px; background:white; } h1 { margin:0; font-size:23px; } p { color:#425873; } label { display:block; margin:12px 0 4px; font-weight:650; }
+    input,button { min-height:44px; font:inherit; border-radius:8px; } input { width:100%; border:1px solid #b6c7d9; padding:8px 10px; } button { cursor:pointer; padding:8px 14px; background:white; color:#224265; border:1px solid #bfd0e2; } button.primary { background:#215da2; color:white; border-color:#215da2; } button:disabled { opacity:.6; }
+    .actions { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0; } fieldset { border:0; padding:0; margin:0; } #status { color:#204d7c; white-space:pre-line; overflow-wrap:anywhere; } small { color:#627691; }
   </style>
 </head>
-<body>
-  <section id="loginScreen" class="screen">
-    <form id="loginForm" class="card" action="javascript:void(0)" onsubmit="return false;">
-      <h1>수술실 재고관리 로그인</h1>
-      <p id="loginGuide">사용자별 입력·수정·입고 기록을 남기기 위한 화면입니다.</p>
-      <label for="loginId">아이디</label><input id="loginId" required autocomplete="username">
-      <label for="loginPin">PIN</label><input id="loginPin" required type="password" inputmode="numeric" autocomplete="current-password">
-      <div class="actions"><button type="submit">로그인</button><button id="requestAccountBtn" type="button" class="secondary">아이디 생성 신청</button></div>
-      <div id="loginStatus" class="status"></div>
-      <div class="app-version" data-app-version="date"></div>
-    </form>
-  </section>
-  <section id="appShell" class="app-shell">
-    <div class="userbar"><div class="user-info"><strong id="currentUserText">-</strong><span id="roleText">-</span></div><div class="actions"><button id="accountManageBtn" type="button" class="secondary">계정관리</button><button id="logoutBtn" type="button" class="danger">로그아웃</button></div></div>
-    <iframe id="inventoryFrame" src="about:blank" title="수술실 재고관리"></iframe>
-  </section>
-  <dialog id="requestDialog">
-    <div class="modal">
-      <div>
-        <h1>아이디 생성 신청</h1>
-        <p>관리자가 계정관리에서 사용으로 변경하면 로그인할 수 있습니다.</p>
-      </div>
-      <form id="requestForm" class="grid">
-        <label for="requestName">이름</label><input id="requestName" required autocomplete="name">
-        <label for="requestLoginId">아이디</label><input id="requestLoginId" required autocomplete="username">
-        <label for="requestPin">PIN</label><input id="requestPin" required type="password" inputmode="numeric" autocomplete="new-password">
-        <p class="helper">PIN은 원문으로 저장하지 않고 기존 방식과 동일하게 salt와 SHA-256 hash로 저장됩니다.</p>
-        <div class="actions"><button type="submit">신청하기</button><button id="requestCloseBtn" type="button" class="secondary">닫기</button></div>
-      </form>
-      <div id="requestStatus" class="status"></div>
-    </div>
-  </dialog>
-  <dialog id="accountDialog"><div class="modal"><div><h1>계정관리</h1><p>관리자만 계정 추가, 권한 변경, 사용중지, 삭제 처리를 할 수 있습니다.</p></div><form id="accountForm" class="grid"><input type="hidden" id="accountEditId"><label for="accountName">이름</label><input id="accountName" required><label for="accountLoginId">아이디</label><input id="accountLoginId" required><label for="accountPin">PIN</label><input id="accountPin" type="password" inputmode="numeric"><p class="helper">새 계정은 PIN이 필요하고, 기존 계정 수정 시 비워두면 기존 PIN을 유지합니다.</p><label for="accountRole">권한</label><select id="accountRole" required><option value="staff">일반사용자 - 사용입력/조회/수정</option><option value="receiver">입고담당자 - 비급여 입고관리만</option><option value="manager">책임사용자 - 설정/입고/사용수정</option><option value="admin">관리자 - 전체 설정/계정관리</option></select><div class="permission-guide" aria-label="권한 안내"><strong>권한 안내</strong><span>관리자: 전체 기능과 계정관리</span><span>책임사용자: 설정, 입고, 사용수정 가능 / 계정관리는 불가</span><span>입고담당자: 비급여 입고관리만 가능</span><span>일반사용자: 사용입력, 사용내역 조회, 사용수정 가능 / 삭제 불가</span></div><label for="accountActive">사용 여부</label><select id="accountActive"><option value="true">사용</option><option value="false">사용중지</option></select><div class="actions"><button type="submit">계정 저장</button><button id="accountResetBtn" type="button" class="secondary">새로 입력</button><button id="accountCloseBtn" type="button" class="secondary">닫기</button></div></form><div id="accountList" class="grid"></div><div id="accountStatus" class="status"></div></div></dialog>
-  <script>
-    document.getElementById("loginForm")?.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const status = document.getElementById("loginStatus");
-      if (status && !window.orInventoryLoginReady) {
-        status.textContent = "로그인 스크립트를 불러오는 중입니다. 잠시 후 다시 눌러 주세요.";
-        status.className = "status";
-      }
-    });
-  </script>
-  <script src="./version.js?v=20261104-compact-1"></script>
-  <script src="./auth_shell.js?v=20261011-ux-1"></script>
-</body>
-</html>
+<body><main>
+  <h1>수술실 재고관리</h1>
+  <p>직원 인증 전환 중입니다. 처음 이용할 때 업무 이메일과 새 비밀번호로 등록하고, 받은 메일에서 주소를 확인해 주세요.</p>
+  <form id="authForm"><fieldset id="fields" disabled>
+    <label for="email">업무 이메일</label><input id="email" required type="email" autocomplete="username">
+    <label for="password">비밀번호</label><input id="password" required type="password" autocomplete="current-password">
+    <div class="actions"><button id="login" type="submit" class="primary">로그인</button><button id="register" type="button">직원 계정 등록</button><button id="reset" type="button">비밀번호 재설정</button></div>
+  </fieldset></form>
+  <div id="signedIn" hidden><strong id="address"></strong><div class="actions"><button id="refresh" type="button">인증 상태 확인</button><button id="verify" type="button">인증 메일 다시 받기</button><button id="logout" type="button">로그아웃</button></div></div>
+  <p id="status" role="status" aria-live="polite">인증 연결 중…</p><small data-app-version="date"></small>
+</main>
+<script src="./version.js?v=20261105-enrollment"></script><script type="module" src="./auth_shell.js?v=20261105-enrollment"></script>
+</body></html>

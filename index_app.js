@@ -7,7 +7,10 @@ let setDoc;
 let deleteDoc;
 let runTransaction;
 let onSnapshot;
-let enableIndexedDbPersistence;
+let authSdk;
+let appAuth;
+let getDocFromServer;
+let verifiedActor = null;
 let collection;
 let query;
 let where;
@@ -57,9 +60,7 @@ const setButtonBusy = (button, busy, message = "저장 중...") => {
   }
 };
 
-const firebaseConfig = {
-  projectId: "nonpay-inventory"
-};
+
 
 const menus = [
   ["dashboard", "대시보드"],
@@ -306,7 +307,7 @@ let productFormDirty = false;
 let prescriptionSettingsDirty = false;
 let morningCountDirty = false;
 let deferredUseEntryRender = false;
-const useEntryAutosaveKey = "orInventoryUseEntryPatientDraft";
+const useEntryAutosaveKey = () => 'orInventoryUseEntryDraft:' + appAuth?.currentUser?.uid;
 const useEntryAutosaveMaxAgeMs = 12 * 60 * 60 * 1000;
 
 if (!window.ORInventoryUtils) throw new Error("공통 유틸 모듈을 불러오지 못했습니다.");
@@ -547,31 +548,8 @@ const renderOrDeferForUseEntry = (message = "새 데이터가 들어왔습니다
 
 const userStorageKey = "orInventoryUser";
 
-const readStoredUser = () => {
-  for (const storageName of ["sessionStorage", "localStorage"]) {
-    try {
-      const raw = window[storageName]?.getItem(userStorageKey);
-      if (!raw) continue;
-      const user = JSON.parse(raw);
-      if (user?.id) return user;
-    } catch (error) {
-      console.info(`${storageName} user read failed`, error);
-    }
-  }
-  return null;
-};
-
-const writeStoredUser = (user) => {
-  for (const storageName of ["sessionStorage", "localStorage"]) {
-    try {
-      window[storageName]?.setItem(userStorageKey, JSON.stringify(user));
-    } catch (error) {
-      console.info(`${storageName} user write failed`, error);
-    }
-  }
-};
-
 const clearStoredUser = () => {
+  verifiedActor = null;
   for (const storageName of ["sessionStorage", "localStorage"]) {
     try {
       window[storageName]?.removeItem(userStorageKey);
@@ -583,12 +561,12 @@ const clearStoredUser = () => {
 
 const readUseEntryAutosave = () => {
   try {
-    const raw = localStorage.getItem(useEntryAutosaveKey);
+    const raw = localStorage.getItem(useEntryAutosaveKey());
     if (!raw) return null;
     const payload = JSON.parse(raw);
     if (!payload?.savedAt) return null;
     if (Date.now() - new Date(payload.savedAt).getTime() > useEntryAutosaveMaxAgeMs) {
-      localStorage.removeItem(useEntryAutosaveKey);
+      localStorage.removeItem(useEntryAutosaveKey());
       return null;
     }
     return payload;
@@ -600,7 +578,7 @@ const readUseEntryAutosave = () => {
 
 const writeUseEntryAutosave = (payload) => {
   try {
-    localStorage.setItem(useEntryAutosaveKey, JSON.stringify({
+    localStorage.setItem(useEntryAutosaveKey(), JSON.stringify({
       ...payload,
       savedAt: new Date().toISOString()
     }));
@@ -611,7 +589,7 @@ const writeUseEntryAutosave = (payload) => {
 
 const clearUseEntryAutosave = () => {
   try {
-    localStorage.removeItem(useEntryAutosaveKey);
+    localStorage.removeItem(useEntryAutosaveKey());
   } catch (error) {
     console.info("use entry autosave clear failed", error);
   }
@@ -623,20 +601,7 @@ const resetUseEntryProtection = ({ clearAutosave = true } = {}) => {
   if (clearAutosave) clearUseEntryAutosave();
 };
 
-const currentAuditUser = () => {
-  try {
-    const user = readStoredUser();
-    if (!user?.id) return null;
-    return {
-      id: user.id,
-      loginId: user.loginId || "",
-      name: user.name || user.loginId || "",
-      role: user.role || "staff"
-    };
-  } catch (error) {
-    return null;
-  }
-};
+const currentAuditUser = () => verifiedActor ? { ...verifiedActor } : null;
 
 const auditCreateFields = () => {
   const user = currentAuditUser();
@@ -692,8 +657,9 @@ const redirectToLogin = (message) => {
 
 const ensureLocalSession = () => currentAuditUser() || redirectToLogin("로그인이 필요합니다.");
 
-const logoutToAuthShell = () => {
+const logoutToAuthShell = async () => {
   clearStoredUser();
+  if (appAuth) await authSdk.signOut(appAuth);
   try {
     window.top.location.replace(authShellUrl);
   } catch (error) {
@@ -729,20 +695,24 @@ const renderSessionControls = () => {
 };
 
 const verifySessionUser = async () => {
-  const sessionUser = currentAuditUser();
-  if (!sessionUser) return redirectToLogin("로그인이 필요합니다.");
-  const usersSnap = await getDoc(doc(db, "app", "users"));
-  const accounts = usersSnap.exists() && Array.isArray(usersSnap.data().accounts) ? usersSnap.data().accounts : [];
-  const account = accounts.find((item) => String(item.id) === String(sessionUser.id) && item.active !== false);
-  if (!account) return redirectToLogin("세션이 만료되었습니다.");
-  const verified = {
-    id: account.id,
-    loginId: account.loginId || "",
-    name: account.name || account.loginId || "",
-    role: roleAllowedViews[account.role] ? account.role : "staff"
-  };
-  writeStoredUser(verified);
-  return verified;
+  await appAuth.authStateReady();
+  const user = appAuth.currentUser;
+  if (!user || !user.emailVerified) return redirectToLogin('업무 이메일 확인이 필요합니다.');
+  const profileRef = doc(db, 'staffAccess', user.uid);
+  const accepts = data => data?.active === true && data.email === user.email &&
+    typeof data.id === 'string' && data.id.length > 0 && Object.hasOwn(roleAllowedViews, data.role);
+  const snap = await getDocFromServer(profileRef);
+  const profile = snap.data();
+  if (!accepts(profile)) return redirectToLogin('직원 계정 승인이 필요합니다.');
+  verifiedActor = { id:profile.id, loginId:profile.loginId, name:profile.name, role:profile.role };
+  authSdk.onAuthStateChanged(appAuth, next => {
+    if (next?.uid !== user.uid) redirectToLogin('다시 로그인해 주세요.');
+  });
+  onSnapshot(profileRef, changed => {
+    const next = changed.data();
+    if (!accepts(next) || next.id !== profile.id || next.role !== profile.role) redirectToLogin('직원 권한이 변경되었습니다.');
+  }, () => redirectToLogin('직원 권한을 다시 확인해 주세요.'));
+  return true;
 };
 
 const ensureCurrentViewAllowed = () => {
@@ -6922,10 +6892,13 @@ const subscribeImplantCollections = () => {
 };
 
 const boot = async () => {
-  if (!ensureLocalSession()) return;
-  render();
   try {
-    const firebaseApp = initializeApp(firebaseConfig);
+    const response = await fetch('/__/firebase/init.json', { cache:'no-store' });
+    if (!response.ok) throw Error('인증 설정을 읽을 수 없습니다.');
+    const config = await response.json();
+    if (config.projectId !== 'nonpay-inventory') throw Error('인증 프로젝트를 확인해 주세요.');
+    const firebaseApp = initializeApp(config);
+    appAuth = authSdk.initializeAuth(firebaseApp, { persistence:authSdk.browserSessionPersistence });
     db = getFirestore(firebaseApp);
     if (getStorage) {
       storage = getStorage(firebaseApp, "gs://nonpay-inventory.firebasestorage.app");
@@ -6935,12 +6908,7 @@ const boot = async () => {
     if (!verifiedUser) return;
     ref = doc(db, "app", "main");
     subscribeImplantCollections();
-    try {
-      await enableIndexedDbPersistence(db);
-    } catch (error) {
-      console.info("Offline persistence unavailable", error);
-    }
-    const snap = await getDoc(ref);
+    const snap = await getDocFromServer(ref);
     if (snap.exists()) {
       state = normalizeState(snap.data());
     } else {
@@ -6972,6 +6940,7 @@ const boot = async () => {
       setStatus(`Firebase 연결 오류: ${error.message}`, "error");
     });
   } catch (error) {
+    if (!verifiedActor) return redirectToLogin("직원 인증이 필요합니다.");
     console.error(error);
     setStatus(`Firebase 연결 실패: ${error.message}`, "error");
   }
@@ -6986,8 +6955,6 @@ window.addEventListener("beforeunload", (event) => {
 });
 
 const loadFirebaseAndBoot = async () => {
-  if (!ensureLocalSession()) return;
-  render();
   try {
     setStatus("Firebase 모듈 불러오는 중", "ok");
     const appModule = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js");
@@ -7002,7 +6969,8 @@ const loadFirebaseAndBoot = async () => {
     deleteDoc = firestoreModule.deleteDoc;
     runTransaction = firestoreModule.runTransaction;
     onSnapshot = firestoreModule.onSnapshot;
-    enableIndexedDbPersistence = firestoreModule.enableIndexedDbPersistence;
+    getDocFromServer = firestoreModule.getDocFromServer;
+    authSdk = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js');
     collection = firestoreModule.collection;
     query = firestoreModule.query;
     where = firestoreModule.where;
