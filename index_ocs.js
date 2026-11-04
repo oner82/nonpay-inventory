@@ -22,7 +22,9 @@
   const isServiceOrder = row => {
     const name=String(row.name || '').replace(/\s+/g,' ').trim();
     if (/수술팩/.test(name)) return false;
-    return /(?:사용료|이용료|수술료|행위료)$/.test(name)
+    return (row.code==='LZB4136' && /^Ordinary culture,Antibiotic sensitivity\(Wound\)$/i.test(name))
+      || (row.code==='LZB4101' && /^외주\) Gram stain$/i.test(name))
+      || /(?:사용료|이용료|수술료|행위료)$/.test(name)
       || /수술.*(?:사용하는|사용한).*치료재료 비용/.test(name)
       || /^복강경하 수술-복강경을 사용한 경우$/.test(name)
       || /^조직병리검사(?:\s|\[)/.test(name)
@@ -157,6 +159,7 @@
         <p class="helper">앞에 7-1이 있으면 7번방·첫 번째 수술로 자동 입력합니다. 목록에 없는 수술명도 입력할 수 있습니다. 환자명·등록번호는 입력하지 마세요. 처방 붙여넣기 원문은 저장하지 않습니다.</p>
         <p id="ocsCaseHint" class="helper" role="status"></p>
         ${record?'':`<div class="ocs-paste-box"><details id="ocsPasteDetails" open><summary><span id="ocsPasteTitle">OCS 처방 붙여넣기</span><span class="ocs-paste-hint">펼치기 / 접기</span></summary><label class="helper" for="ocsPaste">아래 칸을 누르고 Ctrl+V 또는 ⌘V로 붙여넣으세요.</label><textarea id="ocsPaste" rows="3" autocomplete="off" spellcheck="false" wrap="off" placeholder="여기에 OCS 처방을 붙여넣으세요"></textarea></details><div class="ocs-paste-actions"><span id="ocsPasteStatus" role="status">복사한 내용은 읽기 후 지워집니다.</span><button id="ocsParse" type="button">처방 읽기</button></div></div>`}
+        ${record?'':`<div class="ocs-paste-box"><label for="ocsExcelFile">또는 OCS 처방 엑셀 불러오기 (.xlsx)</label><input id="ocsExcelFile" type="file" accept=".xlsx"><div id="ocsExcelSheets" hidden><label for="ocsExcelSheet">읽을 시트 · 한 케이스씩</label><select id="ocsExcelSheet"></select><button id="ocsExcelRead" type="button">선택한 시트 읽기</button></div><p id="ocsExcelStatus" role="status">파일은 이 기기에서만 읽으며 서버에 첨부하지 않습니다. 읽은 뒤 수량을 확인하고 최종 저장해 주세요.</p></div>`}
         <p id="ocsMessage" role="status"></p><div id="ocsRows"></div>
         <div class="ocs-confirm"><input type="checkbox" id="ocsConfirm"><label for="ocsConfirm">수술 후 사용 수량과 연결·미연결 항목을 확인했습니다.</label></div>
         <p id="ocsSaveMessage" role="status" aria-live="polite"></p>
@@ -228,6 +231,26 @@
         try {catalogSnapshot=clone(context.getState().ocsCatalog||[]);const parsed=parse($('ocsPaste').value);excludedCount=parsed.excludedCount;excludedServiceCount=parsed.excludedServiceCount||0;rows=prepare(parsed,catalogSnapshot);$('ocsPaste').value='';$('ocsPasteTitle').textContent='다른 처방 다시 붙여넣기';$('ocsPasteStatus').textContent=`읽기 완료 · 등록 대상 ${rows.length}행${excludedCount?` · 삭제 ${excludedCount}행 제외`:''}${excludedServiceCount?` · 비용·검사 ${excludedServiceCount}행 제외`:''}`;touch();paint();}
         catch(error){rows=[];excludedCount=0;excludedServiceCount=0;touch();paint();message(error.message);$('ocsPasteTitle').textContent='복사한 내용 확인하기';$('ocsPasteStatus').textContent='읽지 못했습니다. 내용을 펼쳐 확인하거나 다시 붙여넣으세요.';}
       });
+      let excelBook=null;
+      const acceptExcel=()=>{
+        const parsed=window.OROcsExcel.parseSheet(excelBook,$('ocsExcelSheet').value);
+        catalogSnapshot=clone(context.getState().ocsCatalog||[]);excludedCount=parsed.excludedCount;excludedServiceCount=parsed.excludedServiceCount||0;
+        rows=prepare(parsed,catalogSnapshot);touch();paint();$('ocsPaste').value='';
+        $('ocsExcelStatus').textContent=`엑셀 읽기 완료 · ${rows.length}행 · 삭제 ${excludedCount}행 / 비용·검사 ${excludedServiceCount}행 제외. 아직 저장되지 않았습니다.`;
+      };
+      $('ocsExcelFile')?.addEventListener('change',async()=>{
+        const file=$('ocsExcelFile').files[0];if(!file)return;
+        if(busy){message('저장이 끝난 뒤 파일을 선택해 주세요.');return;}
+        busy=true;$('ocsSave').disabled=true;excelBook=null;$('ocsExcelSheets').hidden=true;$('ocsExcelStatus').textContent='엑셀 읽는 중…';
+        try {
+          excelBook=await window.OROcsExcel.read(file);
+          $('ocsExcelSheet').innerHTML=excelBook.SheetNames.map(name=>`<option value="${e(name)}">${e(name)}</option>`).join('');
+          if(excelBook.SheetNames.length===1)acceptExcel();
+          else {$('ocsExcelSheets').hidden=false;$('ocsExcelStatus').textContent='읽을 시트를 선택해 주세요. 여러 시트를 합치지 않습니다.';}
+        } catch(error){message(error.message);$('ocsExcelStatus').textContent='엑셀을 읽지 못했습니다. 기존 입력 내용은 유지됩니다.';}
+        finally {busy=false;$('ocsSave').disabled=!rows.length;$('ocsExcelFile').value='';}
+      });
+      $('ocsExcelRead')?.addEventListener('click',()=>{if(busy)return;try{acceptExcel();}catch(error){message(error.message);}});
       $('ocsBack')?.addEventListener('click',()=>{if(!dirty||confirm('저장하지 않은 변경을 닫을까요?')){dirty=false;context.back();}});
       $('ocsSave').addEventListener('click',async()=>{
         if(busy)return;
