@@ -10,17 +10,39 @@ const status = text => { element('status').textContent = text; };
 const form = element('authForm');
 let auth;
 let busy = false;
+let profileCheck = 0;
 
-function showUser(user) {
+async function showUser(user) {
+  const check = ++profileCheck;
+  element('openApp').hidden = true;
   form.hidden = Boolean(user);
   element('signedIn').hidden = !user;
   element('fields').disabled = busy;
   if (!user) return;
   element('address').textContent = user.email;
   element('verify').hidden = user.emailVerified;
-  status(user.emailVerified
-    ? '업무 이메일 확인이 완료되었습니다. 관리자가 기존 작성자 기록과 연결한 후 업무 화면을 열 수 있습니다. 현재 업무 앱은 보안 점검 중입니다.'
-    : '업무 이메일 확인이 필요합니다. 메일의 링크를 열고 이 화면에서 인증 상태 확인을 눌러 주세요.');
+  if (!user.emailVerified) {
+    status('업무 이메일 확인이 필요합니다. 메일의 링크를 열고 이 화면에서 인증 상태 확인을 눌러 주세요.');
+    return;
+  }
+  status('업무 이메일 확인이 완료되었습니다. 관리자 연결을 확인하고 있습니다.');
+  try {
+    const uid = encodeURIComponent(user.uid);
+    const project = auth.app.options.projectId;
+    const response = await fetch(`https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents/staffAccess/${uid}`, {
+      cache:'no-store', headers:{ Authorization:`Bearer ${await user.getIdToken()}` }
+    });
+    if (!response.ok && ![403,404].includes(response.status)) throw Error('profile');
+    const profile = response.ok ? (await response.json()).fields : null;
+    if (check !== profileCheck) return;
+    const approved = profile?.active?.booleanValue === true && profile.role?.stringValue === 'admin' &&
+      profile.email?.stringValue === user.email && Boolean(profile.id?.stringValue);
+    element('openApp').hidden = !approved;
+    status(approved ? '관리자 연결이 완료되었습니다. 업무 화면을 열 수 있습니다.'
+      : '업무 이메일 확인이 완료되었습니다. 관리자 연결 대기 중입니다. 연결 후 인증 상태 확인을 눌러 주세요.');
+  } catch {
+    if (check === profileCheck) status('업무 이메일 확인이 완료되었습니다. 관리자 연결을 조회할 수 없습니다. 인증 상태 확인을 다시 눌러 주세요.');
+  }
 }
 
 function friendlyError(error) {
@@ -82,6 +104,7 @@ element('logout').addEventListener('click', () => perform(async () => {
   await signOut(auth);
   status('로그아웃했습니다.');
 }));
+element('openApp').addEventListener('click', () => location.assign('./index_new.html'));
 
 try {
   sessionStorage.removeItem('orInventoryUser');

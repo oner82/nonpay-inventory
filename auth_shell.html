@@ -19,8 +19,8 @@
     <label for="password">비밀번호</label><input id="password" required type="password" autocomplete="current-password">
     <div class="actions"><button id="login" type="submit" class="primary">로그인</button><button id="register" type="button">직원 계정 등록</button><button id="reset" type="button">비밀번호 재설정</button></div>
   </fieldset></form>
-  <div id="signedIn" hidden><strong id="address"></strong><div class="actions"><button id="refresh" type="button">인증 상태 확인</button><button id="verify" type="button">인증 메일 다시 받기</button><button id="logout" type="button">로그아웃</button></div></div>
+  <div id="signedIn" hidden><strong id="address"></strong><div class="actions"><button type="button" id="openApp" class="primary" hidden>관리자 업무 화면 열기</button><button id="refresh" type="button">인증 상태 확인</button><button id="verify" type="button">인증 메일 다시 받기</button><button id="logout" type="button">로그아웃</button></div></div>
   <p id="status" role="status" aria-live="polite">인증 연결 중…</p><small data-app-version="date"></small>
 </main>
-<script src="./version.js?v=20261105-enrollment"></script><script type="module" src="./auth_shell.js?v=20261105-enrollment"></script>
+<script src="./version.js?v=20261105-adminpilot"></script><script type="module" src="./auth_shell.js?v=20261105-adminpilot"></script>
 </body></html>
