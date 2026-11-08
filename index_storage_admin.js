@@ -1,7 +1,7 @@
 (() => {
   window.createStorageAdminModule = ctx => {
     const api=window.ORStorageV2,e=ctx.escapeHtml;
-    let busy=false,prepared=null,preparedLinks=null,result='',generation='';
+    let busy=false,prepared=null,preparedLinks=null,result='',generation='',backfillSource=null,backfillChoices={};
     const download=(name,data)=>{
       const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
       const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -12,6 +12,7 @@
       <label for="catalogSearch">처방코드·처방명 검색</label><input id="catalogSearch" type="search" placeholder="코드 또는 처방명" autocomplete="off"><p id="catalogCount"></p><div id="catalogResults"></div>
       ${ctx.actor()?.role==='admin'?`<details><summary>관리자 자료 등록</summary><p>코드·명칭 전용 JSON 파일을 선택하면 추가 대상부터 확인합니다. 이미 등록된 내용은 중복 추가하지 않습니다.</p><input id="catalogFile" type="file" accept=".json"><p id="catalogPreview" role="status"></p><button type="button" id="catalogImport" disabled>확인한 코드·명칭 등록</button></details>
       <details><summary>확인한 재고 연결 반영</summary><p>제품·단위 확인을 마친 연결 파일만 반영합니다. 과거 케이스와 현재 수량은 바꾸지 않으며 다음 처방 읽기부터 적용합니다.</p><input id="catalogLinksFile" type="file" accept=".json" aria-label="확인한 재고 연결 파일"><div id="catalogLinksPreview" role="status"></div><button id="catalogLinksApply" type="button" disabled>확인한 연결만 저장</button></details>
+      <details><summary>저장된 케이스에 확인한 연결 적용</summary><p>기존 차감 내역과 대조해 아직 미연결인 수량만 추가합니다. 이미 연결된 행·기존 수량은 유지하며, 실제 사용 제품이 필요한 행은 선택 전까지 보류합니다.</p><button id="backfillPreview" type="button">저장된 케이스 연결 점검</button><div id="backfillResults" role="status"></div><button id="backfillApply" type="button" disabled>미차감 수량만 반영</button></details>
       <details><summary>저장 구조 전환·백업</summary><p>전환 전에 다른 기기의 입력을 멈추세요. 기존 자료를 백업·복사하고 원본과 일치하는지 확인한 뒤 전환합니다. 복사 실패 시 기존 저장소를 유지합니다.</p>
       <button type="button" id="coreBackup">현재 핵심 자료 백업 다운로드</button><p class="helper">제품·코드·케이스·입고·설정을 포함합니다. 별도 임플란트 장부·대기 장부와 사진은 이 파일에 포함되지 않으며 기존 저장소에 보존됩니다.</p>
       ${ctx.separated()?'':`<label><input type="checkbox" id="storagePauseConfirm"> 다른 기기 입력을 중지했고, 저장 구조 전환을 진행합니다.</label><button type="button" id="storageMigrate">백업 후 분리 저장으로 전환</button>`}</details>`:''}
@@ -54,6 +55,35 @@
         const final=await ctx.store().read();
         if(window.ORCatalogLinks.apply(final.state,file,ctx.actor(),new Date().toISOString()).changed.length)throw Error('재조회 대조 실패. 새로고침 후 확인해 주세요.');
         ctx.accept(final);preparedLinks=null;message(`재고 연결 ${count}코드 반영·재조회 완료. 기존 수량과 과거 케이스는 유지했습니다.`);
+      }));
+      const paintBackfill=()=>{
+        const plan=window.OROcsBackfill.inspect(backfillSource.state,backfillChoices);
+        const selectionRows=window.OROcsBackfill.inspect(backfillSource.state).pending.filter(p=>p.options);
+        $('backfillResults').innerHTML=`<p>추가 반영 ${plan.changes.length}케이스 · 이미 연결된 ${plan.preserved}행 유지 · 확인 대기 ${plan.pending.length}행</p>`+plan.changes.map(c=>`<p><strong>${e(c.label)}</strong><br>${c.additions.map(a=>`${e(a.code)} · ${e(a.productName)} [${e(a.orderCode)}] +${a.qty}${a.vendorManaged?' (업체관리 · 재고 차감 없음)':''}`).join('<br>')}</p>`).join('')+[...plan.pending.filter(p=>!p.options),...selectionRows].map(p=>`<p>${e(p.label)} · ${e(p.code||'')} ${e(p.name||'')} · ${e(p.reason)}${p.options?`<select data-backfill-choice="${e(p.usageId+':'+p.index)}" aria-label="${e(p.label)} 실제 사용 제품"><option value="">확인 필요 · 보류</option>${p.options.map(id=>{const product=backfillSource.state.products.find(x=>x.id===id);return `<option value="${e(id)}" ${backfillChoices[p.usageId+':'+p.index]===id?'selected':''}>${e(product?.name||id)} · ${e(product?.orderCode||'')}</option>`;}).join('')}</select>`:''}</p>`).join('');
+        $('backfillApply').disabled=!plan.changes.length;
+        $('backfillResults').querySelectorAll('[data-backfill-choice]').forEach(select=>select.addEventListener('change',()=>{backfillChoices[select.dataset.backfillChoice]=select.value;paintBackfill();}));
+      };
+      $('backfillPreview')?.addEventListener('click',async()=>{
+        if(busy)return;busy=true;ctx.lock(true);$('backfillPreview').disabled=true;
+        try{backfillSource=await ctx.store().read();backfillChoices={};if(!backfillSource.meta)throw Error('분리 저장 전환이 필요합니다.');paintBackfill();}
+        catch(error){backfillSource=null;message(error.message);}
+        finally{busy=false;ctx.lock(false);$('backfillPreview').disabled=false;}
+      });
+      $('backfillApply')?.addEventListener('click',()=>operation(async()=>{
+        if(!backfillSource)throw Error('먼저 케이스 연결을 점검해 주세요.');
+        const expected=backfillSource.state,choices={...backfillChoices},at=new Date().toISOString();
+        const plan=window.OROcsBackfill.inspect(expected,choices);
+        if(!plan.changes.length)throw Error('추가 반영할 수량이 없습니다.');
+        const records=await ctx.backfillLedgers();
+        download('수술실_과거연결반영전_'+ctx.today()+'.json',{format:'or-inventory-backfill-backup-v1',createdAt:at,storage:backfillSource.meta,data:expected,implantRecords:records});
+        const saved=await ctx.store().commit(remote=>window.OROcsBackfill.apply(remote,expected,choices,ctx.actor(),at,{reconcile:ctx.backfillReconcile,stockUnconfirmed:ctx.stockUnconfirmed}).state,{prepareWrites:ctx.backfillLedgerWrites(plan,records,at)});
+        ctx.accept(saved);const final=await ctx.store().read();
+        for(const c of plan.changes)if(!api.equal(final.state.usages.find(u=>u.id===c.usageId),saved.state.usages.find(u=>u.id===c.usageId)))throw Error('저장 후 케이스가 변경되었습니다. 사용내역을 확인해 주세요.');
+        const ledgerAfter=await ctx.backfillLedgers();
+        ctx.backfillVerify(plan,final.state,ledgerAfter);
+        download('수술실_과거연결반영후_'+ctx.today()+'.json',{format:'or-inventory-backfill-backup-v1',createdAt:new Date().toISOString(),storage:final.meta,data:final.state,implantRecords:ledgerAfter});
+        ctx.accept(final);backfillSource=null;backfillChoices={};
+        message(`과거 케이스 ${plan.changes.length}건 반영·재조회 완료. 추가 연결 ${plan.changes.reduce((n,c)=>n+c.additions.length,0)}행, 기존 차감 중복 없음. 확인 대기 ${plan.pending.length}행은 유지했습니다.`);
       }));
       $('coreBackup')?.addEventListener('click',()=>operation(async()=>{
         const current=await ctx.store().read();
@@ -98,6 +128,6 @@
         ctx.accept(final);prepared=null;message(`등록·재조회 확인 완료: 새 코드 ${addedCodes}개, 추가 별칭 ${addedNames-addedCodes}개. 재고 연결과 수량은 유지했습니다.`);
       }));
     }
-    return {render,bind,isDirty:()=>busy||!!prepared||!!preparedLinks};
+    return {render,bind,isDirty:()=>busy||!!prepared||!!preparedLinks||!!backfillSource};
   };
 })();

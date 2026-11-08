@@ -1953,6 +1953,24 @@ let settingsModule = null;
 let storageAdminModule = null;
 const getStorageAdminModule = () => storageAdminModule || (storageAdminModule = window.createStorageAdminModule({
   escapeHtml, today, actor:currentAuditUser, state:()=>state, store:()=>storageV2, separated:()=>!!storageMeta, render,
+  backfillReconcile:next=>{const previous=state;try{state=next;reconcileProductStocks();}finally{state=previous;}},
+  stockUnconfirmed:isUnconfirmedStock,
+  backfillLedgers:async()=>{const snapshot=await storageSdk.getDocsFromServer(collection(db,'implantRecords'));return snapshot.docs.map(d=>({...d.data(),id:d.id}));},
+  backfillVerify:(plan,next,records)=>{
+    for(const change of plan.changes.filter(c=>c.additions.some(a=>a.ledger))){
+      const usage=next.usages.find(u=>u.id===change.usageId),matches=records.filter(r=>r.usageId===usage.id);
+      if(matches.length!==1||!matches[0].ocsManaged||matches[0].ocsRevision!==usage.ocsRevision)throw Error('업체 장부 재조회 확인이 필요합니다. 다시 반영하지 말고 장부를 확인해 주세요.');
+      const expected={},actual={};
+      for(const id of usage.productIds)if(window.OROcsLedger.needsLedger(next.products.find(p=>p.id===id)))expected[id]=(expected[id]||0)+1;
+      for(const i of matches[0].implants||[])for(const item of i.ocsItems||[])actual[item.productId]=(actual[item.productId]||0)+item.qty;
+      if(!window.ORStorageV2.equal(expected,actual))throw Error('장부 수량 재조회가 일치하지 않습니다.');
+    }
+  },
+  backfillLedgerWrites:(plan,records,at)=>async(tx,remote,next)=>{
+    const writers=[];
+    for(const change of plan.changes.filter(c=>c.additions.some(a=>a.ledger)))writers.push(await prepareOcsLedgerWrites({id:change.usageId,at},records)(tx,remote,next));
+    return ()=>writers.forEach(write=>write());
+  },
   lock:busy=>{savingCount=Math.max(0,savingCount+(busy?1:-1));saving=savingCount>0;},
   accept:loaded=>{storageMeta=loaded.meta;state=normalizeState(loaded.state);durableState=window.ORStorageV2.clone(state);}
 }));
@@ -2994,6 +3012,17 @@ const bindOcsLedger = usage => {
     finally{input.disabled=false;}
   }));
 };
+const prepareOcsLedgerWrites=(request,records=null)=>async(tx,remote,next)=>{
+  if(!records && !implantRecordsLoaded)throw Error("업체 장부를 불러오는 중입니다. 잠시 후 다시 저장해 주세요.");
+  const usage=next.usages.find(u=>u.id===request.id);
+  const existingRecords=(records||implantRecords).filter(r=>sameId(r.usageId,request.id));
+  if(existingRecords.length>1)throw Error("이 케이스의 장부가 여러 건입니다. 먼저 확인해 주세요.");
+  const ledgerRef=doc(db,"implantRecords",existingRecords[0]?.id||"ocs_"+request.id);
+  const snap=await tx.get(ledgerRef);
+  const existing=snap.exists()?snap.data():null;
+  const record=window.OROcsLedger.build({existing,usage,products:next.products,doctor:next.doctors.find(d=>d.id===usage.doctorId),actor:currentAuditUser(),at:request.at,vendorFor:p=>{const v=implantVendorSelectionForProduct(p);return {vendorId:v.vendorId==="__custom__"?"":v.vendorId||"",vendor:implantDraftVendorName(v)||p.company||""};}});
+  return ()=>{if(record)tx.set(ledgerRef,record);};
+};
 let ocsModule = null;
 const getOcsModule = () => {
   if (!ocsModule) ocsModule = window.createOcsModule({
@@ -3001,17 +3030,7 @@ const getOcsModule = () => {
     canEdit:canEditUsage,canManage:canManageSettings,canModify:canModifyUsageRecord,
     actor:currentAuditUser,stockUnconfirmed:isUnconfirmedStock,
     storageSeparated:()=>!!storageMeta,
-    ledgerWrites:request=>async(tx,remote,next)=>{
-      if(!implantRecordsLoaded)throw Error("업체 장부를 불러오는 중입니다. 잠시 후 다시 저장해 주세요.");
-      const usage=next.usages.find(u=>u.id===request.id);
-      const existingRecords=implantRecordsForUsage(request.id);
-      if(existingRecords.length>1)throw Error("이 케이스의 장부가 여러 건입니다. 먼저 확인해 주세요.");
-      const ledgerRef=doc(db,"implantRecords",existingRecords[0]?.id||"ocs_"+request.id);
-      const snap=await tx.get(ledgerRef);
-      const existing=snap.exists()?snap.data():null;
-      const record=window.OROcsLedger.build({existing,usage,products:next.products,doctor:next.doctors.find(d=>d.id===usage.doctorId),actor:currentAuditUser(),at:request.at,vendorFor:p=>{const v=implantVendorSelectionForProduct(p);return {vendorId:v.vendorId==="__custom__"?"":v.vendorId||"",vendor:implantDraftVendorName(v)||p.company||""};}});
-      return ()=>{if(record)tx.set(ledgerRef,record);};
-    },
+    ledgerWrites:request=>prepareOcsLedgerWrites(request),
     ledgerHtml:record=>renderOcsLedger(record),
     bindLedger:record=>bindOcsLedger(record),
     otherFormDirty:()=>currentView==='use' && useEntryDirty,
