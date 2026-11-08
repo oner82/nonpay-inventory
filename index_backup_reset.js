@@ -151,6 +151,7 @@
 
     // 유지보수 시간에만 실행한다. 부분 실패를 피하기 위해 작은 복원만 단일 거래로 처리한다.
     const restoreCompleteBackup = async (backup) => {
+      if (ctx.isSeparatedStorage?.()) throw new Error('분리 저장 후에는 구형 전체 문서 복원을 사용할 수 없습니다. 관리자 전환 백업으로 복구해 주세요.');
       if (!canManageSettings()) throw new Error('복원 권한이 없습니다.');
       validateBackup(backup);
       if (!['full','beforeOperationalResetFull','beforeRestoreFull'].includes(backup.kind)) throw new Error('설정 전용 백업은 전체 기록 복원에 사용할 수 없습니다.');
@@ -298,6 +299,7 @@
     };
 
     const saveBackupDocument = async ({ id, label, kind, data, externalCollections, message }) => {
+      if (ctx.isSeparatedStorage?.()) throw new Error('분리 저장 자료는 처방코드·저장 관리의 백업 다운로드를 이용해 주세요.');
       validateBackup({data,externalCollections});
       const createdAt = new Date().toISOString();
       const summary = externalCollections ? externalCollectionsSummary(externalCollections) : null;

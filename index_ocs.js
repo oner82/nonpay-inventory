@@ -147,7 +147,7 @@
     }
     target.ocsCatalog=catalog;
     // 전체 상태가 단일 Firestore 문서이므로 크기 초과 시 부분 저장 없이 중단한다.
-    if (new TextEncoder().encode(JSON.stringify(target)).length > 850000) throw Error('저장 공간이 부족합니다. 관리자에게 OCS 목록 저장소 분리를 요청해 주세요.');
+    if (!permissions.storageSeparated && new TextEncoder().encode(JSON.stringify(target)).length > 850000) throw Error('저장 공간이 부족합니다. 관리자에게 OCS 목록 저장소 분리를 요청해 주세요.');
   }
   window.OROcs = {parse,prepare,apply,supportedProduct,surgeryName,surgeryCase,isServiceOrder};
   window.createOcsModule = context => {
@@ -325,7 +325,7 @@
         let failedShortages=null;
         try {
           const saved=await context.saveState('OCS 사용 기록 저장 완료',{requireTransaction:true,preserveFormOnFailure:true,apply:(target,remote)=>apply(target,remote,request,{
-            canEdit:context.canEdit(),canManage:context.canManage(),canModify:context.canModify,actor:context.actor()||{},stockUnconfirmed:context.stockUnconfirmed,onStockShortage:list=>{failedShortages=list;}
+            canEdit:context.canEdit(),canManage:context.canManage(),canModify:context.canModify,actor:context.actor()||{},stockUnconfirmed:context.stockUnconfirmed,storageSeparated:!!context.storageSeparated?.(),onStockShortage:list=>{failedShortages=list;}
           })});
           if(saved){dirty=false;context.saved(request.id);}else if(failedShortages){showShortages(failedShortages);message('재고가 부족합니다. 아래 품목·수량을 확인해 주세요.');$('ocsStockNotice').scrollIntoView({block:'nearest'});}else message('저장하지 못했습니다. 입력은 유지됩니다. 오류 안내를 확인해 주세요.');
         } catch(error) {if(failedShortages)showShortages(failedShortages);message(`저장하지 못했습니다: ${error.message || '알 수 없는 오류'}. 입력은 유지됩니다.`);

@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function verified() {
+      return request.auth != null && request.auth.token.email_verified == true &&
+        request.auth.token.firebase.sign_in_provider == 'password';
+    }
+    function admin() {
+      return verified() && exists(/databases/$(database)/documents/staffAccess/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/staffAccess/$(request.auth.uid)).data.active == true &&
+        get(/databases/$(database)/documents/staffAccess/$(request.auth.uid)).data.role == 'admin' &&
+        get(/databases/$(database)/documents/staffAccess/$(request.auth.uid)).data.email == request.auth.token.email &&
+        get(/databases/$(database)/documents/staffAccess/$(request.auth.uid)).data.id is string &&
+        get(/databases/$(database)/documents/staffAccess/$(request.auth.uid)).data.id.size() > 0;
+    }
+    function main() { return get(/databases/$(database)/documents/app/main).data; }
+    function nextMain() { return getAfter(/databases/$(database)/documents/app/main).data; }
+    function separated(data) { return data.get('storageVersion', 1) == 2; }
+    function validMeta(data) {
+      return data.keys().hasOnly(['storageVersion','generation','revision','updatedAt','changed']) &&
+        data.storageVersion == 2 && data.generation is string && data.revision is int && data.revision >= 0 &&
+        data.updatedAt is string && data.changed is list && data.changed.size() <= 350;
+    }
+    function knownGroup(group) { return group in ['products','doctors','surgeries','receipts','usages','roomRefills','morningCounts','usageRules','purchaseRequests','prescriptionPatternSettings','prescriptionMaterialSettings','backupVersions','prescriptionCodes','prescriptionLinks','meta']; }
+    function journalMatches(data) {
+      let journal = getAfter(/databases/$(database)/documents/inventoryData/$(data.generation)/changes/$(string(data.revision))).data;
+      return journal.revision == data.revision && journal.changed == data.changed && journal.at == data.updatedAt;
+    }
+    match /staffAccess/{uid} { allow get: if verified() && request.auth.uid == uid; }
+    match /app/main {
+      allow get: if admin();
+      allow update: if admin() && (
+        (!separated(resource.data) && !separated(request.resource.data)) ||
+        (!separated(resource.data) && validMeta(request.resource.data) && request.resource.data.revision == 0 &&
+          getAfter(/databases/$(database)/documents/inventoryData/$(request.resource.data.generation)).data.status == 'active' &&
+          get(/databases/$(database)/documents/inventoryArchives/$(request.resource.data.generation)).data.state == resource.data) ||
+        (separated(resource.data) && validMeta(request.resource.data) && request.resource.data.generation == resource.data.generation && request.resource.data.revision == resource.data.revision + 1 && journalMatches(request.resource.data))
+      );
+    }
+    match /inventoryArchives/{generation} {
+      allow get: if admin();
+      allow create: if admin() && !separated(main()) && request.resource.data.keys().hasOnly(['state','createdAt','actor']) && request.resource.data.state == main();
+      // 전환 직전 원본은 앱에서 덮어쓰거나 삭제하지 않는다.
+    }
+    match /inventoryData/{generation} {
+      allow get: if admin();
+      allow create: if admin() && !separated(main()) && request.resource.data.status == 'staging';
+      allow update: if admin() && resource.data.status == 'staging' && request.resource.data.status == 'active' &&
+        separated(nextMain()) && nextMain().generation == generation && nextMain().revision == 0;
+      match /changes/{revision} {
+        allow read: if admin();
+        allow create: if admin() && separated(main()) && main().generation == generation &&
+          validMeta(nextMain()) && nextMain().generation == generation && nextMain().revision == main().revision + 1 &&
+          revision == string(nextMain().revision) && request.resource.data.keys().hasOnly(['revision','changed','at','by']) &&
+          request.resource.data.revision == nextMain().revision && request.resource.data.changed == nextMain().changed &&
+          request.resource.data.at == nextMain().updatedAt && request.resource.data.by.id == get(/databases/$(database)/documents/staffAccess/$(request.auth.uid)).data.id;
+      }
+      match /{group}/{id} {
+        allow read: if admin() && knownGroup(group);
+        allow create, update, delete: if admin() && knownGroup(group) && (
+          (!separated(main()) && get(/databases/$(database)/documents/inventoryData/$(generation)).data.status == 'staging') ||
+          (separated(main()) && main().generation == generation && validMeta(nextMain()) && nextMain().generation == generation &&
+            nextMain().revision == main().revision + 1 && (group + '/' + id) in nextMain().changed)
+        );
+      }
+    }
+    match /implantRecords/{id} { allow read, write: if admin(); }
+    match /implantVendors/{id} { allow read, write: if admin(); }
+    match /pendingUsages/{id} { allow read, write: if admin(); }
+  }
+}

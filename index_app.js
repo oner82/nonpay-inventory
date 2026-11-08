@@ -10,6 +10,10 @@ let onSnapshot;
 let authSdk;
 let appAuth;
 let getDocFromServer;
+let storageV2;
+let storageSdk;
+let storageMeta = null;
+let durableState = null;
 let verifiedActor = null;
 let collection;
 let query;
@@ -95,7 +99,8 @@ const settingsMenus = [
   ["surgeries", "수술관리"],
   ["usageRules", "수술별 사용관리"],
   ["implantVendors", "임플란트 업체"],
-  ["backup", "백업"]
+  ["backup", "백업"],
+  ["storage", "처방코드·저장 관리"]
 ];
 
 const blankState = () => ({
@@ -537,7 +542,7 @@ const isPrescriptionSettingsProtected = () => currentView === "settings" && ((cu
 const isMorningCountProtected = () => currentView === "morningcount" && morningCountDirty;
 
 const renderOrDeferForUseEntry = (message = "새 데이터가 들어왔습니다. 입력 중인 사용입력을 보호하고 있습니다.") => {
-  if (isUseEntryProtected() || isEditEntryProtected() || isProductFormProtected() || isPrescriptionSettingsProtected() || isMorningCountProtected() || (['purchase','morningcount'].includes(currentView) && purchaseModule?.isDirty())) {
+  if (storageAdminModule?.isDirty() || isUseEntryProtected() || isEditEntryProtected() || isProductFormProtected() || isPrescriptionSettingsProtected() || isMorningCountProtected() || (['purchase','morningcount'].includes(currentView) && purchaseModule?.isDirty())) {
     deferredUseEntryRender = true;
     setStatus(message, "ok");
     return false;
@@ -1225,12 +1230,29 @@ const saveState = async (message = "저장 완료", options = {}) => {
   saving = true;
   savingToast(options.savingMessage || "저장 중입니다...");
   state.updatedAt = new Date().toISOString();
+  const baseForSave = durableState && window.ORStorageV2.clone(durableState);
+  const localForSave = window.ORStorageV2?.clone(state);
   try {
     if (options.requireTransaction && !(runTransaction && db)) throw new Error('안전한 동시 저장 연결이 준비되지 않았습니다. 다시 시도해 주세요.');
-    if (runTransaction && db) {
+    if (storageMeta) {
+      const saved = await storageV2.commit(remoteData => {
+        const next = window.ORStorageV2.merge(baseForSave, localForSave, remoteData);
+        const previousState = state;
+        try {
+          state = normalizeState(next);
+          if (typeof options.apply === 'function') options.apply(state, remoteData);
+          reconcileProductStocks();
+          state.updatedAt = new Date().toISOString();
+          return normalizeState(state);
+        } finally { state = previousState; }
+      });
+      state = normalizeState(saved.state);
+      storageMeta = saved.meta;
+    } else if (runTransaction && db) {
       const merged = await runTransaction(db, async (transaction) => {
         const serverSnap = await transaction.get(ref);
         const remoteData = serverSnap.exists() ? serverSnap.data() : blankState();
+        if (remoteData.storageVersion === 2) throw new Error('저장 구조가 전환되었습니다. 입력 내용을 보관하고 새로고침해 주세요.');
         // 항상 최신 서버 데이터를 읽어 로컬 변경과 병합한다(동시저장 클로버링 방지).
         let nextState = mergeStates(remoteData, state);
         // 삭제·수정처럼 병합만으로는 표현되지 않는 동작(병합은 remote에 남은
@@ -1253,6 +1275,7 @@ const saveState = async (message = "저장 완료", options = {}) => {
       reconcileProductStocks();
       await setDoc(ref, state);
     }
+    durableState = window.ORStorageV2.clone(state);
     lastLocalSaveAt = Date.now();
     setStatus(`${message} · 동시저장 보호`, "ok");
     saveDoneToast(options.doneMessage || "저장 완료");
@@ -1266,9 +1289,11 @@ const saveState = async (message = "저장 완료", options = {}) => {
     // (다른 저장이 아직 진행 중이면 그 저장이 끝나며 상태를 정리하므로 건너뛴다.)
     if (getDoc && ref && savingCount <= 1) {
       try {
-        const snap = await getDoc(ref);
-        if (snap.exists()) {
-          state = normalizeState(snap.data());
+        const latest = await storageV2.read();
+        if (latest) {
+          storageMeta = latest.meta;
+          state = normalizeState(latest.state);
+          durableState = window.ORStorageV2.clone(state);
           reconcileProductStocks();
           if (!options.preserveFormOnFailure) render();
         }
@@ -1290,8 +1315,8 @@ const renderNav = () => {
   `).join("");
   nav.querySelectorAll("button").forEach((button) => {
     button.addEventListener("click", () => {
-      if (!canOpenView(button.dataset.view)) return;
-      if (button.dataset.view !== currentView && (isUseEntryProtected() || isEditEntryProtected() || isProductFormProtected() || isPrescriptionSettingsProtected() || isMorningCountProtected() || (['purchase','morningcount'].includes(currentView) && purchaseModule?.isDirty())) && !confirm('저장하지 않은 입력이 있습니다. 화면을 이동할까요?')) return;
+      if (!canOpenView(button.dataset.view) || saving) return;
+      if (button.dataset.view !== currentView && (storageAdminModule?.isDirty() || isUseEntryProtected() || isEditEntryProtected() || isProductFormProtected() || isPrescriptionSettingsProtected() || isMorningCountProtected() || (['purchase','morningcount'].includes(currentView) && purchaseModule?.isDirty())) && !confirm('저장하지 않은 입력이 있습니다. 화면을 이동할까요?')) return;
       currentView = button.dataset.view;
       render();
     });
@@ -1924,12 +1949,19 @@ const getPrescriptionAdminModule = () => prescriptionAdminModule || (prescriptio
   saveState, render, canManageSettings, auditUpdateFields
 }));
 let settingsModule = null;
+let storageAdminModule = null;
+const getStorageAdminModule = () => storageAdminModule || (storageAdminModule = window.createStorageAdminModule({
+  escapeHtml, today, actor:currentAuditUser, state:()=>state, store:()=>storageV2, separated:()=>!!storageMeta, render,
+  lock:busy=>{savingCount=Math.max(0,savingCount+(busy?1:-1));saving=savingCount>0;},
+  accept:loaded=>{storageMeta=loaded.meta;state=normalizeState(loaded.state);durableState=window.ORStorageV2.clone(state);}
+}));
 const getSettingsModule = () => {
   if (!window.createSettingsModule) throw new Error("설정 모듈을 불러오지 못했습니다.");
   if (!settingsModule) {
     settingsModule = window.createSettingsModule({
       getApp: () => app,
       getCurrentSettingsView: () => currentSettingsView,
+      isSaving: () => saving,
       setCurrentSettingsView: (view) => { currentSettingsView = view; },
       settingsMenus,
       canManageSettings,
@@ -1938,7 +1970,9 @@ const getSettingsModule = () => {
       renderPrescriptionSettings,
       renderPrescriptionPatterns: () => getPrescriptionAdminModule().render(),
       bindPrescriptionPatterns: () => getPrescriptionAdminModule().bind(),
-      hasUnsavedSettings: () => isProductFormProtected() || isPrescriptionSettingsProtected(),
+      renderStorage: () => getStorageAdminModule().render(),
+      bindStorage: () => getStorageAdminModule().bind(),
+      hasUnsavedSettings: () => storageAdminModule?.isDirty() || isProductFormProtected() || isPrescriptionSettingsProtected(),
       renderDoctors,
       renderSurgeries,
       renderUsageRules,
@@ -2939,6 +2973,7 @@ const getOcsModule = () => {
     getState:()=>state,escapeHtml,today,uid,saveState,validateCase:caseNumberValidationMessage,
     canEdit:canEditUsage,canManage:canManageSettings,canModify:canModifyUsageRecord,
     actor:currentAuditUser,stockUnconfirmed:isUnconfirmedStock,
+    storageSeparated:()=>!!storageMeta,
     otherFormDirty:()=>currentView==='use' && useEntryDirty,
     saved:id=>{useEntryDirty=false;editEntryDirty=false;pendingEditUsageId=id;currentView='edit';render();},
     back:()=>{pendingEditUsageId='';editEntryDirty=false;currentView='history';render();}
@@ -6756,6 +6791,7 @@ const getBackupResetModule = () => {
       getGetDoc: () => getDoc,
       getRunTransaction: () => runTransaction,
       getMainRef: () => ref,
+      isSeparatedStorage: () => !!storageMeta,
       alphaFirstCompare,
       escapeHtml,
       currentAuditUser,
@@ -6907,10 +6943,13 @@ const boot = async () => {
     const verifiedUser = await verifySessionUser();
     if (!verifiedUser) return;
     ref = doc(db, "app", "main");
+    storageV2 = window.ORStorageV2.create(storageSdk, db, {actor:currentAuditUser});
     subscribeImplantCollections();
     const snap = await getDocFromServer(ref);
     if (snap.exists()) {
-      state = normalizeState(snap.data());
+      const loaded = await storageV2.read();
+      storageMeta = loaded.meta;
+      state = normalizeState(loaded.state);
     } else {
       await setDoc(ref, state);
     }
@@ -6918,21 +6957,35 @@ const boot = async () => {
     // 기본 자료는 app/main이 없는 최초 설치에만 넣는다.
     const addedSeedCount = snap.exists() ? 0 : addSeedMasters();
     const reconciledStockCount = reconcileProductStocks();
+    durableState = window.ORStorageV2.clone(state);
     hydrated = true;
     setStatus("Firebase 연결됨", "ok");
     if (addedSeedCount > 0 || reconciledStockCount > 0) {
       await saveState("Firebase 연결됨 · 저장 완료");
     }
     render();
-    unsubscribe = onSnapshot(ref, (snapshot) => {
+    unsubscribe = onSnapshot(ref, async (snapshot) => {
       if (!snapshot.exists() || saving) return;
       const incoming = snapshot.data();
+      if (incoming.storageVersion === 2) {
+        try {
+          const loaded = await storageV2.read();
+          if (saving || storageMeta?.generation === loaded.meta?.generation && storageMeta?.revision > loaded.meta?.revision) return;
+          storageMeta = loaded.meta;
+          state = normalizeState(loaded.state);
+          durableState = window.ORStorageV2.clone(state);
+          if (hydrated) renderOrDeferForUseEntry('Firebase 데이터가 갱신됐습니다. 입력 중인 내용을 보호하고 있습니다.');
+        } catch (error) { setStatus(`분리 저장 자료 조회 실패: ${error.message}`, 'error'); }
+        return;
+      }
+      if (storageMeta) { setStatus('저장 구조가 변경되었습니다. 새로고침이 필요합니다.', 'error'); return; }
       // 저장 직후 뒤늦게 도착하는, 방금 저장분이 반영되기 전의 과거 스냅샷을 무시한다
       // (랜딩 입고 확인 항목이 사라졌다 다시 나타나는 깜빡임 방지).
       // 기기 간 시계 오차로 다른 태블릿의 정상 갱신까지 계속 놓치지 않도록
       // 마지막 로컬 저장 후 15초 동안만 적용한다.
       if (Date.now() - lastLocalSaveAt < 15000 && String(incoming.updatedAt || "") < String(state.updatedAt || "")) return;
       state = normalizeState(incoming);
+      durableState = window.ORStorageV2.clone(state);
       reconcileProductStocks();
       if (hydrated) renderOrDeferForUseEntry("Firebase 데이터가 갱신됐습니다. 입력 중인 사용입력을 보호하고 있습니다.");
     }, (error) => {
@@ -6947,7 +7000,7 @@ const boot = async () => {
 };
 
 window.addEventListener("beforeunload", (event) => {
-  if (ocsModule?.isDirty()) { event.preventDefault(); event.returnValue = ''; }
+  if (ocsModule?.isDirty() || storageAdminModule?.isDirty()) { event.preventDefault(); event.returnValue = ''; }
   if (unsubscribe) unsubscribe();
   if (implantRecordsUnsubscribe) implantRecordsUnsubscribe();
   if (implantVendorsUnsubscribe) implantVendorsUnsubscribe();
@@ -6970,6 +7023,7 @@ const loadFirebaseAndBoot = async () => {
     runTransaction = firestoreModule.runTransaction;
     onSnapshot = firestoreModule.onSnapshot;
     getDocFromServer = firestoreModule.getDocFromServer;
+    storageSdk = firestoreModule;
     authSdk = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js');
     collection = firestoreModule.collection;
     query = firestoreModule.query;

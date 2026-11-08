@@ -10,7 +10,8 @@
         surgeries: context.renderSurgeries,
         usageRules: context.renderUsageRules,
         implantVendors: context.renderImplantVendors,
-        backup: context.renderBackup
+        backup: context.renderBackup,
+        storage: context.renderStorage
       };
       return `
         <section>
@@ -27,6 +28,7 @@
       const app = context.getApp();
       app.querySelectorAll("[data-settings-view]").forEach((button) => {
         button.addEventListener("click", () => {
+          if (context.isSaving?.()) return;
           if (button.dataset.settingsView !== context.getCurrentSettingsView() && context.hasUnsavedSettings?.() && !confirm('저장하지 않은 입력이 있습니다. 이동할까요?')) return;
           context.setCurrentSettingsView(button.dataset.settingsView);
           context.render();
@@ -40,7 +42,8 @@
         surgeries: context.bindSurgeries,
         usageRules: context.bindUsageRules,
         implantVendors: context.bindImplantVendors,
-        backup: context.bindBackup
+        backup: context.bindBackup,
+        storage: context.bindStorage
       };
       handlers[context.getCurrentSettingsView()]?.();
     };
