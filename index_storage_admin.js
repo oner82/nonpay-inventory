@@ -39,8 +39,8 @@
           const data=JSON.parse(await file.text()),current=await ctx.store().read();
           if(!current.meta)throw Error('분리 저장 전환이 필요합니다.');
           const check=window.ORCatalogLinks.apply(current.state,data,ctx.actor(),new Date().toISOString());
-          preparedLinks=check.changed.length?data:null;
-          $('catalogLinksPreview').innerHTML=`<p>변경 ${check.changed.length}코드 · 현재 재고·과거 케이스 유지</p>`+data.entries.map(x=>`<p><strong>${e(x.code)}</strong> · ${x.names.map(e).join(' / ')}<br>${e(window.ORCatalogLinks.label(x.policy,current.state.products))}<br><small>${e(x.policy.linkNote)}</small></p>`).join('');
+          preparedLinks=check.changed.length||check.productChanges.length?data:null;
+          $('catalogLinksPreview').innerHTML=`<p>변경 ${check.changed.length}코드 · 제품명/물류코드 ${check.productChanges.length}건 · 현재 수량·과거 케이스 유지</p>`+(data.productUpdates||[]).map(x=>`<p>제품 수정: ${e(x.expected.name)} → ${e(x.patch.name||x.expected.name)} · 물류코드 ${e(x.patch.orderCode||x.expected.orderCode||'없음')}</p>`).join('')+data.entries.map(x=>`<p><strong>${e(x.code)}</strong> · ${x.names.map(e).join(' / ')}<br>${e(window.ORCatalogLinks.label(x.policy,current.state.products))}<br><small>${e(x.policy.linkNote)}</small></p>`).join('');
           $('catalogLinksApply').disabled=!preparedLinks;
         }catch(error){$('catalogLinksPreview').textContent=error.message;}
       });

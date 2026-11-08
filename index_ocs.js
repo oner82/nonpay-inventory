@@ -4,7 +4,7 @@
   const number = value => /^\d+(?:\.\d+)?$/.test(String(value).trim()) ? Number(value) : null;
   const canonical = value => JSON.stringify(value, (_key, item) => item && !Array.isArray(item) && typeof item === 'object' ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
   const selectionIds = c => c?.linkPolicy==='select' ? c.selectionProductIds||[] : [];
-  const protectedLink = c => ['select','hold','ledger-pending','usage-only','direct'].includes(c?.linkPolicy);
+  const protectedLink = c => ['select','hold','ledger-pending','ledger-direct','usage-only','direct'].includes(c?.linkPolicy);
   const supportedProduct = p => p && p.active !== false && ['비급여', 'PURCHASE'].includes(p.category);
   const surgeryName = value => {
     const name=String(value || '').trim();
@@ -117,7 +117,7 @@
       const oldRow = previous?.ocsRows?.find(r => r.code === row.code && r.name === row.name);
       const sameLink = r => r && r.mode === row.mode && (r.productId || '') === (row.productId || '');
       if (!canManage && !row.cancelled && row.mode !== 'unresolved' && !sameLink(oldRow) && !(stored?.names?.includes(row.name) && (sameLink(stored) || row.mode==='linked' && selectionIds(stored).includes(row.productId)))) throw Error('새 재고 연결·차감 제외는 관리자가 확인해야 합니다.');
-      if (row.mode === 'linked' && !supportedProduct(target.products.find(p => p.id === row.productId))) throw Error('연결 제품이 삭제되었거나 별도 장부 대상입니다. 연결을 다시 확인해 주세요.');
+      if (row.mode === 'linked' && !(supportedProduct(target.products.find(p => p.id === row.productId)) || permissions.ledgerAtomic && stored?.linkPolicy==='ledger-direct' && stored.productId===row.productId && target.products.some(p=>p.id===row.productId&&p.active!==false&&window.OROcsLedger?.needsLedger(p)))) throw Error('연결 제품이 삭제되었거나 별도 장부 대상입니다. 연결을 다시 확인해 주세요.');
       return {code:row.code,name:row.name,section:String(row.section||'').slice(0,250),dose:row.dose,times:row.times,days:row.days,cancelled:!!row.cancelled,qty:row.qty,mode:row.mode,productId:row.mode==='linked'?row.productId:''};
     });
     // 같은 코드의 복수 행은 합산하되 연결 결정은 일치해야 한다.
@@ -130,7 +130,7 @@
     for (const [id,qty] of counts(productIds)) {
       const p = remote.products.find(p => p.id === id) || target.products.find(p => p.id === id);
       const increase=qty-(oldCounts.get(id)||0),stock=Number(p.stock||0);
-      if (increase>0 && increase>stock && !stockUnconfirmed(p)) shortages.push({productId:id,name:p.name,orderCode:p.orderCode||'',unit:p.stockUnit||'개',stock,qty,increase,shortage:increase-stock});
+      if (increase>0 && increase>stock && !stockUnconfirmed(p) && !(p.category==='인체조직'&&p.vendorManaged)) shortages.push({productId:id,name:p.name,orderCode:p.orderCode||'',unit:p.stockUnit||'개',stock,qty,increase,shortage:increase-stock});
     }
     // 허용은 이번 저장에서 확인한 부족 목록에만 적용한다. 동시 변경 시 다시 확인한다.
     if (shortages.length && !(canManage && request.testStockOverride===true && canonical(shortages)===canonical(request.confirmedShortages||[]))) {
@@ -167,7 +167,7 @@
     const linkItem=row=>(context.getState().ocsCatalog||[]).find(c=>c.code===row.code);
     const mayPick=row=>selectionIds(linkItem(row)).length>0 || context.canManage()&&!protectedLink(linkItem(row));
     const linkLabel=row=>{
-      const product=context.getState().products.find(p=>p.id===row.productId&&supportedProduct(p));
+      const product=context.getState().products.find(p=>p.id===row.productId&&(supportedProduct(p)||linkItem(row)?.linkPolicy==='ledger-direct'));
       const item=linkItem(row);
       if(row.mode!=='linked' && item?.linkPolicy==='select')return '실제 사용 제품 선택';
       if(item?.linkPolicy==='ledger-pending')return '제품 확인됨 · 별도 장부 입력';
@@ -203,7 +203,7 @@
         <div style="max-height:240px;overflow:auto">${(context.getState().ocsCatalog||[]).map(c=>`<p><strong>${e(c.code)}</strong> · ${c.names.map(e).join(' / ')} · ${c.mode==='linked'?'재고 연결':c.mode==='excluded'?'차감 제외':'연결 필요'}</p>`).join('')}</div></details>
         ${record?`<details><summary>수정 이력 (${record.ocsChanges?.length||0}회)</summary>${(record.ocsChanges||[]).map(c=>`<p>${e(c.at)} · ${e(c.by?.name||'')}<br>${c.after.map((r,i)=>`${e(r.code)}: ${e(c.before[i]?.qty??'?')} → ${e(r.qty)}`).join('<br>')}</p>`).join('')}</details>`:''}
         ${record?(record.ocsChanges||[]).filter(c=>c.surgeryAfter!==undefined&&c.surgeryBefore!==c.surgeryAfter).map(c=>`<p class="helper">수술명 수정 · ${e(c.at)} · ${e(c.by?.name||'')}: ${e(c.surgeryBefore)} → ${e(c.surgeryAfter)}</p>`).join(''):''}
-      </section>`;
+      </section>${context.ledgerHtml?.(record)||''}`;
     };
     function bind() {
       const panel=document.getElementById('ocsPanel');if(!panel)return;
@@ -215,6 +215,7 @@
       document.getElementById('saveUseDraft')?.addEventListener('click',protectOtherSave,true);
       let confirmedShortages=[];
       const showShortages=list=>{confirmedShortages=clone(list);$('ocsStockNotice').hidden=false;if($('ocsTestStockConfirm'))$('ocsTestStockConfirm').checked=false;$('ocsStockList').innerHTML=list.map(p=>`<p><strong>${e(p.name)}</strong> · ${e(p.orderCode||'물류코드 미등록')}<br>현재고 ${e(p.stock)}${e(p.unit)} · 입력 ${e(p.qty)}${e(p.unit)} · 추가 차감 ${e(p.increase)}${e(p.unit)} · <strong>부족 ${e(p.shortage)}${e(p.unit)}</strong></p>`).join('');};
+      context.bindLedger?.(previous);
       const touch=()=>{confirmedShortages=[];$('ocsStockNotice').hidden=true;if($('ocsTestStockConfirm'))$('ocsTestStockConfirm').checked=false;dirty=true;$('ocsConfirm').checked=false;$('ocsUnlinkedConfirm').checked=false;$('ocsUnlinkedNotice').hidden=true;};
       const fillSurgeryCase=value=>{
         const parsed=surgeryCase(value);
@@ -341,8 +342,8 @@
         busy=true;$('ocsSave').disabled=true;$('ocsSave').textContent='저장 중…';message('서버에 저장 중입니다. 잠시 기다려 주세요.');
         let failedShortages=null;
         try {
-          const saved=await context.saveState('OCS 사용 기록 저장 완료',{requireTransaction:true,preserveFormOnFailure:true,apply:(target,remote)=>apply(target,remote,request,{
-            canEdit:context.canEdit(),canManage:context.canManage(),canModify:context.canModify,actor:context.actor()||{},stockUnconfirmed:context.stockUnconfirmed,storageSeparated:!!context.storageSeparated?.(),onStockShortage:list=>{failedShortages=list;}
+          const saved=await context.saveState('OCS 사용 기록 저장 완료',{requireTransaction:true,prepareWrites:context.ledgerWrites?.(request),preserveFormOnFailure:true,apply:(target,remote)=>apply(target,remote,request,{
+            canEdit:context.canEdit(),canManage:context.canManage(),canModify:context.canModify,actor:context.actor()||{},stockUnconfirmed:context.stockUnconfirmed,storageSeparated:!!context.storageSeparated?.(),ledgerAtomic:!!context.ledgerWrites,onStockShortage:list=>{failedShortages=list;}
           })});
           if(saved){dirty=false;context.saved(request.id);}else if(failedShortages){showShortages(failedShortages);message('재고가 부족합니다. 아래 품목·수량을 확인해 주세요.');$('ocsStockNotice').scrollIntoView({block:'nearest'});}else message('저장하지 못했습니다. 입력은 유지됩니다. 오류 안내를 확인해 주세요.');
         } catch(error) {if(failedShortages)showShortages(failedShortages);message(`저장하지 못했습니다: ${error.message || '알 수 없는 오류'}. 입력은 유지됩니다.`);

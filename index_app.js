@@ -1233,6 +1233,7 @@ const saveState = async (message = "저장 완료", options = {}) => {
   const baseForSave = durableState && window.ORStorageV2.clone(durableState);
   const localForSave = window.ORStorageV2?.clone(state);
   try {
+    if (options.prepareWrites && !storageMeta) throw new Error('장부 동시 저장은 분리 저장 전환 후 가능합니다.');
     if (options.requireTransaction && !(runTransaction && db)) throw new Error('안전한 동시 저장 연결이 준비되지 않았습니다. 다시 시도해 주세요.');
     if (storageMeta) {
       const saved = await storageV2.commit(remoteData => {
@@ -1245,7 +1246,7 @@ const saveState = async (message = "저장 완료", options = {}) => {
           state.updatedAt = new Date().toISOString();
           return normalizeState(state);
         } finally { state = previousState; }
-      });
+      }, {prepareWrites:options.prepareWrites});
       state = normalizeState(saved.state);
       storageMeta = saved.meta;
     } else if (runTransaction && db) {
@@ -1331,7 +1332,7 @@ const getPurchaseModule = () => purchaseModule ||= window.createPurchaseModule({
 const renderPurchaseOrders = () => getPurchaseModule().render();
 const bindPurchaseOrders = () => getPurchaseModule().bind();
 
-const implantRecordViews = new Set(["implants", "edit", "history", "receipts"]);
+const implantRecordViews = new Set(["implants", "use", "edit", "history", "receipts"]);
 const currentViewNeedsImplantRecords = () => implantRecordViews.has(currentView);
 const implantRecordsLoadingHtml = () => `
   <div class="card">
@@ -2967,6 +2968,32 @@ const getUsageEntryModule = () => {
 const pendingUsageSummary = (item) => getUsageEntryModule().pendingUsageSummary(item);
 const renderPendingUsageList = () => getUsageEntryModule().renderPendingUsageList();
 
+const renderOcsLedger = usage => {
+  if(!usage)return '';
+  const record=implantRecordsForUsage(usage.id).find(r=>r.ocsManaged);
+  if(!record)return '';
+  return `<section id="ocsLedger" class="card"><h3>수술별 업체 장부</h3><p class="helper">사용량과 함께 저장된 장부입니다. 업체별 모아보기·전송 자료에 포함됩니다. 환자정보가 없는 라벨 사진만 추가해 주세요.</p>${record.implants.map(i=>`<div><strong>${escapeHtml(i.vendor)}</strong><p style="white-space:pre-wrap">${escapeHtml(i.description)}</p><p>라벨 사진 ${(i.photos||[]).length}장</p><input type="file" accept="image/*" multiple data-ocs-ledger-photo="${escapeHtml(i.id)}" aria-label="${escapeHtml(i.vendor)} 장부 라벨 사진 추가"></div>`).join('')}<p id="ocsLedgerStatus" role="status"></p></section>`;
+};
+const bindOcsLedger = usage => {
+  document.querySelectorAll('[data-ocs-ledger-photo]').forEach(input=>input.addEventListener('change',async()=>{
+    const files=Array.from(input.files||[]);if(!files.length)return;
+    const record=implantRecordsForUsage(usage.id).find(r=>r.ocsManaged),implantId=input.dataset.ocsLedgerPhoto;
+    const status=document.getElementById('ocsLedgerStatus');input.disabled=true;
+    try{
+      if(!record||!canModifyImplantRecord(record))throw Error('장부 수정 권한을 확인해 주세요.');
+      const uploaded=[];
+      for(const file of files){const photo={id:uid(),file:new File([file],'label.jpg',{type:file.type}),name:'라벨 사진',rotation:0};uploaded.push(await uploadImplantPhoto(record.id,implantId,photo,record.surgeryDate));}
+      await runTransaction(db,async tx=>{
+        const ledgerRef=doc(db,'implantRecords',record.id),snap=await tx.get(ledgerRef),latest=snap.data();
+        if(!snap.exists()||!canModifyImplantRecord(latest))throw Error('장부가 삭제되었거나 잠겼습니다.');
+        const implant=latest.implants.find(i=>i.id===implantId);if(!implant)throw Error('업체 항목이 변경되었습니다.');
+        implant.photos=[...(implant.photos||[]),...uploaded];tx.set(ledgerRef,{...latest,updatedAt:new Date().toISOString(),updatedBy:currentAuditUser()});
+      });
+      status.textContent=`사진 ${uploaded.length}장 저장 완료. 임플란트 메뉴에서 업체별 장부를 확인하세요.`;input.value='';
+    }catch(error){status.textContent='사진 저장 실패: '+error.message+' · 사용량과 재고 저장은 유지됩니다. 사진을 다시 선택해 주세요.';}
+    finally{input.disabled=false;}
+  }));
+};
 let ocsModule = null;
 const getOcsModule = () => {
   if (!ocsModule) ocsModule = window.createOcsModule({
@@ -2974,6 +3001,19 @@ const getOcsModule = () => {
     canEdit:canEditUsage,canManage:canManageSettings,canModify:canModifyUsageRecord,
     actor:currentAuditUser,stockUnconfirmed:isUnconfirmedStock,
     storageSeparated:()=>!!storageMeta,
+    ledgerWrites:request=>async(tx,remote,next)=>{
+      if(!implantRecordsLoaded)throw Error("업체 장부를 불러오는 중입니다. 잠시 후 다시 저장해 주세요.");
+      const usage=next.usages.find(u=>u.id===request.id);
+      const existingRecords=implantRecordsForUsage(request.id);
+      if(existingRecords.length>1)throw Error("이 케이스의 장부가 여러 건입니다. 먼저 확인해 주세요.");
+      const ledgerRef=doc(db,"implantRecords",existingRecords[0]?.id||"ocs_"+request.id);
+      const snap=await tx.get(ledgerRef);
+      const existing=snap.exists()?snap.data():null;
+      const record=window.OROcsLedger.build({existing,usage,products:next.products,doctor:next.doctors.find(d=>d.id===usage.doctorId),actor:currentAuditUser(),at:request.at,vendorFor:p=>{const v=implantVendorSelectionForProduct(p);return {vendorId:v.vendorId==="__custom__"?"":v.vendorId||"",vendor:implantDraftVendorName(v)||p.company||""};}});
+      return ()=>{if(record)tx.set(ledgerRef,record);};
+    },
+    ledgerHtml:record=>renderOcsLedger(record),
+    bindLedger:record=>bindOcsLedger(record),
     otherFormDirty:()=>currentView==='use' && useEntryDirty,
     saved:id=>{useEntryDirty=false;editEntryDirty=false;pendingEditUsageId=id;currentView='edit';render();},
     back:()=>{pendingEditUsageId='';editEntryDirty=false;currentView='history';render();}
@@ -6758,6 +6798,19 @@ const deleteUsageRecord = async (usageId, { onSuccess } = {}) => {
         ? { ...receipt, type: "landingCancelled" }
         : receipt);
   };
+  if(usage.source==='ocs-paste' && storageMeta){
+    const deleted=await saveState('사용내역·장부 삭제 완료 · 재고 복구', {requireTransaction:true,
+      apply:(target,remote)=>{const latest=remote.usages.find(u=>u.id===usage.id);if(!window.ORStorageV2.equal(latest,usage))throw Error('사용내역이 변경되었습니다. 다시 확인해 주세요.');applyUsageDelete(target);},
+      prepareWrites:async tx=>{
+        if(!implantRecordsLoaded)throw Error('장부 로딩이 완료된 후 다시 시도해 주세요.');
+        const ids=[...new Set(['ocs_'+usage.id,...implantRecordsForUsage(usage.id).map(r=>r.id)])];
+        const refs=ids.map(id=>doc(db,'implantRecords',id));const snaps=await Promise.all(refs.map(r=>tx.get(r)));
+        for(const snap of snaps)if(snap.exists() && !canModifyImplantRecord(snap.data()))throw Error('장부 수정 권한을 확인해 주세요.');
+        return ()=>snaps.forEach((snap,i)=>{if(snap.exists())tx.delete(refs[i]);});
+      }});
+    if(!deleted)return false;
+    if(typeof onSuccess==='function')onSuccess();render();return true;
+  }
   applyUsageDelete(state);
   await saveState("사용내역 삭제 완료 · 재고 복구", { apply: applyUsageDelete });
   try {

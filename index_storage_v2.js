@@ -156,7 +156,7 @@
       }
       throw Error('동시 저장이 많아 최신 자료를 확정하지 못했습니다. 잠시 후 다시 시도해 주세요.');
     }
-    async function commit(transform) {
+    async function commit(transform, {prepareWrites} = {}) {
       for(let attempt=0;attempt<12;attempt++) {
         const before=await read();
         if(!before.meta) throw Error('분리 저장 전환이 완료되지 않았습니다.');
@@ -170,9 +170,11 @@
           await runTransaction(db,async tx=>{
             const latest=(await tx.get(root)).data();
             if(!equal(latest,before.meta))throw conflict();
+            const extraWrites=prepareWrites ? await prepareWrites(tx,before.state,after) : null;
             for(const op of ops) if(op.after)tx.set(recordRef(meta.generation,op.path),op.after);else tx.delete(recordRef(meta.generation,op.path));
             tx.set(recordRef(meta.generation,'changes/'+meta.revision),{revision:meta.revision,changed:meta.changed,at:meta.updatedAt,by:actor()});
             tx.set(root,meta);
+            if(extraWrites)extraWrites();
           });
           cached={meta,map:nextMap};return {state:unpack(nextMap),meta:clone(meta)};
         } catch(e) {
