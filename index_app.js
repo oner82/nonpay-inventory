@@ -73,15 +73,14 @@ const menus = [
   ["history", "사용내역"],
   ["purchase", "구매주문"],
   ["receipts", "입고관리"],
-  ["implants", "임플란트"],
   ["settings", "설정"]
 ];
 
 const roleAllowedViews = {
-  admin: ["dashboard", "morningcount", "use", "edit", "history", "purchase", "receipts", "implants", "settings"],
-  manager: ["dashboard", "morningcount", "use", "edit", "history", "purchase", "receipts", "implants", "settings"],
-  receiver: ["purchase", "receipts", "implants"],
-  staff: ["dashboard", "morningcount", "use", "edit", "history", "purchase", "implants"]
+  admin: ["dashboard", "morningcount", "use", "edit", "history", "purchase", "receipts", "settings"],
+  manager: ["dashboard", "morningcount", "use", "edit", "history", "purchase", "receipts", "settings"],
+  receiver: ["purchase", "receipts"],
+  staff: ["dashboard", "morningcount", "use", "edit", "history", "purchase"]
 };
 
 const roleLabels = {
@@ -1332,7 +1331,7 @@ const getPurchaseModule = () => purchaseModule ||= window.createPurchaseModule({
 const renderPurchaseOrders = () => getPurchaseModule().render();
 const bindPurchaseOrders = () => getPurchaseModule().bind();
 
-const implantRecordViews = new Set(["implants", "use", "edit", "history", "receipts"]);
+const implantRecordViews = new Set(["use", "edit", "history", "receipts"]);
 const currentViewNeedsImplantRecords = () => implantRecordViews.has(currentView);
 const implantRecordsLoadingHtml = () => `
   <div class="card">
@@ -1396,7 +1395,6 @@ const render = () => {
     dashboard: renderDashboard,
     purchase: renderPurchaseOrders,
     receipts: renderReceipts,
-    implants: renderImplants,
     use: renderUse,
     morningcount: renderMorningCount,
     // 방 마감 이력은 별도 뷰 대신 사용내역 하단의 접힌 카드로 제공한다(관리자·책임사용자만).
@@ -1620,7 +1618,6 @@ const bindView = () => {
     dashboard: bindDashboard,
     purchase: bindPurchaseOrders,
     receipts: bindReceipts,
-    implants: bindImplants,
     use: bindUse,
     morningcount: bindMorningCount,
     history: () => { bindHistory(); if (canManageSettings()) bindRoomCloseHistory(); },
@@ -2911,8 +2908,6 @@ const getImplantsModule = () => {
   return implantsModule;
 };
 
-const renderImplants = () => getImplantsModule().renderImplants();
-
 let implantVendorsModule = null;
 const getImplantVendorsModule = () => {
   if (!window.createImplantVendorsModule) throw new Error("임플란트 업체관리 모듈을 불러오지 못했습니다.");
@@ -3007,7 +3002,7 @@ const bindOcsLedger = usage => {
         const implant=latest.implants.find(i=>i.id===implantId);if(!implant)throw Error('업체 항목이 변경되었습니다.');
         implant.photos=[...(implant.photos||[]),...uploaded];tx.set(ledgerRef,{...latest,updatedAt:new Date().toISOString(),updatedBy:currentAuditUser()});
       });
-      status.textContent=`사진 ${uploaded.length}장 저장 완료. 임플란트 메뉴에서 업체별 장부를 확인하세요.`;input.value='';
+      status.textContent=`사진 ${uploaded.length}장 저장 완료.`;input.value='';
     }catch(error){status.textContent='사진 저장 실패: '+error.message+' · 사용량과 재고 저장은 유지됩니다. 사진을 다시 선택해 주세요.';}
     finally{input.disabled=false;}
   }));
@@ -4602,8 +4597,6 @@ const hideImplantPhotoModal = () => {
   if (modal) modal.hidden = true;
   unlockModalPageScroll();
 };
-
-const bindImplants = () => getImplantsModule().bindImplants();
 
 const loadImageFromFile = (file) => new Promise((resolve, reject) => {
   const image = new Image();
