@@ -3,6 +3,8 @@
   const clone = value => JSON.parse(JSON.stringify(value));
   const number = value => /^\d+(?:\.\d+)?$/.test(String(value).trim()) ? Number(value) : null;
   const canonical = value => JSON.stringify(value, (_key, item) => item && !Array.isArray(item) && typeof item === 'object' ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
+  const selectionIds = c => c?.linkPolicy==='select' ? c.selectionProductIds||[] : [];
+  const protectedLink = c => ['select','hold','ledger-pending','usage-only','direct'].includes(c?.linkPolicy);
   const supportedProduct = p => p && p.active !== false && ['비급여', 'PURCHASE'].includes(p.category);
   const surgeryName = value => {
     const name=String(value || '').trim();
@@ -101,16 +103,25 @@
       if (!row.code || !row.name) throw Error('코드와 명칭이 필요합니다.');
       const stored = (remote.ocsCatalog || []).find(c => c.code === row.code);
       const expected = (request.catalogSnapshot || []).find(c => c.code === row.code);
-      const linkKey = r => `${r?.mode || 'unresolved'}:${r?.productId || ''}`;
+      const linkKey = r => canonical({mode:r?.mode||'unresolved',productId:r?.productId||'',linkPolicy:r?.linkPolicy||'',selectionProductIds:r?.selectionProductIds||[]});
       if (!row.cancelled && request.catalogSnapshot && canManage && linkKey(stored)!==linkKey(expected) && linkKey(row)!==linkKey(stored)) throw Error('다른 사용자가 코드 연결을 변경했습니다. 최신 목록으로 다시 확인해 주세요.');
+      if(protectedLink(stored)){
+        if(!stored.names.includes(row.name) && row.mode!=='unresolved')throw Error('확인되지 않은 새 처방명입니다: '+row.code);
+        if(selectionIds(stored).length){
+          if(row.qty>0 && (row.mode!=='linked' || !selectionIds(stored).includes(row.productId)))throw Error(row.name+': 실제 사용한 제품을 선택해 주세요.');
+          if(row.mode==='linked' && !selectionIds(stored).includes(row.productId))throw Error('확인된 선택 목록과 다른 제품입니다.');
+        }else if(row.mode!==stored.mode || (row.productId||'')!==(stored.productId||'')){
+          throw Error('확인된 연결 정책은 설정에서 변경해 주세요: '+row.code);
+        }
+      }
       const oldRow = previous?.ocsRows?.find(r => r.code === row.code && r.name === row.name);
       const sameLink = r => r && r.mode === row.mode && (r.productId || '') === (row.productId || '');
-      if (!canManage && !row.cancelled && row.mode !== 'unresolved' && !sameLink(oldRow) && !(stored?.names?.includes(row.name) && sameLink(stored))) throw Error('새 재고 연결·차감 제외는 관리자가 확인해야 합니다.');
+      if (!canManage && !row.cancelled && row.mode !== 'unresolved' && !sameLink(oldRow) && !(stored?.names?.includes(row.name) && (sameLink(stored) || row.mode==='linked' && selectionIds(stored).includes(row.productId)))) throw Error('새 재고 연결·차감 제외는 관리자가 확인해야 합니다.');
       if (row.mode === 'linked' && !supportedProduct(target.products.find(p => p.id === row.productId))) throw Error('연결 제품이 삭제되었거나 별도 장부 대상입니다. 연결을 다시 확인해 주세요.');
       return {code:row.code,name:row.name,section:String(row.section||'').slice(0,250),dose:row.dose,times:row.times,days:row.days,cancelled:!!row.cancelled,qty:row.qty,mode:row.mode,productId:row.mode==='linked'?row.productId:''};
     });
     // 같은 코드의 복수 행은 합산하되 연결 결정은 일치해야 한다.
-    for (const row of rows.filter(r=>!r.cancelled)) if (rows.some(r => !r.cancelled && r.code === row.code && (r.mode !== row.mode || r.productId !== row.productId))) throw Error('같은 코드의 연결 설정이 서로 다릅니다.');
+    for (const row of rows.filter(r=>!r.cancelled && !selectionIds((remote.ocsCatalog||[]).find(c=>c.code===r.code)).length)) if (rows.some(r => !r.cancelled && r.code === row.code && (r.mode !== row.mode || r.productId !== row.productId))) throw Error('같은 코드의 연결 설정이 서로 다릅니다.');
     const productIds = rows.flatMap(r => r.mode === 'linked' ? Array(r.qty).fill(r.productId) : []);
     if (productIds.length > 20000) throw Error('한 케이스의 수량이 너무 큽니다. 단위를 확인해 주세요.');
     const counts = ids => ids.reduce((m,id) => (m.set(id,(m.get(id)||0)+1),m),new Map());
@@ -143,7 +154,7 @@
       if (!item) { item={id:row.code,code:row.code,names:[],firstSeenAt:at,mode:'unresolved',productId:''};catalog.push(item); }
       if (!item.names.includes(row.name)) item.names.push(row.name);
       item.lastSeenAt=at;item.updatedAt=at;
-      if (canManage && !row.cancelled) {item.mode=row.mode;item.productId=row.productId;item.updatedBy=actor;}
+      if (canManage && !row.cancelled && !protectedLink(item)) {item.mode=row.mode;item.productId=row.productId;item.updatedBy=actor;}
     }
     target.ocsCatalog=catalog;
     // 전체 상태가 단일 Firestore 문서이므로 크기 초과 시 부분 저장 없이 중단한다.
@@ -153,8 +164,14 @@
   window.createOcsModule = context => {
     const e=context.escapeHtml;
     const productLabel=p=>`${p.orderCode||''} · ${p.name}${p.purchaseSpec?' · '+p.purchaseSpec:''} (${p.stockUnit||'개'})`;
+    const linkItem=row=>(context.getState().ocsCatalog||[]).find(c=>c.code===row.code);
+    const mayPick=row=>selectionIds(linkItem(row)).length>0 || context.canManage()&&!protectedLink(linkItem(row));
     const linkLabel=row=>{
       const product=context.getState().products.find(p=>p.id===row.productId&&supportedProduct(p));
+      const item=linkItem(row);
+      if(row.mode!=='linked' && item?.linkPolicy==='select')return '실제 사용 제품 선택';
+      if(item?.linkPolicy==='ledger-pending')return '제품 확인됨 · 별도 장부 입력';
+      if(item?.linkPolicy==='hold')return '확인 보류 · 재고 미반영';
       return row.mode==='linked'?(product?productLabel(product):'기존 연결 확인 필요'):row.mode==='excluded'?'사용량만 기록 · 차감 제외':'미연결 · 재고 미반영';
     };
     let rows=[], previous=null, dirty=false, busy=false, catalogSnapshot=[], excludedCount=0, excludedServiceCount=0;
@@ -221,7 +238,7 @@
           (i===0 || r.section!==rows[i-1].section ? '<div class="ocs-sheet-section">'+e(r.section||'처방 목록')+'</div>' : '')+
           `<div class="item ocs-sheet-row"><span class="ocs-sheet-code">${e(r.code)}</span><div class="ocs-sheet-name">${e(r.name)}<small>원본 ${e(r.dose)} × ${e(r.times)}회 × ${e(r.days)}일${r.times!==1||r.days!==1?' · 실제 사용량 확인':''}</small></div>
           <input id="ocsQty${i}" aria-label="${e(r.name)} 사용 수량" data-ocs-qty="${i}" type="number" min="0" max="10000" step="1" value="${r.qty===null?'':r.qty}">
-          <button type="button" class="ocs-link-control" id="ocsLink${i}" data-ocs-open="${i}" aria-label="${e(r.name)} 재고 연결" aria-haspopup="dialog" title="${e(linkLabel(r))}" ${context.canManage()?'':'disabled'}><span>${e(linkLabel(r))}</span><span aria-hidden="true">▾</span></button></div>`).join('')+'</div>' : '';
+          <button type="button" class="ocs-link-control" id="ocsLink${i}" data-ocs-open="${i}" aria-label="${e(r.name)} 재고 연결" aria-haspopup="dialog" title="${e(linkLabel(r))}" ${mayPick(r)?'':'disabled'}><span>${e(linkLabel(r))}</span><span aria-hidden="true">▾</span></button></div>`).join('')+'</div>' : '';
         message(`${excludedServiceCount?`비용·검사 ${excludedServiceCount}행 제외 · `:''}${excludedCount?`삭제 ${excludedCount}행 제외 · `:''}${rows.length?`등록 대상 ${rows.length}행 · 미연결 ${rows.filter(r=>r.mode==='unresolved').length}행은 재고에 반영되지 않습니다.`:'등록할 처방이 없습니다.'}`);
         $('ocsSave').disabled=!rows.length;
       };
@@ -231,9 +248,9 @@
         if(pickerRow===null)return;
         const normalize=value=>String(value||'').normalize('NFKC').toLocaleLowerCase().replace(/\s+/g,' ').trim();
         const terms=normalize($('ocsLinkSearch').value).split(' ').filter(Boolean);
-        const found=context.getState().products.filter(supportedProduct).filter(p=>terms.every(term=>normalize([p.name,p.purchaseName,p.purchaseSpec,p.orderCode].join(' ')).includes(term)));
+        const found=context.getState().products.filter(supportedProduct).filter(p=>!selectionIds(linkItem(rows[pickerRow])).length || selectionIds(linkItem(rows[pickerRow])).includes(p.id)).filter(p=>terms.every(term=>normalize([p.name,p.purchaseName,p.purchaseSpec,p.orderCode].join(' ')).includes(term)));
         const row=rows[pickerRow],selected=row.mode==='linked'?'p:'+row.productId:row.mode;
-        const options=[{value:'unresolved',label:'미연결 · 재고 미반영'},{value:'excluded',label:'사용량만 기록 · 차감 제외'},...found.map(p=>({value:'p:'+p.id,label:productLabel(p)}))];
+        const options=[...(selectionIds(linkItem(row)).length?[]:[{value:'unresolved',label:'미연결 · 재고 미반영'},{value:'excluded',label:'사용량만 기록 · 차감 제외'}]),...found.map(p=>({value:'p:'+p.id,label:productLabel(p)}))];
         $('ocsLinkStatus').textContent=found.length?`${found.length}개 제품 · 선택해야 연결이 바뀝니다.`:'일치하는 제품이 없습니다. 기존 연결은 유지됩니다.';
         $('ocsLinkOptions').innerHTML=options.map(o=>`<button type="button" data-ocs-choice="${e(o.value)}" aria-pressed="${selected===o.value}">${e(o.label)}</button>`).join('');
       };
@@ -241,7 +258,7 @@
       $('ocsPickerClose').addEventListener('click',closePicker);
       panel.addEventListener('click',event=>{
         const opener=event.target.closest('[data-ocs-open]');
-        if(opener && context.canManage()){
+        if(opener && mayPick(rows[Number(opener.dataset.ocsOpen)])){
           pickerRow=Number(opener.dataset.ocsOpen);$('ocsLinkSearch').value='';$('ocsPickerTitle').textContent=rows[pickerRow].name;filterLinks();
           const rect=opener.getBoundingClientRect(),width=Math.min(440,innerWidth-24),height=Math.min(360,innerHeight-24);
           picker.style.width=width+'px';picker.style.maxHeight=height+'px';
@@ -250,7 +267,7 @@
           picker.showPopover();$('ocsLinkSearch').focus();return;
         }
         const choice=event.target.closest('[data-ocs-choice]');
-        if(!choice || pickerRow===null || !context.canManage())return;
+        if(!choice || pickerRow===null || !mayPick(rows[pickerRow]))return;
         const row=rows[pickerRow],v=choice.dataset.ocsChoice;
         row.mode=v.startsWith('p:')?'linked':v;row.productId=v.startsWith('p:')?v.slice(2):'';touch();
         const button=$('ocsLink'+pickerRow);button.querySelector('span').textContent=linkLabel(row);button.title=linkLabel(row);closePicker();
