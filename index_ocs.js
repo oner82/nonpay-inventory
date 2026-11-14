@@ -299,8 +299,9 @@
         if(event.target.hasAttribute('data-ocs-qty'))rows[Number(event.target.dataset.ocsQty)].qty=number(event.target.value);
       });
       $('ocsParse')?.addEventListener('click',()=>{
-        try {catalogSnapshot=clone(context.getState().ocsCatalog||[]);const parsed=parse($('ocsPaste').value);excludedCount=parsed.excludedCount;excludedServiceCount=parsed.excludedServiceCount||0;rows=prepare(parsed,catalogSnapshot);$('ocsPaste').value='';$('ocsPasteTitle').textContent='다른 처방 다시 붙여넣기';$('ocsPasteStatus').textContent=`읽기 완료 · 등록 대상 ${rows.length}행${excludedCount?` · 삭제 ${excludedCount}행 제외`:''}${excludedServiceCount?` · 비용·검사 ${excludedServiceCount}행 제외`:''}`;touch();paint();}
-        catch(error){rows=[];excludedCount=0;excludedServiceCount=0;touch();paint();message(error.message);$('ocsPasteTitle').textContent='복사한 내용 확인하기';$('ocsPasteStatus').textContent='읽지 못했습니다. 내용을 펼쳐 확인하거나 다시 붙여넣으세요.';}
+        if(busy)return;
+        try {const nextCatalog=clone(context.getState().ocsCatalog||[]),parsed=parse($('ocsPaste').value),nextRows=prepare(parsed,nextCatalog);catalogSnapshot=nextCatalog;excludedCount=parsed.excludedCount;excludedServiceCount=parsed.excludedServiceCount||0;rows=nextRows;$('ocsPaste').value='';$('ocsPasteTitle').textContent='다른 처방 다시 붙여넣기';$('ocsPasteStatus').textContent=`읽기 완료 · 등록 대상 ${rows.length}행${excludedCount?` · 삭제 ${excludedCount}행 제외`:''}${excludedServiceCount?` · 비용·검사 ${excludedServiceCount}행 제외`:''}`;touch();paint();}
+        catch(error){touch();paint();message(error.message+' 기존 처방 목록과 수정 수량은 유지됩니다.');$('ocsPasteTitle').textContent='복사한 내용 확인하기';$('ocsPasteStatus').textContent='읽지 못했습니다. 내용을 펼쳐 확인하거나 다시 붙여넣으세요.';}
       });
       let excelBook=null;
       const acceptExcel=()=>{
@@ -325,6 +326,8 @@
       $('ocsBack')?.addEventListener('click',()=>{if(!dirty||confirm('저장하지 않은 변경을 닫을까요?')){dirty=false;context.back();}});
       $('ocsSave').addEventListener('click',async()=>{
         if(busy)return;
+        // 새 원문을 읽기 전에는 화면에 남은 이전 처방을 저장하지 않는다.
+        if($('ocsPaste')?.value.trim()){message('새로 붙여넣은 내용이 아직 읽히지 않았습니다. 처방 읽기를 누르거나 붙여넣기 칸을 비운 뒤 기존 목록을 확인해 주세요.');$('ocsPasteDetails').open=true;$('ocsPaste').focus();return;}
         if(context.otherFormDirty?.()){message('아래 기존 사용입력에 저장하지 않은 내용이 있습니다. 먼저 저장하거나 새 케이스 입력으로 정리해 주세요.');return;}
         try {if(surgeryCase($('ocsSurgery').value).caseRoom!==undefined){fillSurgeryCase($('ocsSurgery').value);message('자동 입력된 방·순서를 확인한 뒤 확인에 체크해 주세요.');return;}}catch(error){message(error.message);return;}
         const date=$('ocsDate').value,caseRoom=$('ocsRoom').value,caseOrder=$('ocsOrder').value;
