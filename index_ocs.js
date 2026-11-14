@@ -189,7 +189,7 @@
         <p class="helper">앞에 7-1이 있으면 7번방·첫 번째 수술로 자동 입력합니다. 목록에 없는 수술명도 입력할 수 있습니다. 환자명·등록번호는 입력하지 마세요. 처방 붙여넣기 원문은 저장하지 않습니다.</p>
         <p id="ocsCaseHint" class="helper" role="status"></p>
         ${record?'':`<div class="ocs-paste-box"><button id="ocsExcelOpen" type="button" title="OCS 처방 엑셀 불러오기 (.xlsx)"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M6 2h11v16H6zM10 6h5M10 10h5M10 14h5" stroke="currentColor"/><rect x="1" y="5" width="10" height="10" rx="1" fill="currentColor"/><path d="m4 8 4 4m0-4-4 4" stroke="#167345" stroke-width="1.7"/></svg>엑셀 불러오기</button><input id="ocsExcelFile" type="file" accept=".xlsx" hidden><details id="ocsPasteDetails" open><summary><span id="ocsPasteTitle">OCS 처방 붙여넣기</span><span class="ocs-paste-hint">펼치기 / 접기</span></summary><label class="helper" for="ocsPaste">아래 칸을 누르고 Ctrl+V 또는 ⌘V로 붙여넣으세요.</label><textarea id="ocsPaste" rows="3" autocomplete="off" spellcheck="false" wrap="off" placeholder="여기에 OCS 처방을 붙여넣으세요"></textarea></details><div class="ocs-paste-actions"><span id="ocsPasteStatus" role="status">복사한 내용은 읽기 후 지워집니다.</span><button id="ocsParse" type="button">처방 읽기</button></div><div id="ocsExcelSheets" hidden><label for="ocsExcelSheet">읽을 시트 · 한 케이스씩</label><select id="ocsExcelSheet"></select><button id="ocsExcelRead" type="button">선택한 시트 읽기</button></div><p id="ocsExcelStatus" class="helper" role="status"></p></div>`}
-        <p id="ocsMessage" role="status"></p><div id="ocsRows"></div>
+        <p id="ocsMessage" role="status"></p><p id="ocsQtyHelp" class="helper">수량 칸에서 Enter는 다음 행, Shift+Enter는 이전 행으로 이동합니다. 마지막 행에서는 저장되지 않습니다.</p><div id="ocsRows"></div>
         <div id="ocsLinkPicker" popover="auto" role="dialog" aria-label="재고 연결 제품 선택"><div class="ocs-picker-heading"><strong id="ocsPickerTitle">재고 연결</strong><button type="button" id="ocsPickerClose" aria-label="제품 검색 닫기">×</button></div><input id="ocsLinkSearch" type="search" aria-label="연결 제품 검색" placeholder="제품명 · 규격 · 물류코드 검색" autocomplete="off"><small id="ocsLinkStatus" role="status" aria-live="polite"></small><div id="ocsLinkOptions"></div></div>
         <div class="ocs-confirm"><input type="checkbox" id="ocsConfirm"><label for="ocsConfirm">수술 후 사용 수량과 연결·미연결 항목을 확인했습니다.</label></div>
         <p id="ocsSaveMessage" role="status" aria-live="polite"></p>
@@ -238,7 +238,7 @@
         $('ocsRows').innerHTML=rows.length ? '<div class="ocs-sheet"><div class="ocs-sheet-head"><span>처방코드</span><span>품목 · 규격</span><span>사용량</span><span>재고 연결</span></div>'+rows.map((r,i)=>
           (i===0 || r.section!==rows[i-1].section ? '<div class="ocs-sheet-section">'+e(r.section||'처방 목록')+'</div>' : '')+
           `<div class="item ocs-sheet-row"><span class="ocs-sheet-code">${e(r.code)}</span><div class="ocs-sheet-name">${e(r.name)}<small>원본 ${e(r.dose)} × ${e(r.times)}회 × ${e(r.days)}일${r.times!==1||r.days!==1?' · 실제 사용량 확인':''}</small></div>
-          <input id="ocsQty${i}" aria-label="${e(r.name)} 사용 수량" data-ocs-qty="${i}" type="number" min="0" max="10000" step="1" value="${r.qty===null?'':r.qty}">
+          <input id="ocsQty${i}" aria-label="${e(r.name)} 사용 수량" data-ocs-qty="${i}" aria-describedby="ocsQtyHelp" type="number" min="0" max="10000" step="1" value="${r.qty===null?'':r.qty}">
           <button type="button" class="ocs-link-control" id="ocsLink${i}" data-ocs-open="${i}" aria-label="${e(r.name)} 재고 연결" aria-haspopup="dialog" title="${e(linkLabel(r))}" ${mayPick(r)?'':'disabled'}><span>${e(linkLabel(r))}</span><span aria-hidden="true">▾</span></button></div>`).join('')+'</div>' : '';
         message(`${excludedServiceCount?`비용·검사 ${excludedServiceCount}행 제외 · `:''}${excludedCount?`삭제 ${excludedCount}행 제외 · `:''}${rows.length?`등록 대상 ${rows.length}행 · 미연결 ${rows.filter(r=>r.mode==='unresolved').length}행은 재고에 반영되지 않습니다.`:'등록할 처방이 없습니다.'}`);
         $('ocsSave').disabled=!rows.length;
@@ -285,6 +285,16 @@
       panel.addEventListener('wheel',event=>{if(picker.matches(':popover-open')&&!picker.contains(event.target))picker.hidePopover();},{passive:true});
       $('ocsExcelOpen')?.addEventListener('click',()=>{if(!busy)$('ocsExcelFile').click();});
       paint();
+      // 수량만 연속 확인할 때 연결 버튼을 건너뛰되, 확인·저장은 자동 실행하지 않는다.
+      panel.addEventListener('keydown',event=>{
+        if(event.key!=='Enter' || event.isComposing || event.ctrlKey || event.metaKey || event.altKey || !event.target.hasAttribute('data-ocs-qty'))return;
+        event.preventDefault();
+        if(busy)return;
+        if(!event.target.checkValidity()){event.target.reportValidity();return;}
+        const index=Number(event.target.dataset.ocsQty),next=index+(event.shiftKey?-1:1);
+        if(next<0 || next>=rows.length)return;
+        $('ocsQty'+next)?.focus();
+      });
       panel.addEventListener('input',event=>{
         if(event.target.id==='ocsLinkSearch'){filterLinks();return;}
         if(['ocsConfirm','ocsUnlinkedConfirm','ocsTestStockConfirm'].includes(event.target.id))return;

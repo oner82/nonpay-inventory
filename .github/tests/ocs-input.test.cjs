@@ -7,11 +7,14 @@ const path = require('node:path');
 
 function setup() {
   const elements = new Map();
+  let focused=null;
   class Element {
     constructor(id) { this.id=id; this.value=''; this.checked=false; this.hidden=false; this.disabled=false; this.listeners={}; this.dataset={}; }
     addEventListener(name, handler) { (this.listeners[name] ||= []).push(handler); }
     async fire(name, extra={}) { for(const handler of this.listeners[name]||[]) await handler({target:this,...extra}); }
-    focus() {} scrollIntoView() {} hasAttribute(name) { return name==='data-ocs-qty' && this.dataset.ocsQty!==undefined; }
+    focus() { focused=this.id; }
+    checkValidity() { return this.valid!==false; } reportValidity() { this.reported=true; }
+    scrollIntoView() {} hasAttribute(name) { return name==='data-ocs-qty' && this.dataset.ocsQty!==undefined; }
     set innerHTML(html) {
       this.html=html;
       if(this.id==='ocsRows') for(const id of [...elements.keys()]) if(/^ocsQty\d+$/.test(id)) elements.delete(id);
@@ -34,7 +37,7 @@ function setup() {
   $('ocsDate').value='2026-11-14';$('ocsRoom').value='1';$('ocsOrder').value='1';$('ocsDoctor').value='test';
   const paste=async text=>{$('ocsPaste').value=text;await $('ocsPanel').fire('input',{target:$('ocsPaste')});};
   const order=(code='TEST001')=>{const row=Array(103).fill('');Object.assign(row,{0:'A',1:'처방',3:code,4:'시험 품목',7:'2',8:'1',9:'1'});return row.join('\t');};
-  return {$,paste,order,saves:()=>saves};
+  return {$,paste,order,saves:()=>saves,focused:()=>focused};
 }
 test('새 원문 미해석·해석 실패 시 기존 처방을 잘못 저장하거나 잃지 않는다',async()=>{
   const {$,paste,order,saves}=setup();
@@ -48,4 +51,19 @@ test('새 원문 미해석·해석 실패 시 기존 처방을 잘못 저장하�
   await paste('');$('ocsConfirm').checked=true;await $('ocsSave').fire('click');
   $('ocsUnlinkedConfirm').checked=true;await $('ocsSave').fire('click');assert.equal(saves(),1);
   await paste(order('TEST002'));await $('ocsParse').fire('click');assert.equal($('ocsQty0').value,'2');assert.match($('ocsRows').innerHTML,/TEST002/);assert.equal($('ocsPaste').value,'');
+});
+
+test('수량 Enter 이동은 경계·조합 입력·유효성·저장 안전을 지킨다',async()=>{
+  const {$,paste,order,saves,focused}=setup();
+  await paste(order()+'\n'+order('TEST002'));await $('ocsParse').fire('click');
+  let prevented=0;
+  const key=async(index,extra={})=>$('ocsPanel').fire('keydown',{target:$('ocsQty'+index),key:'Enter',preventDefault:()=>prevented++,...extra});
+  await key(0);assert.equal(focused(),'ocsQty1');assert.equal(prevented,1);
+  await key(1,{shiftKey:true});assert.equal(focused(),'ocsQty0');
+  await key(0,{shiftKey:true});assert.equal(focused(),'ocsQty0');
+  $('ocsQty0').valid=false;await key(0);assert.equal(focused(),'ocsQty0');assert.equal($('ocsQty0').reported,true);
+  $('ocsQty0').valid=true;
+  for(const extra of [{isComposing:true},{ctrlKey:true},{metaKey:true},{altKey:true},{key:'Tab'}]){const before=prevented;await key(0,extra);assert.equal(prevented,before);assert.equal(focused(),'ocsQty0');}
+  await key(0);await key(1);assert.equal(focused(),'ocsQty1');assert.equal(saves(),0);
+  assert.match($('ocsRows').innerHTML,/aria-describedby="ocsQtyHelp"/);
 });

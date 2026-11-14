@@ -71,6 +71,22 @@ const { chromium } = require('playwright');
     assert.equal(await page.locator('#ocsQty0').inputValue(), '2');
     assert.match(await page.locator('#ocsRows').textContent(), /TEST002/);
     assert.equal(await page.locator('#ocsPaste').inputValue(), '');
-    console.log('PASS: 미해석 원문 저장 차단, 재읽기 실패 보존, 재확인, 정상 교체');
+    // 실제 number 입력의 키보드 이동, 범위/소수 오류 및 자동 저장 방지를 확인한다.
+    await page.locator('#ocsPasteDetails').evaluate(element => { element.open = true; });
+    await page.locator('#ocsPaste').fill(await page.evaluate(() => orderText('TEST001', '시험 하나')+'\n'+orderText('TEST002', '시험 둘')));
+    await page.locator('#ocsParse').click();
+    const focused = () => page.evaluate(() => document.activeElement.id);
+    await page.locator('#ocsQty0').press('Enter');assert.equal(await focused(), 'ocsQty1');
+    await page.locator('#ocsQty1').press('Shift+Enter');assert.equal(await focused(), 'ocsQty0');
+    for(const invalid of ['-1','10001','1.5']) {
+      await page.locator('#ocsQty0').fill(invalid);
+      await page.locator('#ocsQty0').press('Enter');assert.equal(await focused(), 'ocsQty0');
+    }
+    await page.locator('#ocsQty0').fill('3');
+    await page.locator('#ocsQty0').press('Enter');
+    await page.locator('#ocsQty1').press('Enter');assert.equal(await focused(), 'ocsQty1');
+    assert.equal(await page.evaluate(() => savedRequests.length), 1);
+    assert.equal(await page.locator('#ocsConfirm').isChecked(), false);
+    console.log('PASS: 입력 보존, 미해석 저장 차단, 수량 키보드 이동 및 자동 저장 방지');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
