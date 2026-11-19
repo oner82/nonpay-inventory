@@ -9,7 +9,10 @@
       if(usage.source!=='ocs-paste'||!Array.isArray(usage.ocsRows))continue;
       const label=`${usage.date} ${usage.caseRoom}-${usage.caseOrder}`;
       const linked=usage.ocsRows.filter(r=>r.mode==='linked');
-      if(linked.some(r=>!Number.isSafeInteger(r.qty)||r.qty<0||r.qty>10000)||!equal(counts(linked.flatMap(r=>Array(r.qty).fill(r.productId))),counts(usage.productIds||[]))){pending.push({usageId:usage.id,label,reason:'처방 연결 수량과 기존 차감 기록 불일치'});continue;}
+      let recordedIds;
+      try { recordedIds=usage.ocsRows.flatMap(window.OROcs.rowProductIds); }
+      catch { pending.push({usageId:usage.id,label,reason:'처방 연결 수량과 기존 차감 기록 불일치'});continue; }
+      if(linked.some(r=>!Number.isSafeInteger(r.qty)||r.qty<0||r.qty>10000)||!equal(counts(recordedIds),counts(usage.productIds||[]))){pending.push({usageId:usage.id,label,reason:'처방 연결 수량과 기존 차감 기록 불일치'});continue;}
       const additions=[];
       usage.ocsRows.forEach((row,index)=>{
         const c=catalog.get(row.code);if(!c?.linkPolicy)return;

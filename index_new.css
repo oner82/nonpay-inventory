@@ -2900,6 +2900,15 @@
 #ocsPanel .ocs-sheet-code { font-size:11px; color:#586c83; overflow-wrap:anywhere; }
 #ocsPanel .ocs-sheet-name { min-width:0; overflow-wrap:anywhere; }
 #ocsPanel .ocs-sheet-name small { display:block; color:#64748b; font-size:10px; margin-top:2px; }
+#ocsPanel .ocs-pack-row { grid-template-columns:125px minmax(0,1fr); }
+#ocsPanel .ocs-pack-list { grid-column:2 / -1; min-width:0; display:grid; gap:8px; }
+#ocsPanel .ocs-pack-list > strong { font-size:12px; color:#52677e; }
+#ocsPanel .ocs-pack-item { display:grid; grid-template-columns:minmax(0,1fr) 64px auto; gap:8px; align-items:end; }
+#ocsPanel .ocs-pack-quantity { margin:0; font-size:11px; color:#52677e; }
+#ocsPanel .ocs-pack-list button { min-height:34px; padding:6px 10px; margin:0; font-size:12px; }
+#ocsPanel .ocs-pack-list > button { justify-self:start; }
+#ocsPanel .ocs-pack-list .helper { margin:0; }
+#ocsPanel .ocs-pack-convert { grid-column:1 / -1; justify-self:end; margin:0; }
 #ocsPanel .ocs-sheet-row input, #ocsPanel .ocs-sheet-row select { min-width:0; width:100%; min-height:34px; padding:5px; font-size:12px; margin:0; }
 #manualUseEntry > summary { padding:16px; cursor:pointer; color:#52677e; background:#f1f5f9; border-radius:10px; font-weight:700; }
 @media(max-width:600px) {
@@ -2909,6 +2918,11 @@
  #ocsPanel .ocs-sheet-name { grid-column:1; grid-row:auto; }
  #ocsPanel .ocs-sheet-row input { grid-column:2; grid-row:span 2; }
  #ocsPanel .ocs-sheet-row select { grid-column:1 / -1; }
+ #ocsPanel .ocs-pack-list { grid-column:1 / -1; }
+ #ocsPanel .ocs-pack-item select { grid-column:1 / -1; }
+ #ocsPanel .ocs-pack-item input { grid-column:auto; grid-row:auto; }
+ #ocsPanel .ocs-pack-item { grid-template-columns:minmax(0,1fr) auto; padding-top:8px; border-top:1px solid #e2e8f0; }
+ #ocsPanel .ocs-pack-quantity { max-width:100px; }
 }
 
 /* 한 줄 연결 버튼과 화면 위에 뜨는 검색 목록: 행 높이를 늘리지 않는다. */
