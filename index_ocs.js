@@ -4,7 +4,9 @@
   const number = value => /^\d+(?:\.\d+)?$/.test(String(value).trim()) ? Number(value) : null;
   const canonical = value => JSON.stringify(value, (_key, item) => item && !Array.isArray(item) && typeof item === 'object' ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
   const selectionIds = c => c?.linkPolicy==='select' ? c.selectionProductIds||[] : [];
-  const protectedLink = c => ['select','hold','ledger-pending','ledger-direct','usage-only','direct'].includes(c?.linkPolicy);
+  const protectedLink = c => ['select','hold','ledger-pending','ledger-direct','ledger-select','usage-only','direct'].includes(c?.linkPolicy);
+  const multiRow = row => ['packs','selection'].includes(row?.mode);
+  const chosenItems = row => row.mode === 'packs' ? row.packItems : row.selectedItems;
   const supportedProduct = p => p && p.active !== false && ['비급여', 'PURCHASE'].includes(p.category);
   const isPackOrder = row => /마취\s*시간/.test(row.name || '') && /수술\s*팩/.test(row.name || '');
   const packCodes = new Set([
@@ -16,11 +18,13 @@
     /수술\s*팩|(?:^|[^a-z0-9])pack(?:$|[^a-z])|힙용|핸드용|무릎용|개복용|갑상선용|양측하지용/i.test([product.name, product.purchaseName].join(' '))
   );
   const rowProductIds = row => {
-    if (row.mode === 'packs') {
-      if (!isPackOrder(row) || !Array.isArray(row.packItems) || row.packItems.length > 100) throw Error('수술팩 선택 목록을 확인해 주세요.');
+    if (multiRow(row)) {
+      const label = row.mode === 'packs' ? '수술팩' : '제품';
+      const items = chosenItems(row);
+      if (row.mode === 'packs' && !isPackOrder(row) || !Array.isArray(items) || items.length > 100) throw Error(label + ' 선택 목록을 확인해 주세요.');
       const ids = [];
-      for (const item of row.packItems) {
-        if (!item.productId || !Number.isSafeInteger(item.qty) || item.qty < 1 || item.qty > 10000) throw Error('수술팩 종류와 사용 개수(1~10000)를 확인해 주세요.');
+      for (const item of items) {
+        if (!item?.productId || !Number.isSafeInteger(item.qty) || item.qty < 1 || item.qty > 10000) throw Error(label + ' 종류와 사용 개수(1~10000)를 확인해 주세요.');
         if (ids.length + item.qty > 20000) throw Error('한 케이스의 수량이 너무 큽니다. 단위를 확인해 주세요.');
         ids.push(...Array(item.qty).fill(item.productId));
       }
@@ -104,6 +108,7 @@
       const item = catalog.find(c => c.code === row.code);
       // 같은 코드라도 새 명칭이면 기존 연결을 무조건 적용하지 않는다.
       const known = item?.names?.includes(row.name);
+      if (known && item.linkPolicy === 'ledger-select') return {...row, mode:'selection', productId:'', selectedItems:[{productId:'', qty:1}]};
       return {...row, mode:known ? item.mode || 'unresolved' : 'unresolved', productId:known ? item.productId || '' : ''};
     });
   }
@@ -134,6 +139,21 @@
           packItems:row.packItems.map(item => ({productId:item.productId, qty:item.qty}))
         };
       }
+      if (row.mode === 'selection') {
+        const stored = (remote.ocsCatalog || []).find(c => c.code === row.code);
+        if (!permissions.ledgerAtomic || stored?.linkPolicy !== 'ledger-select' || !stored.names.includes(row.name)) throw Error('확인된 세부 제품 연결과 업체 장부 동시 저장이 필요합니다.');
+        const ids = rowProductIds(row);
+        for (const item of row.selectedItems) {
+          const product = target.products.find(p => p.id === item.productId);
+          if (!stored.selectionProductIds?.includes(item.productId) || !product || product.active === false || !window.OROcsLedger?.needsLedger(product)) throw Error('선택한 제품이 확인 목록에서 제외되었거나 변경되었습니다. 다시 선택해 주세요.');
+        }
+        return {
+          code:row.code, name:row.name, section:String(row.section || '').slice(0,250),
+          dose:row.dose, times:row.times, days:row.days, cancelled:false,
+          qty:ids.length, mode:'selection', productId:'',
+          selectedItems:row.selectedItems.map(item => ({productId:item.productId, qty:item.qty}))
+        };
+      }
       if (!['linked','excluded','unresolved','cancelled'].includes(row.mode) || !Number.isSafeInteger(row.qty) || row.qty < 0 || row.qty > 10000) throw Error('사용 수량은 0~10000의 정수로 확인해 주세요.');
       if ((row.cancelled || row.mode==='cancelled') && (!row.cancelled || row.mode!=='cancelled' || row.qty!==0 || row.productId)) throw Error('OCS 삭제 행은 사용량에 포함할 수 없습니다.');
       if (!row.code || !row.name) throw Error('코드와 명칭이 필요합니다.');
@@ -157,7 +177,7 @@
       return {code:row.code,name:row.name,section:String(row.section||'').slice(0,250),dose:row.dose,times:row.times,days:row.days,cancelled:!!row.cancelled,qty:row.qty,mode:row.mode,productId:row.mode==='linked'?row.productId:''};
     });
     // 같은 코드의 복수 행은 합산하되 연결 결정은 일치해야 한다.
-    for (const row of rows.filter(r=>r.mode!=='packs' && !r.cancelled && !selectionIds((remote.ocsCatalog||[]).find(c=>c.code===r.code)).length)) if (rows.some(r => r.mode!=='packs' && !r.cancelled && r.code === row.code && (r.mode !== row.mode || r.productId !== row.productId))) throw Error('같은 코드의 연결 설정이 서로 다릅니다.');
+    for (const row of rows.filter(r=>!multiRow(r) && !r.cancelled && !selectionIds((remote.ocsCatalog||[]).find(c=>c.code===r.code)).length)) if (rows.some(r => !multiRow(r) && !r.cancelled && r.code === row.code && (r.mode !== row.mode || r.productId !== row.productId))) throw Error('같은 코드의 연결 설정이 서로 다릅니다.');
     const productIds = rows.flatMap(rowProductIds);
     if (productIds.length > 20000) throw Error('한 케이스의 수량이 너무 큽니다. 단위를 확인해 주세요.');
     const counts = ids => ids.reduce((m,id) => (m.set(id,(m.get(id)||0)+1),m),new Map());
@@ -190,7 +210,7 @@
       if (!item) { item={id:row.code,code:row.code,names:[],firstSeenAt:at,mode:'unresolved',productId:''};catalog.push(item); }
       if (!item.names.includes(row.name)) item.names.push(row.name);
       item.lastSeenAt=at;item.updatedAt=at;
-      if (canManage && row.mode!=='packs' && !row.cancelled && !protectedLink(item)) {item.mode=row.mode;item.productId=row.productId;item.updatedBy=actor;}
+      if (canManage && !multiRow(row) && !row.cancelled && !protectedLink(item)) {item.mode=row.mode;item.productId=row.productId;item.updatedBy=actor;}
     }
     target.ocsCatalog=catalog;
     // 전체 상태가 단일 Firestore 문서이므로 크기 초과 시 부분 저장 없이 중단한다.
@@ -201,38 +221,48 @@
     const e=context.escapeHtml;
     const productLabel=p=>`${p.orderCode||''} · ${p.name}${p.purchaseSpec?' · '+p.purchaseSpec:''} (${p.stockUnit||'개'})`;
     const linkItem=row=>(context.getState().ocsCatalog||[]).find(c=>c.code===row.code);
+    const hasLedgerChoices = row => {
+      const item = linkItem(row);
+      return item?.linkPolicy === 'ledger-select' && item.names.includes(row.name);
+    };
     const mayPick=row=>selectionIds(linkItem(row)).length>0 || context.canManage()&&!protectedLink(linkItem(row));
     const linkLabel=row=>{
       const product=context.getState().products.find(p=>p.id===row.productId&&(supportedProduct(p)||linkItem(row)?.linkPolicy==='ledger-direct'));
       const item=linkItem(row);
       if(row.mode!=='linked' && item?.linkPolicy==='select')return '실제 사용 제품 선택';
+      if(item?.linkPolicy==='ledger-select')return '아래에서 실제 제품 선택';
       if(item?.linkPolicy==='ledger-pending')return '제품 확인됨 · 별도 장부 입력';
       if(item?.linkPolicy==='hold')return '확인 보류 · 재고 미반영';
       return row.mode==='linked'?(product?productLabel(product):'기존 연결 확인 필요'):row.mode==='excluded'?'사용량만 기록 · 차감 제외':'미연결 · 재고 미반영';
     };
-    const packSummary = row => (row?.packItems || []).map(item => {
+    const selectionSummary = row => (row && chosenItems(row) || []).map(item => {
       const product = context.getState().products.find(p => p.id === item.productId);
       return (product?.name || '제품 확인 필요') + ' ' + item.qty + '개';
     }).join(', ') || '사용 없음';
-    const renderPackItems = (row, rowIndex) => {
+    const renderSelections = (row, rowIndex) => {
       const products = context.getState().products;
-      return '<div class="ocs-pack-list"><strong>실제 사용 수술팩</strong>' +
-        row.packItems.map((item, itemIndex) => {
-          const choices = products.filter(p => surgicalPackProduct(p) || p.id === item.productId);
+      const items = chosenItems(row);
+      const label = row.mode === 'packs' ? '수술팩' : '제품';
+      const permitted = product => row.mode === 'packs'
+        ? surgicalPackProduct(product)
+        : product.active !== false && window.OROcsLedger.needsLedger(product) && (linkItem(row)?.selectionProductIds || []).includes(product.id);
+      return '<div class="ocs-pack-list"><strong>실제 사용 ' + label + '</strong>' +
+        items.map((item, itemIndex) => {
+          const choices = products.filter(p => permitted(p) || p.id === item.productId);
           const missing = item.productId && !products.some(p => p.id === item.productId);
           return '<div class="ocs-pack-item">' +
-            '<select aria-label="수술팩 종류 ' + (itemIndex + 1) + '" data-ocs-pack-product="' + rowIndex + ':' + itemIndex + '">' +
-            '<option value="">수술팩 선택</option>' +
+            '<select aria-label="' + label + ' 종류 ' + (itemIndex + 1) + '" data-ocs-pack-product="' + rowIndex + ':' + itemIndex + '">' +
+            '<option value="">' + label + ' 선택</option>' +
             (missing ? '<option selected value="' + e(item.productId) + '">기존 제품 확인 필요</option>' : '') +
             choices.map(p => '<option value="' + e(p.id) + '"' + (p.id === item.productId ? ' selected' : '') +
-              (surgicalPackProduct(p) ? '' : ' disabled') + '>' + e(productLabel(p)) + (surgicalPackProduct(p) ? '' : ' · 선택 불가') + '</option>').join('') +
-            '</select><label class="ocs-pack-quantity">개수<input aria-label="수술팩 개수 ' + (itemIndex + 1) +
+              (permitted(p) ? '' : ' disabled') + '>' + e(productLabel(p) + (row.mode === 'selection' && p.company ? ' · ' + p.company : '')) + (permitted(p) ? '' : ' · 선택 불가') + '</option>').join('') +
+            '</select><label class="ocs-pack-quantity">개수<input aria-label="' + label + ' 개수 ' + (itemIndex + 1) +
             '" data-ocs-pack-qty="' + rowIndex + ':' + itemIndex + '" type="number" min="1" max="10000" step="1" value="' +
             (item.qty === null ? '' : e(item.qty)) + '"></label>' +
-            '<button class="danger" type="button" data-ocs-pack-remove="' + rowIndex + ':' + itemIndex + '" aria-label="수술팩 ' + (itemIndex + 1) + ' 삭제">삭제</button></div>';
+            '<button class="danger" type="button" data-ocs-pack-remove="' + rowIndex + ':' + itemIndex + '" aria-label="' + label + ' ' + (itemIndex + 1) + ' 삭제">삭제</button></div>';
         }).join('') +
-        (row.packItems.length ? '' : '<p class="helper">수술팩 사용 없음 · 재고 반영 0개</p>') +
-        '<button class="secondary" type="button" data-ocs-pack-add="' + rowIndex + '"' + (row.packItems.length >= 100 ? ' disabled' : '') + '>팩 추가</button></div>';
+        (items.length ? '' : '<p class="helper">' + label + ' 사용 없음 · 재고 반영 0개</p>') +
+        '<button class="secondary" type="button" data-ocs-pack-add="' + rowIndex + '"' + (items.length >= 100 ? ' disabled' : '') + '>' + (row.mode === 'packs' ? '팩 추가' : '제품 추가') + '</button></div>';
     };
     let rows=[], previous=null, dirty=false, busy=false, catalogSnapshot=[], excludedCount=0, excludedServiceCount=0;
     const render = (record=null) => {
@@ -259,9 +289,9 @@
         ${record?.ocsStockOverrides?.length?`<details><summary>테스트 재고 부족 허용 이력 (${record.ocsStockOverrides.length}회)</summary>${record.ocsStockOverrides.map(a=>`<p>${e(a.at)} · ${e(a.by?.name||'')}<br>${a.shortages.map(p=>`${e(p.name)} · 부족 ${e(p.shortage)}${e(p.unit)}`).join('<br>')}</p>`).join('')}</details>`:''}
         <button id="ocsSave" type="button">${record?'수량 수정 저장':'확인 후 최종 저장'}</button>
         ${record?'<button id="ocsBack" class="secondary" type="button">사용내역으로</button>':''}
-        <details><summary>OCS 코드·명칭 누적 목록 (${(context.getState().ocsCatalog||[]).length}코드)</summary><p class="helper">관리자는 처방 행에서 재고 제품을 선택하면 다음 등록부터 같은 코드·명칭에 적용됩니다. 1회량 1과 선택 제품의 재고 단위 1이 같을 때만 연결하세요. 인체조직·임플란트 등 별도 장부 품목은 기존 입력을 이용하세요.</p>
+        <details><summary>OCS 코드·명칭 누적 목록 (${(context.getState().ocsCatalog||[]).length}코드)</summary><p class="helper">관리자는 처방 행에서 재고 제품을 선택하면 다음 등록부터 같은 코드·명칭에 적용됩니다. 1회량 1과 선택 제품의 재고 단위 1이 같을 때만 연결하세요. 확인된 인체조직·앵커·랜딩제품은 위에서 제품·개수를 확인하고, 미연결 품목은 직접 입력을 이용하세요.</p>
         <div style="max-height:240px;overflow:auto">${(context.getState().ocsCatalog||[]).map(c=>`<p><strong>${e(c.code)}</strong> · ${c.names.map(e).join(' / ')} · ${c.mode==='linked'?'재고 연결':c.mode==='excluded'?'차감 제외':'연결 필요'}</p>`).join('')}</div></details>
-        ${record?`<details><summary>수정 이력 (${record.ocsChanges?.length||0}회)</summary>${(record.ocsChanges||[]).map(c=>`<p>${e(c.at)} · ${e(c.by?.name||'')}<br>${c.after.map((r,i)=>`${e(r.code)}: ${e(c.before[i]?.qty??'?')} → ${e(r.qty)}${r.mode==='packs'||c.before[i]?.mode==='packs' ? '<br>수술팩 ' + e(packSummary(c.before[i])) + ' → ' + e(packSummary(r)) : ''}`).join('<br>')}</p>`).join('')}</details>`:''}
+        ${record?`<details><summary>수정 이력 (${record.ocsChanges?.length||0}회)</summary>${(record.ocsChanges||[]).map(c=>`<p>${e(c.at)} · ${e(c.by?.name||'')}<br>${c.after.map((r,i)=>`${e(r.code)}: ${e(c.before[i]?.qty??'?')} → ${e(r.qty)}${multiRow(r)||multiRow(c.before[i]) ? '<br>선택 제품 ' + e(selectionSummary(c.before[i])) + ' → ' + e(selectionSummary(r)) : ''}`).join('<br>')}</p>`).join('')}</details>`:''}
         ${record?(record.ocsChanges||[]).filter(c=>c.surgeryAfter!==undefined&&c.surgeryBefore!==c.surgeryAfter).map(c=>`<p class="helper">수술명 수정 · ${e(c.at)} · ${e(c.by?.name||'')}: ${e(c.surgeryBefore)} → ${e(c.surgeryAfter)}</p>`).join(''):''}
       </section>${context.ledgerHtml?.(record)||''}`;
     };
@@ -297,10 +327,10 @@
       const paint=()=>{
         $('ocsRows').innerHTML=rows.length ? '<div class="ocs-sheet"><div class="ocs-sheet-head"><span>처방코드</span><span>품목 · 규격</span><span>사용량</span><span>재고 연결</span></div>'+rows.map((r,i)=>
           (i===0 || r.section!==rows[i-1].section ? '<div class="ocs-sheet-section">'+e(r.section||'처방 목록')+'</div>' : '')+
-          (r.mode==='packs' ? `<div class="item ocs-sheet-row ocs-pack-row"><span class="ocs-sheet-code">${e(r.code)}</span><div class="ocs-sheet-name">${e(r.name)}<small>처방 원본 ${e(r.dose)} × ${e(r.times)}회 × ${e(r.days)}일 · 팩 개수는 별도 입력</small></div>${renderPackItems(r,i)}</div>` :
+          (multiRow(r) ? `<div class="item ocs-sheet-row ocs-pack-row"><span class="ocs-sheet-code">${e(r.code)}</span><div class="ocs-sheet-name">${e(r.name)}<small>처방 원본 ${e(r.dose)} × ${e(r.times)}회 × ${e(r.days)}일 · ${r.mode==='packs'?'팩':'제품'} 개수는 별도 입력</small></div>${renderSelections(r,i)}</div>` :
           `<div class="item ocs-sheet-row"><span class="ocs-sheet-code">${e(r.code)}</span><div class="ocs-sheet-name">${e(r.name)}<small>원본 ${e(r.dose)} × ${e(r.times)}회 × ${e(r.days)}일${r.times!==1||r.days!==1?' · 실제 사용량 확인':''}</small></div>
           <input id="ocsQty${i}" aria-label="${e(r.name)} 사용 수량" data-ocs-qty="${i}" type="number" min="0" max="10000" step="1" value="${r.qty===null?'':r.qty}">
-          <button type="button" class="ocs-link-control" id="ocsLink${i}" data-ocs-open="${i}" aria-label="${e(r.name)} 재고 연결" aria-haspopup="dialog" title="${e(linkLabel(r))}" ${mayPick(r)?'':'disabled'}><span>${e(linkLabel(r))}</span><span aria-hidden="true">▾</span></button>${isPackOrder(r)?'<button class="secondary ocs-pack-convert" type="button" data-ocs-enable-packs="'+i+'">수술팩 직접 선택</button>':''}</div>`)).join('')+'</div>' : '';
+          <button type="button" class="ocs-link-control" id="ocsLink${i}" data-ocs-open="${i}" aria-label="${e(r.name)} 재고 연결" aria-haspopup="dialog" title="${e(linkLabel(r))}" ${mayPick(r)?'':'disabled'}><span>${e(linkLabel(r))}</span><span aria-hidden="true">▾</span></button>${isPackOrder(r)?'<button class="secondary ocs-pack-convert" type="button" data-ocs-enable-packs="'+i+'">수술팩 직접 선택</button>':hasLedgerChoices(r)?'<button class="secondary ocs-pack-convert" type="button" data-ocs-enable-selection="'+i+'">실제 제품 선택</button>':''}</div>`)).join('')+'</div>' : '';
         message(`${excludedServiceCount?`비용·검사 ${excludedServiceCount}행 제외 · `:''}${excludedCount?`삭제 ${excludedCount}행 제외 · `:''}${rows.length?`등록 대상 ${rows.length}행 · 미연결 ${rows.filter(r=>r.mode==='unresolved').length}행은 재고에 반영되지 않습니다.`:'등록할 처방이 없습니다.'}`);
         $('ocsSave').disabled=!rows.length;
       };
@@ -319,10 +349,16 @@
       const closePicker=()=>{picker.hidePopover();$('ocsLink'+pickerRow)?.focus();};
       $('ocsPickerClose').addEventListener('click',closePicker);
       panel.addEventListener('click',event=>{
-        const packAction = event.target.closest('[data-ocs-pack-add], [data-ocs-pack-remove], [data-ocs-enable-packs]');
+        const packAction = event.target.closest('[data-ocs-pack-add], [data-ocs-pack-remove], [data-ocs-enable-packs], [data-ocs-enable-selection]');
         if (packAction) {
           if (busy) return;
-          if (packAction.hasAttribute('data-ocs-enable-packs')) {
+          if (packAction.hasAttribute('data-ocs-enable-selection')) {
+            const row = rows[Number(packAction.dataset.ocsEnableSelection)];
+            if (!hasLedgerChoices(row)) return;
+            row.selectedItems = [{productId:'', qty:1}];
+            row.mode = 'selection';
+            row.productId = '';
+          } else if (packAction.hasAttribute('data-ocs-enable-packs')) {
             const row = rows[Number(packAction.dataset.ocsEnablePacks)];
             const linked = row.mode === 'linked' && surgicalPackProduct(context.getState().products.find(p => p.id === row.productId));
             row.packItems = [{productId:linked ? row.productId : '', qty:linked && row.qty > 0 ? row.qty : 1}];
@@ -330,11 +366,11 @@
             row.productId = '';
           } else if (packAction.hasAttribute('data-ocs-pack-add')) {
             const row = rows[Number(packAction.dataset.ocsPackAdd)];
-            if (row.packItems.length >= 100) return;
-            row.packItems.push({productId:'', qty:1});
+            if (chosenItems(row).length >= 100) return;
+            chosenItems(row).push({productId:'', qty:1});
           } else {
             const [rowIndex, itemIndex] = packAction.dataset.ocsPackRemove.split(':').map(Number);
-            rows[rowIndex].packItems.splice(itemIndex,1);
+            chosenItems(rows[rowIndex]).splice(itemIndex,1);
           }
           touch();
           paint();
@@ -380,11 +416,11 @@
         touch();
         if (event.target.hasAttribute('data-ocs-pack-product')) {
           const [rowIndex,itemIndex] = event.target.dataset.ocsPackProduct.split(':').map(Number);
-          rows[rowIndex].packItems[itemIndex].productId = event.target.value;
+          chosenItems(rows[rowIndex])[itemIndex].productId = event.target.value;
         }
         if (event.target.hasAttribute('data-ocs-pack-qty')) {
           const [rowIndex,itemIndex] = event.target.dataset.ocsPackQty.split(':').map(Number);
-          rows[rowIndex].packItems[itemIndex].qty = number(event.target.value);
+          chosenItems(rows[rowIndex])[itemIndex].qty = number(event.target.value);
         }
         if(event.target.hasAttribute('data-ocs-qty'))rows[Number(event.target.dataset.ocsQty)].qty=number(event.target.value);
       });
@@ -429,7 +465,7 @@
           $('ocsUnlinkedNotice').hidden=false;message('아래 미연결 항목 저장 동의에 체크한 뒤 최종 저장을 눌러 주세요.');return;
         }
         const request={testStockOverride:!!$('ocsTestStockConfirm')?.checked,confirmedShortages:clone(confirmedShortages),id:previous?.id||context.uid(),previous:clone(previous),catalogSnapshot:clone(catalogSnapshot),rows:clone(rows),date,caseRoom,caseOrder,doctorId:$('ocsDoctor').value,surgeryDetail,at:new Date().toISOString()};
-        const packControls = [...panel.querySelectorAll('[data-ocs-pack-product], [data-ocs-pack-qty], [data-ocs-pack-add], [data-ocs-pack-remove], [data-ocs-enable-packs]')];
+        const packControls = [...panel.querySelectorAll('[data-ocs-pack-product], [data-ocs-pack-qty], [data-ocs-pack-add], [data-ocs-pack-remove], [data-ocs-enable-packs], [data-ocs-enable-selection]')];
         const disabledBeforeSave = packControls.map(control => control.disabled);
         packControls.forEach(control => { control.disabled = true; });
         busy=true;$('ocsSave').disabled=true;$('ocsSave').textContent='저장 중…';message('서버에 저장 중입니다. 잠시 기다려 주세요.');

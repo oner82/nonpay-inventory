@@ -19,6 +19,7 @@
         if(row.mode==='linked'){preserved++;return;}
         if(row.mode!=='unresolved'||row.cancelled||!row.qty)return;
         const item={usageId:usage.id,label,index,code:row.code,name:row.name,qty:row.qty};
+        if(c.linkPolicy==='ledger-select'){pending.push({...item,reason:'세부 제품·개수를 케이스에서 직접 확인해 주세요.'});return;}
         if(!['direct','ledger-direct','select'].includes(c.linkPolicy)){if(c.linkPolicy==='hold')pending.push({...item,reason:'현장 확인 보류'});return;}
         if(!c.names.includes(row.name)){pending.push({...item,reason:'처방명 확인 필요'});return;}
         let id=c.productId;

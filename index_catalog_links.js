@@ -22,21 +22,21 @@
       const item=next.ocsCatalog.find(c=>c.code===entry.code);
       if(!item || !equal(item.names,entry.names))throw Error('처방명 변경 또는 코드 없음: '+entry.code);
       const p=entry.policy;
-      if(!p || !['direct','select','usage-only','hold','ledger-pending','ledger-direct'].includes(p.linkPolicy) || typeof p.linkNote!=='string' || !p.linkNote.trim() || p.linkNote.length>1500)throw Error('연결 근거가 필요합니다: '+entry.code);
+      if(!p || !['direct','select','usage-only','hold','ledger-pending','ledger-direct','ledger-select'].includes(p.linkPolicy) || typeof p.linkNote!=='string' || !p.linkNote.trim() || p.linkNote.length>1500)throw Error('연결 근거가 필요합니다: '+entry.code);
       const normalized=policy(p);
       if(!equal(p,normalized))throw Error('연결 필드를 확인해 주세요: '+entry.code);
-      const ids=['direct','ledger-direct'].includes(p.linkPolicy)?[p.productId]:p.linkPolicy==='select'?p.selectionProductIds:p.linkPolicy==='ledger-pending'?p.confirmedProductIds:[];
-      if(!Array.isArray(ids) || new Set(ids).size!==ids.length || (['direct','select','ledger-pending','ledger-direct'].includes(p.linkPolicy)&&!ids.length))throw Error('대상 제품을 확인해 주세요.');
+      const ids=['direct','ledger-direct'].includes(p.linkPolicy)?[p.productId]:['select','ledger-select'].includes(p.linkPolicy)?p.selectionProductIds:p.linkPolicy==='ledger-pending'?p.confirmedProductIds:[];
+      if(!Array.isArray(ids) || new Set(ids).size!==ids.length || (['direct','select','ledger-pending','ledger-direct','ledger-select'].includes(p.linkPolicy)&&!ids.length))throw Error('대상 제품을 확인해 주세요.');
       if(['direct','ledger-direct'].includes(p.linkPolicy) && (p.mode!=='linked'||p.selectionProductIds.length||p.confirmedProductIds.length))throw Error('단일 연결 형식 오류');
       if(!['direct','ledger-direct'].includes(p.linkPolicy) && (p.productId || p.mode!==(p.linkPolicy==='usage-only'?'excluded':'unresolved')))throw Error('연결 상태 오류');
-      if(p.linkPolicy!=='select' && p.selectionProductIds.length || p.linkPolicy!=='ledger-pending' && p.confirmedProductIds.length)throw Error('대상 목록이 잘못되었습니다.');
+      if(!['select','ledger-select'].includes(p.linkPolicy) && p.selectionProductIds.length || p.linkPolicy!=='ledger-pending' && p.confirmedProductIds.length)throw Error('대상 목록이 잘못되었습니다.');
       if(!Array.isArray(entry.products) || entry.products.length!==ids.length)throw Error('제품 대조 정보 누락');
       for(const id of ids){
         const product=next.products.find(x=>x.id===id),expected=entry.products.find(x=>x.id===id);
         if(!product || product.active===false || !equal(identity(product),expected))throw Error('제품 정보가 변경되었습니다: '+entry.code);
         if(['direct','select'].includes(p.linkPolicy) && !window.OROcs.supportedProduct(product))throw Error('별도 장부 품목은 자동 차감 연결할 수 없습니다: '+entry.code);
       }
-      if(p.linkPolicy==='ledger-direct' && !ids.every(id=>window.OROcsLedger.needsLedger(state.products.find(x=>x.id===id))))throw Error('장부 대상 제품이 아닙니다.');
+      if(['ledger-direct','ledger-select'].includes(p.linkPolicy) && !ids.every(id=>window.OROcsLedger.needsLedger(next.products.find(x=>x.id===id))))throw Error('장부 대상 제품이 아닙니다.');
       if(equal(policy(item),p))continue;
       if(!equal(policy(item),entry.expected))throw Error('검토 후 연결이 변경되었습니다: '+entry.code);
       const before=policy(item);
@@ -48,6 +48,7 @@
   function label(c,products){
     const names=ids=>ids.map(id=>{const p=products.find(x=>x.id===id);return p?`${p.orderCode||''} ${p.name}`.trim():'제품 확인 필요';}).join(' / ');
     if(c.linkPolicy==='select')return '사용 제품 선택 · '+names(c.selectionProductIds||[]);
+    if(c.linkPolicy==='ledger-select')return '실제 제품·개수 선택 · 재고·업체 장부 연결 · '+names(c.selectionProductIds||[]);
     if(c.linkPolicy==='ledger-pending')return '제품 대응 확인 · 장부 연결 대기 · '+names(c.confirmedProductIds||[]);
     if(c.linkPolicy==='hold')return '확인 보류';
     if(c.linkPolicy==='ledger-direct')return '재고·업체 장부 연결 · '+names([c.productId]);
