@@ -66,15 +66,20 @@ const setButtonBusy = (button, busy, message = "저장 중...") => {
 
 
 
-const menus = [
-  ["dashboard", "대시보드"],
-  ["morningcount", "실사·재고"],
+const primaryMenus = [
   ["use", "케이스 입력"],
-  ["history", "사용내역"],
-  ["purchase", "구매주문"],
-  ["receipts", "입고관리"],
-  ["settings", "설정"]
+  ["receipts", "입고"],
+  ["morningcount", "실사·재고"],
+  ["history", "사용내역"]
 ];
+
+const secondaryMenus = [
+  ["dashboard", "업무 현황"],
+  ["purchase", "구매 신청"],
+  ["settings", "관리자 설정"]
+];
+
+const menus = [...primaryMenus, ...secondaryMenus];
 
 const roleAllowedViews = {
   admin: ["dashboard", "morningcount", "use", "edit", "history", "purchase", "receipts", "settings"],
@@ -1310,9 +1315,16 @@ const saveState = async (message = "저장 완료", options = {}) => {
 
 const renderNav = () => {
   ensureCurrentViewAllowed();
-  nav.innerHTML = menus.filter(([key]) => canOpenView(key)).map(([key, label]) => `
-    <button class="tab ${currentView === key ? "active" : ""}" data-view="${key}" type="button">${label}</button>
-  `).join("");
+  const renderMenuButtons = (items) => items.filter(([key]) => canOpenView(key)).map(([key, label]) => {
+    const active = currentView === key;
+    return `<button class="tab${active ? " active" : ""}" data-view="${key}" type="button"${active ? ' aria-current="page"' : ""}>${label}</button>`;
+  }).join("");
+  const primaryButtons = renderMenuButtons(primaryMenus);
+  const secondaryButtons = renderMenuButtons(secondaryMenus);
+  nav.innerHTML = `
+    ${primaryButtons ? `<div class="nav-group" role="group" aria-label="재고 업무">${primaryButtons}</div>` : ""}
+    ${secondaryButtons ? `<div class="nav-group nav-secondary" role="group" aria-label="보조 메뉴">${secondaryButtons}</div>` : ""}
+  `;
   nav.querySelectorAll("button").forEach((button) => {
     button.addEventListener("click", () => {
       if (!canOpenView(button.dataset.view) || saving) return;
@@ -1376,7 +1388,9 @@ const render = () => {
   renderedDate = today();
   renderSessionControls();
   renderNav();
-  const currentLabel = menus.find(([key]) => key === currentView)?.[1] || "대시보드";
+  const currentLabel = currentView === "edit"
+    ? "사용내용 수정"
+    : menus.find(([key]) => key === currentView)?.[1] || "업무 현황";
   if (currentViewNeedsImplantRecords() && !ensureImplantRecordsSubscription()) {
     app.innerHTML = `
       <div class="page-head">
